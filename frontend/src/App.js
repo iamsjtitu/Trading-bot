@@ -326,6 +326,15 @@ function App() {
             </div>
             <div className="flex gap-2">
               <Button
+                onClick={() => setShowSettings(true)}
+                variant="outline"
+                className="border-gray-300 hover:bg-gray-100 text-gray-700"
+                data-testid="settings-button"
+                title="Bot Settings"
+              >
+                <FaCog />
+              </Button>
+              <Button
                 onClick={() => setAutoAnalyze(!autoAnalyze)}
                 variant={autoAnalyze ? "default" : "outline"}
                 className={autoAnalyze 
