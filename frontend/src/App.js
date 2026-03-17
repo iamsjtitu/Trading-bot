@@ -398,6 +398,7 @@ function App() {
             <TabsTrigger value="news" data-testid="news-tab" className="data-[state=active]:bg-blue-100 data-[state=active]:text-blue-900">📰 News Feed</TabsTrigger>
             <TabsTrigger value="signals" data-testid="signals-tab" className="data-[state=active]:bg-blue-100 data-[state=active]:text-blue-900">🎯 Signals</TabsTrigger>
             <TabsTrigger value="trades" data-testid="trades-tab" className="data-[state=active]:bg-blue-100 data-[state=active]:text-blue-900">💹 Active Trades</TabsTrigger>
+            <TabsTrigger value="calculator" data-testid="calculator-tab" className="data-[state=active]:bg-blue-100 data-[state=active]:text-blue-900">🧮 Calculator</TabsTrigger>
           </TabsList>
 
           {/* News Feed Tab */}
