@@ -1,141 +1,171 @@
-# AI Trading Bot - Desktop App (Electron)
+# AI Trading Bot - Desktop App
 
-## Quick Start
+Fully local desktop application. No web server needed! Everything runs on your computer.
 
-### Prerequisites
-- Node.js 18+ installed
-- Git installed
+## What You Need
+- **Python 3.9+** (python.org)
+- **Node.js 18+** (nodejs.org)
+- **Git** (optional, for auto-updates)
 
-### Setup
+## Quick Setup
+
+### Windows
+```
+Double-click: desktop\scripts\setup-windows.bat
+```
+
+### Mac / Linux
+```bash
+chmod +x desktop/scripts/setup-mac.sh
+./desktop/scripts/setup-mac.sh
+```
+
+## Manual Setup (Step by Step)
+
+### 1. Install Backend Dependencies
+```bash
+cd backend
+pip install -r requirements.txt
+```
+
+### 2. Create Backend Config
+```bash
+# Copy template
+cp backend/.env.template backend/.env
+
+# Edit .env file - add your Emergent LLM Key
+# MONGO_URL= (leave empty for local file DB)
+# EMERGENT_LLM_KEY=your_key_here
+```
+
+### 3. Build Frontend
+```bash
+cd frontend
+npm install
+npm run build
+```
+
+### 4. Install Desktop Dependencies
 ```bash
 cd desktop
 npm install
 ```
 
-### Run in Development
+### 5. Run the App
 ```bash
+cd desktop
 npm start
 ```
 
-### Build Locally (No Publishing)
+## Build Installers
+
+### Windows (.exe)
 ```bash
-# Windows
+cd desktop
 npm run build:win
+# Output: desktop/dist/AI Trading Bot Setup x.x.x.exe
+```
 
-# Mac
+### Mac (.dmg)
+```bash
+cd desktop
 npm run build:mac
+# Output: desktop/dist/AI Trading Bot-x.x.x.dmg
+```
 
-# Both
+### Both Platforms
+```bash
+cd desktop
 npm run build:all
 ```
 
-Built files will be in `desktop/dist/` folder.
+## Auto-Update via GitHub Releases
 
----
-
-## Auto-Update Setup (via GitHub Releases)
-
-### Step 1: Create GitHub Repository
+### Setup (One Time)
 1. Push this project to GitHub
-2. Note your **username** and **repo name**
+2. Edit `desktop/package.json`:
+   ```json
+   "publish": [{
+     "provider": "github",
+     "owner": "YOUR_USERNAME",
+     "repo": "YOUR_REPO"
+   }]
+   ```
+3. Create a GitHub Personal Access Token (Settings > Developer > Tokens)
+4. Set token: `set GH_TOKEN=your_token` (Windows) or `export GH_TOKEN=your_token` (Mac)
 
-### Step 2: Configure GitHub Details
-Open `desktop/package.json` and update:
-```json
-"publish": [
-  {
-    "provider": "github",
-    "owner": "YOUR_GITHUB_USERNAME",
-    "repo": "YOUR_REPO_NAME",
-    "private": false
-  }
-]
-```
-
-### Step 3: Create GitHub Token
-1. Go to GitHub → Settings → Developer Settings → Personal Access Tokens
-2. Create a token with `repo` scope
-3. Set environment variable:
-```bash
-# Windows
-set GH_TOKEN=your_github_token
-
-# Mac/Linux
-export GH_TOKEN=your_github_token
-```
-
-### Step 4: Publish a Release
-```bash
-# Bump version first
-# Edit package.json version: "1.0.0" → "1.1.0"
-
-# Publish to GitHub Releases
-npm run publish:win    # Windows
-npm run publish:mac    # Mac
-npm run publish:all    # Both
-```
-
-This will:
-- Build the app
-- Create a GitHub Release (draft)
-- Upload installer files (.exe, .dmg)
-- Upload `latest.yml` / `latest-mac.yml` (metadata for auto-updater)
-
-### Step 5: Publish the Release
-1. Go to GitHub → Releases
-2. Find the draft release
-3. Add release notes
-4. Click "Publish release"
+### Release New Version
+1. Update version in `desktop/package.json`: `"version": "1.1.0"`
+2. Build & publish:
+   ```bash
+   npm run publish:win   # Windows
+   npm run publish:mac   # Mac
+   npm run publish:all   # Both
+   ```
+3. Go to GitHub > Releases > Edit draft > Publish
 
 ### How Auto-Update Works
-1. App checks for updates on startup (after 5 sec)
-2. Checks every 30 minutes
-3. If new version found → asks user to download
-4. Download completes → asks to restart
-5. App restarts with new version!
+1. App checks for updates on startup + every 30 minutes
+2. If update found → download prompt
+3. Download completes → restart prompt
+4. App restarts with new version!
 
----
-
-## GitHub Actions (CI/CD Auto-Build)
-
-Create `.github/workflows/build.yml` in your repo for automated builds on every tag push.
-
-### Workflow (already created in this project):
-- Push a tag: `git tag v1.1.0 && git push --tags`
-- GitHub Actions automatically builds Windows + Mac
-- Creates a draft release with all installers
-- Just publish the release!
-
----
-
-## Folder Structure
+### GitHub Actions (CI/CD)
+Push a tag to auto-build:
+```bash
+git tag v1.1.0
+git push --tags
 ```
-desktop/
-├── main.js          # Electron main process
-├── preload.js       # Context bridge (IPC)
-├── package.json     # Config + electron-builder settings
-├── assets/
-│   └── icon.png     # App icon (512x512)
-├── .github/
-│   └── workflows/
-│       └── build.yml  # CI/CD workflow
-└── dist/            # Built installers (after build)
+GitHub Actions will automatically build Windows + Mac installers and create a draft release.
+
+## Architecture
 ```
+┌─────────────────────────────────────┐
+│         Electron Desktop App        │
+│                                     │
+│  ┌────────────┐  ┌──────────────┐  │
+│  │  React UI  │  │ System Tray  │  │
+│  │  (bundled) │  │ Notifications│  │
+│  └──────┬─────┘  └──────────────┘  │
+│         │                           │
+│  ┌──────┴──────────────────────┐   │
+│  │  FastAPI Backend (local)     │   │
+│  │  - AI Sentiment Analysis     │   │
+│  │  - Paper/Live Trading        │   │
+│  │  - Upstox API Integration    │   │
+│  └──────┬──────────────────────┘   │
+│         │                           │
+│  ┌──────┴──────────────────────┐   │
+│  │  Local File DB (JSON)        │   │
+│  │  ~/AppData/ai-trading-bot/   │   │
+│  │  No MongoDB needed!          │   │
+│  └─────────────────────────────┘   │
+└─────────────────────────────────────┘
+         │ Internet (required for)
+    ┌────┴────────────────┐
+    │  - Upstox API       │
+    │  - News APIs        │
+    │  - AI Analysis      │
+    └─────────────────────┘
+```
+
+## Data Storage
+- Settings, trades, portfolio → `%APPDATA%/ai-trading-bot/data/` (Windows) or `~/Library/Application Support/ai-trading-bot/data/` (Mac)
+- Local JSON files, no database install needed
+- Data persists between app restarts
 
 ## Troubleshooting
 
-### Mac: "App is damaged" error
-Since we don't have code signing, Mac may block the app:
-```bash
-# Allow app in Terminal
-xattr -cr "/Applications/AI Trading Bot.app"
-```
+### "Python not found"
+Install Python 3.9+ from python.org. Make sure to check "Add to PATH" during install.
+
+### "Backend did not start"
+- Check Python is installed: `python --version`
+- Install dependencies: `pip install -r backend/requirements.txt`
+- Check port 8765 is free
+
+### Mac: "App is damaged"
+Run in Terminal: `xattr -cr "/Applications/AI Trading Bot.app"`
 
 ### Windows: SmartScreen warning
-Click "More info" → "Run anyway" (unsigned app warning)
-
-### Update not working
-- Check GitHub token is set
-- Check `publish` config has correct owner/repo
-- Make sure release is published (not draft)
-- Check internet connection
+Click "More info" → "Run anyway" (unsigned app)

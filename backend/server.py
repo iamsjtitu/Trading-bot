@@ -1,7 +1,7 @@
 from fastapi import FastAPI, APIRouter, BackgroundTasks
+from fastapi.staticfiles import StaticFiles
 from dotenv import load_dotenv
 from starlette.middleware.cors import CORSMiddleware
-from motor.motor_asyncio import AsyncIOMotorClient
 import os
 import logging
 from pathlib import Path
@@ -20,10 +20,17 @@ from upstox_service import UpstoxService
 ROOT_DIR = Path(__file__).parent
 load_dotenv(ROOT_DIR / '.env')
 
-# MongoDB connection
-mongo_url = os.environ['MONGO_URL']
-client = AsyncIOMotorClient(mongo_url)
-db = client[os.environ['DB_NAME']]
+# Database connection - supports both MongoDB and Local file DB
+mongo_url = os.environ.get('MONGO_URL', '')
+if mongo_url:
+    from motor.motor_asyncio import AsyncIOMotorClient
+    client = AsyncIOMotorClient(mongo_url)
+    db = client[os.environ.get('DB_NAME', 'ai_trading_bot')]
+    logging.info("Using MongoDB")
+else:
+    from local_db import get_local_db
+    db = get_local_db()
+    logging.info("Using Local File DB")
 
 # Initialize services
 news_service = NewsService(db)
@@ -685,5 +692,21 @@ async def startup_event():
 
 @app.on_event("shutdown")
 async def shutdown_db_client():
-    client.close()
+    if mongo_url:
+        client.close()
     logger.info("👋 Trading Bot API Shutdown")
+
+# Serve frontend build if available (for desktop/local mode)
+frontend_build = ROOT_DIR.parent / 'frontend' / 'build'
+if frontend_build.exists():
+    from starlette.responses import FileResponse
+
+    app.mount("/static", StaticFiles(directory=str(frontend_build / "static")), name="static")
+
+    @app.get("/{full_path:path}")
+    async def serve_frontend(full_path: str):
+        file_path = frontend_build / full_path
+        if file_path.exists() and file_path.is_file():
+            return FileResponse(str(file_path))
+        return FileResponse(str(frontend_build / "index.html"))
+

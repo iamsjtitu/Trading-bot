@@ -80,8 +80,19 @@
     "files": [
       "main.js",
       "preload.js",
-      "updater.html",
       "assets/**/*"
+    ],
+    "extraResources": [
+      {
+        "from": "../backend",
+        "to": "backend",
+        "filter": ["**/*.py", "requirements.txt", ".env.template", "data/**"]
+      },
+      {
+        "from": "../frontend/build",
+        "to": "backend/../frontend/build",
+        "filter": ["**/*"]
+      }
     ]
   }
 }
