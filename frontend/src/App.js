@@ -44,6 +44,7 @@ function App() {
     finnifty: { value: 23890.30, change: 0, changePct: 0 }
   });
   const [showSettings, setShowSettings] = useState(false);
+  const [tradingMode, setTradingMode] = useState('PAPER');
 
   useEffect(() => {
     initializeApp();
