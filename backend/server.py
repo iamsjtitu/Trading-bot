@@ -152,7 +152,7 @@ async def fetch_news(background_tasks: BackgroundTasks):
             # Analyze sentiment
             sentiment = await sentiment_service.analyze_news_sentiment(article)
             
-            # Store in database
+            # Store in database (with _id excluded from response)
             news_doc = {
                 'id': article_id,
                 'title': article['title'],
@@ -165,15 +165,26 @@ async def fetch_news(background_tasks: BackgroundTasks):
                 'created_at': datetime.now(timezone.utc).isoformat()
             }
             
-            await db.news_articles.insert_one(news_doc)
+            # Insert and remove MongoDB _id
+            result = await db.news_articles.insert_one(news_doc.copy())
             
             # Generate trading signal if conditions met
             signal = await trading_engine.generate_trading_signal(news_doc)
             
-            processed_articles.append({
-                **news_doc,
+            # Create clean dict without _id
+            clean_article = {
+                'id': article_id,
+                'title': article['title'],
+                'description': article['description'],
+                'source': article['source'],
+                'url': article['url'],
+                'published_at': article['published_at'],
+                'sentiment_analysis': sentiment,
+                'created_at': news_doc['created_at'],
                 'signal_generated': signal is not None
-            })
+            }
+            
+            processed_articles.append(clean_article)
         
         return {
             "status": "success",
