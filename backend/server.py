@@ -342,6 +342,64 @@ async def get_stats():
         logger.error(f"Get stats error: {e}")
         return {"status": "error", "message": str(e)}
 
+@api_router.post("/auto-exit/check")
+async def check_auto_exits():
+    """Check and execute auto-exits for trades"""
+    try:
+        result = await trading_engine.check_and_execute_exits()
+        return {
+            "status": "success",
+            "exits_executed": result['exits'],
+            "new_trades_generated": result['new_trades'],
+            "details": result.get('details', [])
+        }
+    except Exception as e:
+        logger.error(f"Auto-exit check error: {e}")
+        return {"status": "error", "message": str(e)}
+
+@api_router.post("/auto-settings/update")
+async def update_auto_settings(settings: dict):
+    """Update auto-trading settings"""
+    try:
+        if 'auto_exit' in settings:
+            trading_engine.auto_exit_enabled = settings['auto_exit']
+        if 'auto_entry' in settings:
+            trading_engine.auto_entry_enabled = settings['auto_entry']
+        if 'target_pct' in settings:
+            trading_engine.custom_target_pct = settings['target_pct']
+        if 'stoploss_pct' in settings:
+            trading_engine.custom_stoploss_pct = settings['stoploss_pct']
+        
+        return {
+            "status": "success",
+            "settings": {
+                "auto_exit": trading_engine.auto_exit_enabled,
+                "auto_entry": trading_engine.auto_entry_enabled,
+                "target_pct": trading_engine.custom_target_pct,
+                "stoploss_pct": trading_engine.custom_stoploss_pct
+            }
+        }
+    except Exception as e:
+        logger.error(f"Update settings error: {e}")
+        return {"status": "error", "message": str(e)}
+
+@api_router.get("/auto-settings")
+async def get_auto_settings():
+    """Get current auto-trading settings"""
+    try:
+        return {
+            "status": "success",
+            "settings": {
+                "auto_exit": trading_engine.auto_exit_enabled,
+                "auto_entry": trading_engine.auto_entry_enabled,
+                "target_pct": trading_engine.custom_target_pct or trading_engine.risk_params[trading_engine.risk_tolerance]['target_pct'],
+                "stoploss_pct": trading_engine.custom_stoploss_pct or trading_engine.risk_params[trading_engine.risk_tolerance]['stop_loss_pct']
+            }
+        }
+    except Exception as e:
+        logger.error(f"Get settings error: {e}")
+        return {"status": "error", "message": str(e)}
+
 # Include the router in the main app
 app.include_router(api_router)
 
