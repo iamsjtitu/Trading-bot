@@ -150,21 +150,21 @@ function App() {
       <div className="container mx-auto px-4 py-6">
         {/* Portfolio Summary Cards */}
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
-          <Card className="bg-gray-800/50 border-gray-700 p-4" data-testid="portfolio-value-card">
+          <Card className="bg-white border-gray-200 p-4 shadow-md hover:shadow-lg transition-shadow" data-testid="portfolio-value-card">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm text-gray-400">Portfolio Value</p>
-                <p className="text-2xl font-bold">{formatCurrency(portfolio?.current_value || 0)}</p>
+                <p className="text-sm text-gray-600 font-medium">Portfolio Value</p>
+                <p className="text-2xl font-bold text-gray-900">{formatCurrency(portfolio?.current_value || 0)}</p>
               </div>
               <FaWallet className="text-3xl text-blue-500" />
             </div>
           </Card>
 
-          <Card className="bg-gray-800/50 border-gray-700 p-4" data-testid="total-pnl-card">
+          <Card className="bg-white border-gray-200 p-4 shadow-md hover:shadow-lg transition-shadow" data-testid="total-pnl-card">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm text-gray-400">Total P&L</p>
-                <p className={`text-2xl font-bold ${(portfolio?.total_pnl || 0) >= 0 ? 'text-green-500' : 'text-red-500'}`}>
+                <p className="text-sm text-gray-600 font-medium">Total P&L</p>
+                <p className={`text-2xl font-bold ${(portfolio?.total_pnl || 0) >= 0 ? 'text-green-600' : 'text-red-600'}`}>
                   {formatCurrency(portfolio?.total_pnl || 0)}
                 </p>
               </div>
@@ -172,21 +172,21 @@ function App() {
             </div>
           </Card>
 
-          <Card className="bg-gray-800/50 border-gray-700 p-4" data-testid="active-positions-card">
+          <Card className="bg-white border-gray-200 p-4 shadow-md hover:shadow-lg transition-shadow" data-testid="active-positions-card">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm text-gray-400">Active Positions</p>
-                <p className="text-2xl font-bold">{portfolio?.active_positions || 0}</p>
+                <p className="text-sm text-gray-600 font-medium">Active Positions</p>
+                <p className="text-2xl font-bold text-gray-900">{portfolio?.active_positions || 0}</p>
               </div>
               <FaBullseye className="text-3xl text-purple-500" />
             </div>
           </Card>
 
-          <Card className="bg-gray-800/50 border-gray-700 p-4" data-testid="win-rate-card">
+          <Card className="bg-white border-gray-200 p-4 shadow-md hover:shadow-lg transition-shadow" data-testid="win-rate-card">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm text-gray-400">Win Rate</p>
-                <p className="text-2xl font-bold">{stats?.win_rate?.toFixed(1) || 0}%</p>
+                <p className="text-sm text-gray-600 font-medium">Win Rate</p>
+                <p className="text-2xl font-bold text-gray-900">{stats?.win_rate?.toFixed(1) || 0}%</p>
               </div>
               <FaBullseye className="text-3xl text-yellow-500" />
             </div>
