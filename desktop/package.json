@@ -15,7 +15,13 @@
     "publish:all": "electron-builder --win --mac --publish=always"
   },
   "dependencies": {
-    "electron-updater": "^6.3.9"
+    "axios": "^1.13.6",
+    "compression": "^1.8.1",
+    "cors": "^2.8.6",
+    "electron-updater": "^6.3.9",
+    "express": "^5.2.1",
+    "openai": "^6.31.0",
+    "uuid": "^13.0.0"
   },
   "devDependencies": {
     "electron": "^33.3.1",
@@ -37,7 +43,9 @@
       "target": [
         {
           "target": "nsis",
-          "arch": ["x64"]
+          "arch": [
+            "x64"
+          ]
         }
       ],
       "icon": "assets/icon.png",
@@ -59,7 +67,10 @@
       "target": [
         {
           "target": "dmg",
-          "arch": ["x64", "arm64"]
+          "arch": [
+            "x64",
+            "arm64"
+          ]
         }
       ],
       "icon": "assets/icon.png",
@@ -69,8 +80,16 @@
     },
     "dmg": {
       "contents": [
-        { "x": 130, "y": 220 },
-        { "x": 410, "y": 220, "type": "link", "path": "/Applications" }
+        {
+          "x": 130,
+          "y": 220
+        },
+        {
+          "x": 410,
+          "y": 220,
+          "type": "link",
+          "path": "/Applications"
+        }
       ]
     },
     "directories": {
@@ -86,12 +105,19 @@
       {
         "from": "../backend",
         "to": "backend",
-        "filter": ["**/*.py", "requirements.txt", ".env.template", "data/**"]
+        "filter": [
+          "**/*.py",
+          "requirements.txt",
+          ".env.template",
+          "data/**"
+        ]
       },
       {
         "from": "../frontend/build",
         "to": "backend/../frontend/build",
-        "filter": ["**/*"]
+        "filter": [
+          "**/*"
+        ]
       }
     ]
   }
