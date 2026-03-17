@@ -29,6 +29,12 @@ function App() {
     todayTrades: 0,
     todayPnL: 0
   });
+  const [autoSettings, setAutoSettings] = useState({
+    auto_exit: true,
+    auto_entry: false,
+    target_pct: 10,
+    stoploss_pct: 25
+  });
 
   useEffect(() => {
     initializeApp();
