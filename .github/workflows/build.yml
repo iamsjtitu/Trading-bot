@@ -38,6 +38,9 @@ jobs:
         working-directory: desktop
         run: yarn install --frozen-lockfile
 
+      - name: Install NSIS
+        run: choco install nsis -y
+
       - name: Build Windows .exe
         working-directory: desktop
         run: yarn build:win
