@@ -347,7 +347,7 @@ function App() {
         )}
 
         {/* Risk Management Panel */}
-        <Card className="bg-gradient-to-r from-orange-50 to-red-50 border-orange-200 p-4 mb-6 shadow-lg" data-testid="risk-management-panel">
+        <Card className="bg-gradient-to-r from-orange-50 to-red-50 border-orange-200 p-4 mb-4 shadow-lg" data-testid="risk-management-panel">
           <div className="flex items-center justify-between">
             <div className="flex-1">
               <h2 className="text-lg font-bold text-gray-800 mb-3 flex items-center gap-2">
@@ -398,6 +398,95 @@ function App() {
                 {emergencyStop ? '▶️ Resume' : '🛑 STOP'}
               </Button>
             </div>
+          </div>
+        </Card>
+
+        {/* Auto-Trading Settings */}
+        <Card className="bg-gradient-to-r from-blue-50 to-purple-50 border-blue-200 p-4 mb-6 shadow-lg" data-testid="auto-trading-settings">
+          <h2 className="text-lg font-bold text-gray-800 mb-3 flex items-center gap-2">
+            🤖 Auto-Trading Settings
+          </h2>
+          <div className="grid md:grid-cols-2 gap-6">
+            <div className="space-y-4">
+              <div className="flex items-center justify-between p-3 bg-white rounded-lg border border-gray-200">
+                <div>
+                  <p className="font-semibold text-gray-800">Auto-Exit</p>
+                  <p className="text-xs text-gray-600">Automatically close trades at target/stop-loss</p>
+                </div>
+                <Button
+                  onClick={() => updateAutoSettings({ ...autoSettings, auto_exit: !autoSettings.auto_exit })}
+                  className={autoSettings.auto_exit ? 'bg-green-600 hover:bg-green-700' : 'bg-gray-400 hover:bg-gray-500'}
+                  data-testid="auto-exit-toggle"
+                >
+                  {autoSettings.auto_exit ? '✅ ON' : '⏸️ OFF'}
+                </Button>
+              </div>
+
+              <div className="flex items-center justify-between p-3 bg-white rounded-lg border border-gray-200">
+                <div>
+                  <p className="font-semibold text-gray-800">Auto-Entry</p>
+                  <p className="text-xs text-gray-600">Open new trade after profitable exit</p>
+                </div>
+                <Button
+                  onClick={() => updateAutoSettings({ ...autoSettings, auto_entry: !autoSettings.auto_entry })}
+                  className={autoSettings.auto_entry ? 'bg-green-600 hover:bg-green-700' : 'bg-gray-400 hover:bg-gray-500'}
+                  data-testid="auto-entry-toggle"
+                >
+                  {autoSettings.auto_entry ? '✅ ON' : '⏸️ OFF'}
+                </Button>
+              </div>
+            </div>
+
+            <div className="space-y-4">
+              <div className="p-3 bg-white rounded-lg border border-gray-200">
+                <label className="block text-sm font-semibold text-gray-800 mb-2">
+                  Target Profit (%)
+                </label>
+                <input
+                  type="number"
+                  value={autoSettings.target_pct || ''}
+                  onChange={(e) => {
+                    const val = parseInt(e.target.value);
+                    if (val >= 5 && val <= 100) {
+                      updateAutoSettings({ ...autoSettings, target_pct: val });
+                    }
+                  }}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+                  placeholder="e.g., 10"
+                  min="5"
+                  max="100"
+                />
+                <p className="text-xs text-gray-500 mt-1">Trade will close at this profit %</p>
+              </div>
+
+              <div className="p-3 bg-white rounded-lg border border-gray-200">
+                <label className="block text-sm font-semibold text-gray-800 mb-2">
+                  Stop Loss (%)
+                </label>
+                <input
+                  type="number"
+                  value={autoSettings.stoploss_pct || ''}
+                  onChange={(e) => {
+                    const val = parseInt(e.target.value);
+                    if (val >= 5 && val <= 50) {
+                      updateAutoSettings({ ...autoSettings, stoploss_pct: val });
+                    }
+                  }}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+                  placeholder="e.g., 25"
+                  min="5"
+                  max="50"
+                />
+                <p className="text-xs text-gray-500 mt-1">Trade will close at this loss %</p>
+              </div>
+            </div>
+          </div>
+
+          <div className="mt-4 p-3 bg-yellow-50 rounded-lg border border-yellow-200">
+            <p className="text-sm text-gray-700">
+              <strong>💡 How it works:</strong> When auto-exit is ON, trades automatically close when they hit your target profit ({autoSettings.target_pct}%) or stop-loss ({autoSettings.stoploss_pct}%). 
+              {autoSettings.auto_entry && ' With auto-entry ON, a new trade will open automatically after a profitable exit.'}
+            </p>
           </div>
         </Card>
 
