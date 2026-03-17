@@ -166,7 +166,147 @@ Confidence < 60% → NO SIGNAL
 ✅ **News Source**: Demo data (for testing)
 ✅ **Risk Level**: Medium
 
-## 🔮 Future Enhancements
+## 🚀 Going Live with Upstox
+
+### **Portfolio Value Source:**
+
+**Paper Trading Mode (Current):**
+- Portfolio value = Virtual capital (₹5,00,000)
+- All trades are simulated
+- P&L is calculated internally
+- No real money involved
+
+**Live Trading Mode (After Upstox Integration):**
+```
+✅ Portfolio value will come from Upstox account
+✅ Real-time balance from broker
+✅ Actual positions and holdings
+✅ Real market prices (not simulated)
+✅ Actual P&L from executed trades
+```
+
+### **Upstox Integration Flow:**
+
+**Step 1: Get Upstox API Credentials**
+1. Go to [Upstox Developer Portal](https://api.upstox.com/)
+2. Create an app
+3. Get API Key and API Secret
+4. Set redirect URL
+
+**Step 2: Add to Backend .env**
+```env
+UPSTOX_API_KEY=your_api_key
+UPSTOX_API_SECRET=your_api_secret
+UPSTOX_REDIRECT_URI=your_redirect_url
+```
+
+**Step 3: Integration Points**
+- **Portfolio**: Fetch from `/portfolio` API (Upstox)
+- **Positions**: Get active positions from Upstox
+- **Orders**: Place orders via Upstox API
+- **Market Data**: Real-time prices from Upstox feed
+- **P&L**: Calculated from actual executed trades
+
+**Step 4: Switch Mode**
+```python
+# In trading_engine.py
+self.trading_mode = 'LIVE'  # Change from 'PAPER'
+self.broker = UpstoxBroker(api_key, api_secret)
+```
+
+### **What Changes in Live Mode:**
+
+**Portfolio Dashboard:**
+```
+Paper Trading:
+Portfolio Value: ₹5,12,852 (simulated)
+↓
+Live Trading:
+Portfolio Value: ₹X,XX,XXX (from Upstox account)
+Available Margin: From Upstox
+Used Margin: From Upstox
+```
+
+**Trade Execution:**
+```
+Paper Trading:
+- Simulated prices
+- Instant execution
+- No slippage
+- Demo option premiums
+↓
+Live Trading:
+- Real market prices
+- Actual order placement
+- Real slippage
+- Live option premiums
+- Brokerage charges
+```
+
+**Market Data:**
+```
+Paper Trading:
+- Simulated NIFTY/SENSEX
+- Random price movements
+↓
+Live Trading:
+- Real NSE/BSE data
+- Upstox market feed
+- Actual option chain
+- Live Greeks
+```
+
+### **Risk Management in Live Mode:**
+
+**Automatic Safeguards:**
+- Daily limit enforced (₹1,00,000)
+- Max per trade limit (₹20,000)
+- Stop-loss automation active
+- Emergency stop button functional
+- Position size calculations
+- Margin checks before orders
+
+**Additional Checks Needed:**
+- Verify available margin before trade
+- Check order status (COMPLETE, REJECTED)
+- Handle order failures gracefully
+- Monitor connection to broker
+- Circuit breaker limits
+
+### **Cost Implications:**
+
+**Paper Trading:** ₹0 (free simulated trading)
+
+**Live Trading:**
+- Brokerage: ~₹20 per trade (Upstox)
+- STT/Taxes: Government charges
+- Exchange charges: Per contract
+- API charges: Check Upstox pricing
+
+---
+
+## ⚠️ IMPORTANT NOTES:
+
+**Before Going Live:**
+1. ✅ Test thoroughly in paper trading
+2. ✅ Understand your strategy's win rate
+3. ✅ Start with small capital (₹10K-20K)
+4. ✅ Monitor first few trades manually
+5. ✅ Have emergency stop ready
+
+**Portfolio Value:**
+- In paper mode: Internal simulation
+- **In live mode: Directly from Upstox API ✅**
+- Real balance shown in real-time
+- Includes all holdings, margin, cash
+
+**Remember:**
+- Paper trading ≠ Live trading psychology
+- Slippage and brokerage will affect returns
+- Real market can be more volatile
+- Test with minimum capital first
+
+**Your bot will use Upstox's portfolio API to fetch real-time balance and positions when live!** 💰📊
 
 ### Phase 2 (After Paper Trading Success)
 - [ ] Real news API integration (NewsAPI, Alpha Vantage)
