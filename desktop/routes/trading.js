@@ -1,5 +1,7 @@
 const { Router } = require('express');
-const { v4: uuidv4 } = require('uuid');
+const crypto = require('crypto');
+
+function uuid() { return crypto.randomUUID(); }
 
 module.exports = function (db) {
   const router = Router();
@@ -262,7 +264,7 @@ module.exports = function (db) {
     if (quantity === 0) return null;
 
     return {
-      id: uuidv4(),
+      id: uuid(),
       signal_type: signalType,
       symbol: 'NIFTY50',
       strike_price: 24000 + (signalType === 'CALL' ? 500 : -500),
@@ -285,7 +287,7 @@ module.exports = function (db) {
   function _executePaperTrade(signal) {
     if (!db.data.trades) db.data.trades = [];
     const trade = {
-      id: uuidv4(),
+      id: uuid(),
       signal_id: signal.id,
       trade_type: signal.signal_type,
       symbol: signal.symbol,

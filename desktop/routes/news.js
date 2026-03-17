@@ -1,8 +1,10 @@
 const { Router } = require('express');
 const axios = require('axios');
-const { v4: uuidv4 } = require('uuid');
+const crypto = require('crypto');
 let OpenAI;
 try { OpenAI = require('openai'); } catch (_) { OpenAI = null; }
+
+function uuid() { return crypto.randomUUID(); }
 
 module.exports = function (db) {
   const router = Router();
@@ -271,7 +273,7 @@ TRADING_SIGNAL: [BUY_CALL/BUY_PUT/HOLD]`;
 
       const processed = [];
       for (const article of allNews) {
-        const articleId = uuidv4();
+        const articleId = uuid();
         const sentiment = await analyzeSentiment(article);
 
         const newsDoc = {
@@ -345,7 +347,7 @@ TRADING_SIGNAL: [BUY_CALL/BUY_PUT/HOLD]`;
     if (quantity === 0) return null;
 
     return {
-      id: uuidv4(), signal_type: signalType, symbol: 'NIFTY50',
+      id: uuid(), signal_type: signalType, symbol: 'NIFTY50',
       strike_price: 24000 + (signalType === 'CALL' ? 500 : -500),
       option_premium: optionPremium, quantity, investment_amount: quantity * optionPremium,
       entry_price: optionPremium,
@@ -361,7 +363,7 @@ TRADING_SIGNAL: [BUY_CALL/BUY_PUT/HOLD]`;
   function executePaperTrade(signal) {
     if (!db.data.trades) db.data.trades = [];
     const trade = {
-      id: uuidv4(), signal_id: signal.id, trade_type: signal.signal_type,
+      id: uuid(), signal_id: signal.id, trade_type: signal.signal_type,
       symbol: signal.symbol, entry_time: new Date().toISOString(),
       entry_price: signal.entry_price, quantity: signal.quantity,
       investment: signal.investment_amount, stop_loss: signal.stop_loss,
