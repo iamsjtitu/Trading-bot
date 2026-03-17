@@ -20,6 +20,12 @@ class TradingEngine:
             'medium': {'stop_loss_pct': 25, 'target_pct': 50, 'max_position_size': 0.05},
             'high': {'stop_loss_pct': 35, 'target_pct': 70, 'max_position_size': 0.07}
         }
+        
+        # Auto-trading settings
+        self.auto_exit_enabled = True
+        self.auto_entry_enabled = False
+        self.custom_target_pct = None  # None means use default, or set custom like 10
+        self.custom_stoploss_pct = None
     
     async def initialize_portfolio(self):
         """Initialize paper trading portfolio"""
