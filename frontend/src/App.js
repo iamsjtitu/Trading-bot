@@ -155,8 +155,24 @@ function App() {
                 <h1 className="text-2xl font-bold text-gray-800">AI Trading Bot</h1>
                 <p className="text-xs text-gray-600">News-Based Options Trading • Paper Mode</p>
               </div>
+              {autoAnalyze && nextAnalysis && (
+                <div className="ml-4 px-3 py-1 bg-green-100 text-green-700 rounded-full text-xs font-medium border border-green-300">
+                  🤖 Auto-Analysis ON • Next: {formatCountdown(nextAnalysis)}
+                </div>
+              )}
             </div>
             <div className="flex gap-2">
+              <Button
+                onClick={() => setAutoAnalyze(!autoAnalyze)}
+                variant={autoAnalyze ? "default" : "outline"}
+                className={autoAnalyze 
+                  ? "bg-green-600 hover:bg-green-700 text-white" 
+                  : "border-gray-300 hover:bg-gray-100 text-gray-700"}
+                data-testid="auto-analyze-toggle"
+                title={autoAnalyze ? "Disable Auto-Analysis" : "Enable Auto-Analysis"}
+              >
+                {autoAnalyze ? '✅ Auto ON' : '⏸️ Auto OFF'}
+              </Button>
               <Button
                 onClick={loadData}
                 disabled={loading}
@@ -172,7 +188,7 @@ function App() {
                 className="bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 text-white shadow-lg"
                 data-testid="fetch-news-button"
               >
-                {fetchingNews ? 'Fetching...' : 'Analyze News'}
+                {fetchingNews ? 'Fetching...' : 'Analyze Now'}
               </Button>
             </div>
           </div>
