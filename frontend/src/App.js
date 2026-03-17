@@ -323,7 +323,12 @@ function App() {
               </div>
               <div>
                 <h1 className="text-2xl font-bold text-gray-800">AI Trading Bot</h1>
-                <p className="text-xs text-gray-600">News-Based Options Trading • Paper Mode</p>
+                <div className="flex items-center gap-2">
+                  <p className="text-xs text-gray-600">News-Based Options Trading</p>
+                  <Badge className={tradingMode === 'LIVE' ? 'bg-red-600 animate-pulse' : 'bg-blue-600'}>
+                    {tradingMode === 'LIVE' ? '🔴 LIVE TRADING' : '📝 PAPER MODE'}
+                  </Badge>
+                </div>
               </div>
               {autoAnalyze && nextAnalysis && (
                 <div className="ml-4 px-3 py-1 bg-green-100 text-green-700 rounded-full text-xs font-medium border border-green-300">
