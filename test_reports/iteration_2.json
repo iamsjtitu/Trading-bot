@@ -1,0 +1,62 @@
+{
+  "summary": "Tested new Upstox broker integration endpoints and updated frontend. All 38 backend tests pass (19 original + 19 new Upstox tests). Frontend renders all components correctly with LIVE TRADING badge, Upstox:Disconnected badge, and NOT CONNECTED warning banner. Fixed 1 minor HTML validation issue.",
+  "backend_issues": {
+    "critical": [],
+    "minor": [],
+    "fixed": [
+      {
+        "file": "/app/frontend/src/components/SettingsPanel.js",
+        "issue": "Invalid HTML: <Badge> (div) nested inside <p> tag caused React hydration warning",
+        "fix": "Changed <p> to <div> with flex layout on line 137",
+        "priority": "LOW"
+      }
+    ]
+  },
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": []
+  },
+  "test_report_links": [
+    "/app/backend/tests/test_trading_bot_api.py",
+    "/app/backend/tests/test_upstox_integration.py",
+    "/app/test_reports/pytest/upstox_results.xml"
+  ],
+  "action_items": [],
+  "critical_code_review_comments": [
+    "All Upstox endpoints properly handle disconnected state with appropriate error messages",
+    "Combined-status endpoint correctly returns mode=LIVE with upstox_connected=false",
+    "OAuth flow UI is complete with Login button, auth code input, and Connect button",
+    "Trade History tab renders correctly with empty state message"
+  ],
+  "updated_files": [
+    "/app/frontend/src/components/SettingsPanel.js",
+    "/app/backend/tests/test_upstox_integration.py"
+  ],
+  "success_rate": {
+    "backend": "100% (38/38 tests passed - 19 original + 19 new Upstox tests)",
+    "frontend": "100% (all components render, LIVE mode UI working, Settings Broker tab complete)"
+  },
+  "test_credentials": "None required - Upstox not connected (expected)",
+  "seed_data_creation": "None",
+  "retest_needed": false,
+  "main_agent_can_self_test": true,
+  "context_for_next_testing_agent": "Upstox integration endpoints all tested and working in disconnected state. When Upstox is actually connected, additional tests should verify: real market data fetching, portfolio retrieval, order placement. MOCKED: Upstox connection (no real token), Trading engine (paper), Market indices (simulated when not connected to Upstox).",
+  "tested_features": {
+    "upstox_auth_url": "PASS - Returns error 'API Key and Redirect URI required' when not configured",
+    "upstox_connection": "PASS - Returns connected=false, 'No access token. Please login to Upstox.'",
+    "upstox_callback_no_code": "PASS - Returns error 'Authorization code required'",
+    "upstox_callback_with_code": "PASS - Returns error 'Broker credentials incomplete'",
+    "upstox_market_data": "PASS - Returns error 'Not logged in to Upstox' with data=null",
+    "upstox_portfolio": "PASS - Returns error 'Not logged in'",
+    "upstox_orders": "PASS - Returns error 'Not logged in' with orders=[]",
+    "combined_status": "PASS - Returns mode=LIVE, upstox_connected=false, market_data=null, portfolio=null, orders=[]",
+    "existing_health": "PASS - All previous endpoints still working",
+    "frontend_live_badge": "PASS - Shows 'LIVE TRADING' badge in header",
+    "frontend_upstox_badge": "PASS - Shows 'Upstox: Disconnected' badge",
+    "frontend_warning_banner": "PASS - Shows 'LIVE MODE - NOT CONNECTED' banner",
+    "frontend_trade_history_tab": "PASS - Tab exists and shows empty state message",
+    "settings_broker_tab": "PASS - Shows Upstox Connection status, API fields, OAuth flow UI",
+    "all_components": "PASS - MarketTicker, RiskPanel, NewsFeed, TradesList, SignalsList, AutoTradingSettings, PositionCalculator, TradeHistory, SettingsPanel render without errors"
+  }
+}

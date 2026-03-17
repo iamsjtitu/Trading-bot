@@ -118,10 +118,13 @@ typer==0.24.1
 typing-inspection==0.4.2
 typing_extensions==4.15.0
 tzdata==2025.3
+upstox-python-sdk==2.20.0
 uritemplate==4.2.0
 urllib3==2.6.3
+uuid==1.30
 uvicorn==0.25.0
 watchfiles==1.1.1
+websocket-client==1.9.0
 websockets==16.0
 yarl==1.23.0
 zipp==3.23.0

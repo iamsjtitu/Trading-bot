@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import '@/App.css';
 import axios from 'axios';
 import { FaChartLine, FaBullseye, FaWallet, FaSync, FaRobot, FaCog } from 'react-icons/fa';
@@ -14,6 +14,7 @@ import TradesList from '@/components/TradesList';
 import SignalsList from '@/components/SignalsList';
 import AutoTradingSettings from '@/components/AutoTradingSettings';
 import PositionCalculator from '@/components/PositionCalculator';
+import TradeHistory from '@/components/TradeHistory';
 
 const BACKEND_URL = process.env.REACT_APP_BACKEND_URL;
 const API = `${BACKEND_URL}/api`;
@@ -45,47 +46,73 @@ function App() {
   });
   const [showSettings, setShowSettings] = useState(false);
   const [tradingMode, setTradingMode] = useState('PAPER');
+  const [upstoxConnected, setUpstoxConnected] = useState(false);
+  const [upstoxProfile, setUpstoxProfile] = useState(null);
+  const [livePortfolio, setLivePortfolio] = useState(null);
+  const [upstoxOrders, setUpstoxOrders] = useState([]);
 
-  useEffect(() => {
-    initializeApp();
-    const dataInterval = setInterval(loadData, 30000);
-    const exitInterval = setInterval(() => {
-      if (autoSettings.auto_exit && !emergencyStop) checkAutoExits();
-    }, 10000);
-    const analysisInterval = setInterval(() => {
-      if (autoAnalyze) fetchNewNews();
-    }, 5 * 60 * 1000);
-    const countdownInterval = setInterval(() => {
-      if (autoAnalyze) {
-        const now = Date.now();
-        setNextAnalysis(Math.ceil((300000 - (now % 300000)) / 1000));
-      }
-    }, 1000);
-    const marketInterval = setInterval(() => {
-      setMarketIndices(prev => ({
-        nifty50: { value: prev.nifty50.value + (Math.random() - 0.5) * 50, change: (Math.random() - 0.5) * 100, changePct: (Math.random() - 0.5) * 0.8 },
-        sensex: { value: prev.sensex.value + (Math.random() - 0.5) * 150, change: (Math.random() - 0.5) * 300, changePct: (Math.random() - 0.5) * 0.8 },
-        banknifty: { value: prev.banknifty.value + (Math.random() - 0.5) * 80, change: (Math.random() - 0.5) * 150, changePct: (Math.random() - 0.5) * 0.9 },
-        finnifty: { value: prev.finnifty.value + (Math.random() - 0.5) * 40, change: (Math.random() - 0.5) * 80, changePct: (Math.random() - 0.5) * 0.7 }
-      }));
-    }, 3000);
-    return () => {
-      clearInterval(dataInterval);
-      clearInterval(exitInterval);
-      clearInterval(analysisInterval);
-      clearInterval(countdownInterval);
-      clearInterval(marketInterval);
-    };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [autoAnalyze, autoSettings.auto_exit, emergencyStop]);
+  const addNotification = useCallback((type, message) => {
+    const id = Date.now();
+    setNotifications(prev => [{ id, type, message, timestamp: new Date() }, ...prev].slice(0, 5));
+    setTimeout(() => setNotifications(prev => prev.filter(n => n.id !== id)), 5000);
+  }, []);
 
-  const initializeApp = async () => {
+  const loadData = useCallback(async () => {
+    setLoading(true);
     try {
-      await axios.post(`${API}/initialize`);
-      await loadData();
-      await loadAutoSettings();
+      const [portfolioRes, newsRes, signalsRes, tradesRes, statsRes, todayRes, settingsRes] = await Promise.all([
+        axios.get(`${API}/portfolio`),
+        axios.get(`${API}/news/latest?limit=10`),
+        axios.get(`${API}/signals/latest?limit=10`),
+        axios.get(`${API}/trades/active`),
+        axios.get(`${API}/stats`),
+        axios.get(`${API}/trades/today`),
+        axios.get(`${API}/settings`)
+      ]);
+      setPortfolio(portfolioRes.data);
+      setNews(newsRes.data.news || []);
+      setSignals(signalsRes.data.signals || []);
+      setTrades(tradesRes.data.trades || []);
+      setStats(statsRes.data.stats || {});
+
+      const mode = settingsRes.data?.settings?.trading_mode || 'PAPER';
+      setTradingMode(mode);
+
+      const todayData = todayRes.data;
+      setRiskMetrics({
+        dailyUsed: todayData.today_invested || 0,
+        dailyLimit: 100000,
+        maxPerTrade: 20000,
+        todayTrades: todayData.total_trades_today || 0,
+        todayPnL: todayData.today_pnl || 0
+      });
+
+      // If LIVE mode, fetch Upstox data
+      if (mode === 'LIVE') {
+        await loadUpstoxData();
+      }
     } catch (error) {
-      console.error('Initialize error:', error);
+      console.error('Load data error:', error);
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  const loadUpstoxData = async () => {
+    try {
+      const res = await axios.get(`${API}/combined-status`);
+      const data = res.data;
+
+      setUpstoxConnected(data.upstox_connected || false);
+
+      if (data.upstox_connected) {
+        if (data.market_data) setMarketIndices(data.market_data);
+        if (data.portfolio) setLivePortfolio(data.portfolio);
+        if (data.orders) setUpstoxOrders(data.orders);
+        if (data.profile) setUpstoxProfile(data.profile);
+      }
+    } catch (e) {
+      console.error('Upstox data error:', e);
     }
   };
 
@@ -110,60 +137,22 @@ function App() {
     }
   };
 
-  const checkAutoExits = async () => {
+  const checkAutoExits = useCallback(async () => {
     try {
       const response = await axios.post(`${API}/auto-exit/check`);
       if (response.data.exits_executed > 0) {
         addNotification('info', `${response.data.exits_executed} trade(s) auto-exited!`);
         if (response.data.new_trades_generated > 0) {
           addNotification('success', `${response.data.new_trades_generated} new trade(s) opened!`);
-        } else if (autoSettings.auto_entry) {
-          addNotification('warning', 'Auto-entry ON but no high-confidence signal found.');
         }
         await loadData();
       }
     } catch (error) {
       console.error('Check auto exits error:', error);
     }
-  };
+  }, [addNotification, loadData]);
 
-  const loadData = async () => {
-    setLoading(true);
-    try {
-      const [portfolioRes, newsRes, signalsRes, tradesRes, statsRes, todayRes, settingsRes] = await Promise.all([
-        axios.get(`${API}/portfolio`),
-        axios.get(`${API}/news/latest?limit=10`),
-        axios.get(`${API}/signals/latest?limit=10`),
-        axios.get(`${API}/trades/active`),
-        axios.get(`${API}/stats`),
-        axios.get(`${API}/trades/today`),
-        axios.get(`${API}/settings`)
-      ]);
-      setPortfolio(portfolioRes.data);
-      setNews(newsRes.data.news || []);
-      setSignals(signalsRes.data.signals || []);
-      setTrades(tradesRes.data.trades || []);
-      setStats(statsRes.data.stats || {});
-      if (settingsRes.data.status === 'success') {
-        setTradingMode(settingsRes.data.settings.trading_mode || 'PAPER');
-      }
-      const todayData = todayRes.data;
-      setRiskMetrics({
-        dailyUsed: todayData.today_invested || 0,
-        dailyLimit: 100000,
-        maxPerTrade: 20000,
-        todayTrades: todayData.total_trades_today || 0,
-        todayPnL: todayData.today_pnl || 0
-      });
-    } catch (error) {
-      console.error('Load data error:', error);
-      addNotification('error', 'Failed to load data');
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const fetchNewNews = async () => {
+  const fetchNewNews = useCallback(async () => {
     if (emergencyStop) {
       addNotification('warning', 'Trading stopped! Enable trading first.');
       return;
@@ -173,9 +162,7 @@ function App() {
       const response = await axios.get(`${API}/news/fetch`);
       const articles = response.data.articles || [];
       const highConfidence = articles.filter(a => a.sentiment_analysis?.confidence >= 80 && a.signal_generated);
-      if (highConfidence.length > 0) {
-        addNotification('success', `${highConfidence.length} high-confidence signal(s) generated!`);
-      }
+      if (highConfidence.length > 0) addNotification('success', `${highConfidence.length} high-confidence signal(s)!`);
       addNotification('info', `Analyzed ${articles.length} news articles`);
       await loadData();
     } catch (error) {
@@ -183,39 +170,80 @@ function App() {
     } finally {
       setFetchingNews(false);
     }
-  };
+  }, [emergencyStop, addNotification, loadData]);
+
+  useEffect(() => {
+    const init = async () => {
+      try {
+        await axios.post(`${API}/initialize`);
+        await loadData();
+        await loadAutoSettings();
+      } catch (error) {
+        console.error('Initialize error:', error);
+      }
+    };
+    init();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  useEffect(() => {
+    const dataInterval = setInterval(loadData, 30000);
+    const exitInterval = setInterval(() => {
+      if (autoSettings.auto_exit && !emergencyStop) checkAutoExits();
+    }, 10000);
+    const analysisInterval = setInterval(() => {
+      if (autoAnalyze) fetchNewNews();
+    }, 5 * 60 * 1000);
+    const countdownInterval = setInterval(() => {
+      if (autoAnalyze) setNextAnalysis(Math.ceil((300000 - (Date.now() % 300000)) / 1000));
+    }, 1000);
+
+    // Market indices: use real data when live & connected, else simulate
+    const marketInterval = setInterval(() => {
+      if (tradingMode === 'LIVE' && upstoxConnected) {
+        loadUpstoxData();
+      } else {
+        setMarketIndices(prev => ({
+          nifty50: { value: prev.nifty50.value + (Math.random() - 0.5) * 50, change: (Math.random() - 0.5) * 100, changePct: (Math.random() - 0.5) * 0.8 },
+          sensex: { value: prev.sensex.value + (Math.random() - 0.5) * 150, change: (Math.random() - 0.5) * 300, changePct: (Math.random() - 0.5) * 0.8 },
+          banknifty: { value: prev.banknifty.value + (Math.random() - 0.5) * 80, change: (Math.random() - 0.5) * 150, changePct: (Math.random() - 0.5) * 0.9 },
+          finnifty: { value: prev.finnifty.value + (Math.random() - 0.5) * 40, change: (Math.random() - 0.5) * 80, changePct: (Math.random() - 0.5) * 0.7 }
+        }));
+      }
+    }, tradingMode === 'LIVE' && upstoxConnected ? 10000 : 3000);
+
+    return () => {
+      clearInterval(dataInterval);
+      clearInterval(exitInterval);
+      clearInterval(analysisInterval);
+      clearInterval(countdownInterval);
+      clearInterval(marketInterval);
+    };
+  }, [autoAnalyze, autoSettings.auto_exit, emergencyStop, tradingMode, upstoxConnected, checkAutoExits, fetchNewNews, loadData]);
 
   const formatCurrency = (amount) => new Intl.NumberFormat('en-IN', { style: 'currency', currency: 'INR', maximumFractionDigits: 0 }).format(amount);
-
   const formatTime = (isoString) => {
     if (!isoString) return 'N/A';
-    try {
-      return new Date(isoString).toLocaleString('en-IN', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' });
-    } catch { return 'N/A'; }
+    try { return new Date(isoString).toLocaleString('en-IN', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' }); }
+    catch { return 'N/A'; }
   };
-
   const formatCountdown = (seconds) => {
     if (!seconds) return '0:00';
-    const mins = Math.floor(seconds / 60);
-    const secs = seconds % 60;
-    return `${mins}:${secs.toString().padStart(2, '0')}`;
-  };
-
-  const addNotification = (type, message) => {
-    const id = Date.now();
-    setNotifications(prev => [{ id, type, message, timestamp: new Date() }, ...prev].slice(0, 5));
-    setTimeout(() => setNotifications(prev => prev.filter(n => n.id !== id)), 5000);
+    return `${Math.floor(seconds / 60)}:${(seconds % 60).toString().padStart(2, '0')}`;
   };
 
   const handleEmergencyStop = () => {
     setEmergencyStop(!emergencyStop);
-    if (!emergencyStop) {
-      addNotification('warning', 'Emergency Stop Activated! Trading paused.');
-      setAutoAnalyze(false);
-    } else {
-      addNotification('success', 'Trading resumed!');
-    }
+    if (!emergencyStop) { addNotification('warning', 'Emergency Stop Activated!'); setAutoAnalyze(false); }
+    else { addNotification('success', 'Trading resumed!'); }
   };
+
+  // Determine portfolio data based on mode
+  const displayPortfolio = (tradingMode === 'LIVE' && upstoxConnected && livePortfolio) ? {
+    current_value: (livePortfolio.funds?.total || 0),
+    total_pnl: livePortfolio.total_pnl || 0,
+    active_positions: livePortfolio.active_positions || 0,
+  } : portfolio;
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-purple-50 text-gray-900">
@@ -234,6 +262,11 @@ function App() {
                   <Badge data-testid="trading-mode-badge" className={tradingMode === 'LIVE' ? 'bg-red-600 animate-pulse' : 'bg-blue-600'}>
                     {tradingMode === 'LIVE' ? 'LIVE TRADING' : 'PAPER MODE'}
                   </Badge>
+                  {tradingMode === 'LIVE' && (
+                    <Badge data-testid="upstox-status-badge" className={upstoxConnected ? 'bg-green-600' : 'bg-yellow-600'}>
+                      {upstoxConnected ? `Upstox: ${upstoxProfile?.name || 'Connected'}` : 'Upstox: Disconnected'}
+                    </Badge>
+                  )}
                 </div>
               </div>
               {autoAnalyze && nextAnalysis && (
@@ -243,9 +276,7 @@ function App() {
               )}
             </div>
             <div className="flex gap-2">
-              <Button onClick={() => setShowSettings(true)} variant="outline" className="border-gray-300 hover:bg-gray-100 text-gray-700" data-testid="settings-button" title="Bot Settings">
-                <FaCog />
-              </Button>
+              <Button onClick={() => setShowSettings(true)} variant="outline" className="border-gray-300 hover:bg-gray-100 text-gray-700" data-testid="settings-button"><FaCog /></Button>
               <Button onClick={() => setAutoAnalyze(!autoAnalyze)} variant={autoAnalyze ? "default" : "outline"} className={autoAnalyze ? "bg-green-600 hover:bg-green-700 text-white" : "border-gray-300 hover:bg-gray-100 text-gray-700"} data-testid="auto-analyze-toggle">
                 {autoAnalyze ? 'Auto ON' : 'Auto OFF'}
               </Button>
@@ -263,12 +294,21 @@ function App() {
       <div className="container mx-auto px-4 py-6">
         {/* LIVE Trading Warning */}
         {tradingMode === 'LIVE' && (
-          <div className="bg-gradient-to-r from-red-600 to-orange-600 text-white p-4 rounded-lg mb-4 shadow-lg border-2 border-red-700 animate-pulse" data-testid="live-trading-warning">
+          <div className={`p-4 rounded-lg mb-4 shadow-lg border-2 ${upstoxConnected ? 'bg-gradient-to-r from-red-600 to-orange-600 border-red-700' : 'bg-gradient-to-r from-yellow-500 to-orange-500 border-yellow-600'} text-white`} data-testid="live-trading-warning">
             <div className="flex items-center gap-3">
               <div className="text-3xl">!</div>
               <div className="flex-1">
-                <h3 className="font-bold text-lg">LIVE TRADING MODE ACTIVE</h3>
-                <p className="text-sm">You are trading with REAL MONEY! All trades will be executed on Upstox.</p>
+                {upstoxConnected ? (
+                  <>
+                    <h3 className="font-bold text-lg">LIVE TRADING MODE - CONNECTED</h3>
+                    <p className="text-sm">Real money trades active via Upstox. Market data is LIVE.</p>
+                  </>
+                ) : (
+                  <>
+                    <h3 className="font-bold text-lg">LIVE MODE - NOT CONNECTED</h3>
+                    <p className="text-sm">Go to Settings &gt; Broker to login to Upstox and start live trading.</p>
+                  </>
+                )}
               </div>
               <Button onClick={() => setShowSettings(true)} className="bg-white text-red-600 hover:bg-gray-100">Settings</Button>
             </div>
@@ -297,7 +337,6 @@ function App() {
         )}
 
         <RiskPanel riskMetrics={riskMetrics} emergencyStop={emergencyStop} onEmergencyStop={handleEmergencyStop} formatCurrency={formatCurrency} />
-
         <AutoTradingSettings autoSettings={autoSettings} showAutoSettings={showAutoSettings} setShowAutoSettings={setShowAutoSettings} updateAutoSettings={updateAutoSettings} />
 
         {/* Portfolio Summary Cards */}
@@ -306,7 +345,8 @@ function App() {
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-sm text-gray-600 font-medium">Portfolio Value</p>
-                <p className="text-2xl font-bold text-gray-900">{formatCurrency(portfolio?.current_value || 0)}</p>
+                <p className="text-2xl font-bold text-gray-900">{formatCurrency(displayPortfolio?.current_value || 0)}</p>
+                {tradingMode === 'LIVE' && upstoxConnected && <p className="text-xs text-green-600 mt-1">Live from Upstox</p>}
               </div>
               <FaWallet className="text-3xl text-blue-500" />
             </div>
@@ -315,8 +355,8 @@ function App() {
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-sm text-gray-600 font-medium">Total P&L</p>
-                <p className={`text-2xl font-bold ${(portfolio?.total_pnl || 0) >= 0 ? 'text-green-600' : 'text-red-600'}`}>
-                  {formatCurrency(portfolio?.total_pnl || 0)}
+                <p className={`text-2xl font-bold ${(displayPortfolio?.total_pnl || 0) >= 0 ? 'text-green-600' : 'text-red-600'}`}>
+                  {formatCurrency(displayPortfolio?.total_pnl || 0)}
                 </p>
               </div>
               <FaChartLine className="text-3xl text-green-500" />
@@ -326,7 +366,7 @@ function App() {
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-sm text-gray-600 font-medium">Active Positions</p>
-                <p className="text-2xl font-bold text-gray-900">{portfolio?.active_positions || 0}</p>
+                <p className="text-2xl font-bold text-gray-900">{displayPortfolio?.active_positions || 0}</p>
               </div>
               <FaBullseye className="text-3xl text-purple-500" />
             </div>
@@ -348,20 +388,55 @@ function App() {
             <TabsTrigger value="news" data-testid="news-tab" className="data-[state=active]:bg-blue-100 data-[state=active]:text-blue-900">News Feed</TabsTrigger>
             <TabsTrigger value="signals" data-testid="signals-tab" className="data-[state=active]:bg-blue-100 data-[state=active]:text-blue-900">Signals</TabsTrigger>
             <TabsTrigger value="trades" data-testid="trades-tab" className="data-[state=active]:bg-blue-100 data-[state=active]:text-blue-900">Active Trades</TabsTrigger>
+            <TabsTrigger value="history" data-testid="history-tab" className="data-[state=active]:bg-blue-100 data-[state=active]:text-blue-900">Trade History</TabsTrigger>
             <TabsTrigger value="calculator" data-testid="calculator-tab" className="data-[state=active]:bg-blue-100 data-[state=active]:text-blue-900">Calculator</TabsTrigger>
           </TabsList>
 
           <TabsContent value="news"><NewsFeed news={news} formatTime={formatTime} /></TabsContent>
           <TabsContent value="signals"><SignalsList signals={signals} formatCurrency={formatCurrency} formatTime={formatTime} /></TabsContent>
           <TabsContent value="trades"><TradesList trades={trades} formatCurrency={formatCurrency} formatTime={formatTime} /></TabsContent>
+          <TabsContent value="history"><TradeHistory orders={upstoxOrders} formatCurrency={formatCurrency} /></TabsContent>
           <TabsContent value="calculator"><PositionCalculator riskMetrics={riskMetrics} formatCurrency={formatCurrency} /></TabsContent>
         </Tabs>
+
+        {/* Live Positions from Upstox */}
+        {tradingMode === 'LIVE' && upstoxConnected && livePortfolio?.positions?.length > 0 && (
+          <div className="mt-6">
+            <h2 className="text-lg font-bold text-gray-800 mb-3" data-testid="live-positions-title">Upstox Live Positions</h2>
+            <div className="bg-white border border-gray-200 rounded-lg overflow-hidden shadow-md">
+              <table className="w-full text-sm">
+                <thead className="bg-gray-50 border-b border-gray-200">
+                  <tr>
+                    <th className="px-4 py-3 text-left font-semibold text-gray-700">Symbol</th>
+                    <th className="px-4 py-3 text-right font-semibold text-gray-700">Qty</th>
+                    <th className="px-4 py-3 text-right font-semibold text-gray-700">Avg Price</th>
+                    <th className="px-4 py-3 text-right font-semibold text-gray-700">LTP</th>
+                    <th className="px-4 py-3 text-right font-semibold text-gray-700">P&L</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {livePortfolio.positions.map((pos, idx) => (
+                    <tr key={idx} className="border-b border-gray-100 hover:bg-gray-50" data-testid={`live-position-${idx}`}>
+                      <td className="px-4 py-3 font-medium text-gray-900">{pos.symbol}</td>
+                      <td className="px-4 py-3 text-right text-gray-900">{pos.quantity}</td>
+                      <td className="px-4 py-3 text-right text-gray-900">{formatCurrency(pos.avg_price)}</td>
+                      <td className="px-4 py-3 text-right text-gray-900">{formatCurrency(pos.ltp)}</td>
+                      <td className={`px-4 py-3 text-right font-bold ${pos.pnl >= 0 ? 'text-green-600' : 'text-red-600'}`}>
+                        {formatCurrency(pos.pnl)}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        )}
       </div>
 
       {/* Footer */}
       <footer className="border-t border-gray-200 bg-white/80 backdrop-blur-sm mt-8 py-4 shadow-sm">
         <div className="container mx-auto px-4 text-center text-sm text-gray-600">
-          <p>Paper Trading Mode | AI-Powered Options Trading Bot | For Educational Purposes Only</p>
+          <p>{tradingMode === 'LIVE' ? 'LIVE TRADING' : 'Paper Trading'} Mode | AI-Powered Options Trading Bot</p>
           <p className="text-xs mt-1 text-gray-500">Trading involves risk. Past performance does not guarantee future results.</p>
         </div>
       </footer>
@@ -369,10 +444,7 @@ function App() {
       {showSettings && (
         <SettingsPanel
           onClose={() => setShowSettings(false)}
-          onSave={(settings) => {
-            setShowSettings(false);
-            loadData();
-          }}
+          onSave={() => { setShowSettings(false); loadData(); }}
         />
       )}
     </div>

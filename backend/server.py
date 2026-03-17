@@ -15,6 +15,7 @@ from news_service import NewsService
 from sentiment_service import SentimentService
 from trading_engine import TradingEngine
 from settings_manager import SettingsManager
+from upstox_service import UpstoxService
 
 ROOT_DIR = Path(__file__).parent
 load_dotenv(ROOT_DIR / '.env')
@@ -29,6 +30,7 @@ news_service = NewsService(db)
 sentiment_service = SentimentService()
 trading_engine = TradingEngine(db)
 settings_manager = SettingsManager(db)
+upstox_service = UpstoxService(db)
 
 # Create the main app without a prefix
 app = FastAPI(title="AI Trading Bot API")
@@ -556,6 +558,108 @@ async def test_generate_trade():
         }
     except Exception as e:
         logger.error(f"Test generate trade error: {e}")
+        return {"status": "error", "message": str(e)}
+
+# ==================== Upstox Routes ====================
+
+@api_router.get("/upstox/auth-url")
+async def get_upstox_auth_url():
+    """Get Upstox OAuth login URL"""
+    return await upstox_service.get_auth_url()
+
+@api_router.post("/upstox/callback")
+async def upstox_callback(request: dict):
+    """Exchange auth code for access token"""
+    code = request.get('code', '')
+    if not code:
+        return {"status": "error", "message": "Authorization code required"}
+    return await upstox_service.exchange_code_for_token(code)
+
+@api_router.get("/upstox/connection")
+async def check_upstox_connection():
+    """Check if Upstox is connected"""
+    return await upstox_service.check_connection()
+
+@api_router.get("/upstox/profile")
+async def get_upstox_profile():
+    """Get Upstox user profile"""
+    return await upstox_service.get_profile()
+
+@api_router.get("/upstox/market-data")
+async def get_live_market_data():
+    """Get live market indices from Upstox"""
+    return await upstox_service.get_live_market_data()
+
+@api_router.get("/upstox/portfolio")
+async def get_upstox_portfolio():
+    """Get real portfolio from Upstox"""
+    return await upstox_service.get_portfolio()
+
+@api_router.post("/upstox/order")
+async def place_upstox_order(request: dict):
+    """Place order on Upstox"""
+    return await upstox_service.place_order(request)
+
+@api_router.delete("/upstox/order/{order_id}")
+async def cancel_upstox_order(order_id: str):
+    """Cancel order on Upstox"""
+    return await upstox_service.cancel_order(order_id)
+
+@api_router.get("/upstox/orders")
+async def get_upstox_orders():
+    """Get order book from Upstox"""
+    return await upstox_service.get_order_book()
+
+@api_router.get("/upstox/pnl")
+async def get_upstox_pnl(segment: str = "EQ"):
+    """Get P&L from Upstox"""
+    return await upstox_service.get_trade_pnl(segment=segment)
+
+# ==================== Combined Status (Paper + Live) ====================
+
+@api_router.get("/combined-status")
+async def get_combined_status():
+    """Get dashboard status - uses Upstox data when in LIVE mode"""
+    try:
+        settings = await settings_manager.get_settings()
+        mode = settings.get('trading_mode', 'PAPER')
+        upstox_connected = False
+        upstox_profile = None
+
+        result = {
+            'mode': mode,
+            'upstox_connected': False,
+            'market_data': None,
+            'portfolio': None,
+            'orders': [],
+        }
+
+        if mode == 'LIVE':
+            conn = await upstox_service.check_connection()
+            upstox_connected = conn.get('connected', False)
+            result['upstox_connected'] = upstox_connected
+
+            if upstox_connected:
+                # Fetch real data
+                market = await upstox_service.get_live_market_data()
+                if market.get('status') == 'success':
+                    result['market_data'] = market['data']
+
+                portfolio = await upstox_service.get_portfolio()
+                if portfolio.get('status') == 'success':
+                    result['portfolio'] = portfolio
+
+                orders = await upstox_service.get_order_book()
+                if orders.get('status') == 'success':
+                    result['orders'] = orders['orders']
+
+                profile = await upstox_service.get_profile()
+                if profile.get('status') == 'success':
+                    result['profile'] = profile['profile']
+
+        return {"status": "success", **result}
+    except Exception as e:
+        logger.error(f"Combined status error: {e}")
         return {"status": "error", "message": str(e)}
 
 # Include the router in the main app
