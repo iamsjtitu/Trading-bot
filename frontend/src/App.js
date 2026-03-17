@@ -43,6 +43,7 @@ function App() {
     banknifty: { value: 52340.75, change: 0, changePct: 0 },
     finnifty: { value: 23890.30, change: 0, changePct: 0 }
   });
+  const [showSettings, setShowSettings] = useState(false);
 
   useEffect(() => {
     initializeApp();
