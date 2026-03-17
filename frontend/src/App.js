@@ -352,6 +352,63 @@ function App() {
       </header>
 
       <div className="container mx-auto px-4 py-6">
+        {/* Live Market Indices Ticker */}
+        <div className="bg-white border border-gray-200 rounded-lg shadow-md p-3 mb-4 overflow-hidden" data-testid="market-ticker">
+          <div className="flex items-center gap-6 overflow-x-auto">
+            <div className="flex items-center gap-2 flex-shrink-0">
+              <span className="text-sm font-semibold text-gray-600">📊 LIVE MARKET:</span>
+            </div>
+            
+            {/* Nifty 50 */}
+            <div className="flex items-center gap-2 border-l border-gray-300 pl-4 flex-shrink-0">
+              <div>
+                <p className="text-xs text-gray-600 font-medium">NIFTY 50</p>
+                <p className="text-sm font-bold text-gray-900">{marketIndices.nifty50.value.toFixed(2)}</p>
+              </div>
+              <div className={`text-xs font-semibold ${marketIndices.nifty50.changePct >= 0 ? 'text-green-600' : 'text-red-600'}`}>
+                {marketIndices.nifty50.changePct >= 0 ? '▲' : '▼'} {Math.abs(marketIndices.nifty50.changePct).toFixed(2)}%
+              </div>
+            </div>
+            
+            {/* Sensex */}
+            <div className="flex items-center gap-2 border-l border-gray-300 pl-4 flex-shrink-0">
+              <div>
+                <p className="text-xs text-gray-600 font-medium">SENSEX</p>
+                <p className="text-sm font-bold text-gray-900">{marketIndices.sensex.value.toFixed(2)}</p>
+              </div>
+              <div className={`text-xs font-semibold ${marketIndices.sensex.changePct >= 0 ? 'text-green-600' : 'text-red-600'}`}>
+                {marketIndices.sensex.changePct >= 0 ? '▲' : '▼'} {Math.abs(marketIndices.sensex.changePct).toFixed(2)}%
+              </div>
+            </div>
+            
+            {/* Bank Nifty */}
+            <div className="flex items-center gap-2 border-l border-gray-300 pl-4 flex-shrink-0">
+              <div>
+                <p className="text-xs text-gray-600 font-medium">BANK NIFTY</p>
+                <p className="text-sm font-bold text-gray-900">{marketIndices.banknifty.value.toFixed(2)}</p>
+              </div>
+              <div className={`text-xs font-semibold ${marketIndices.banknifty.changePct >= 0 ? 'text-green-600' : 'text-red-600'}`}>
+                {marketIndices.banknifty.changePct >= 0 ? '▲' : '▼'} {Math.abs(marketIndices.banknifty.changePct).toFixed(2)}%
+              </div>
+            </div>
+            
+            {/* Fin Nifty */}
+            <div className="flex items-center gap-2 border-l border-gray-300 pl-4 flex-shrink-0">
+              <div>
+                <p className="text-xs text-gray-600 font-medium">FIN NIFTY</p>
+                <p className="text-sm font-bold text-gray-900">{marketIndices.finnifty.value.toFixed(2)}</p>
+              </div>
+              <div className={`text-xs font-semibold ${marketIndices.finnifty.changePct >= 0 ? 'text-green-600' : 'text-red-600'}`}>
+                {marketIndices.finnifty.changePct >= 0 ? '▲' : '▼'} {Math.abs(marketIndices.finnifty.changePct).toFixed(2)}%
+              </div>
+            </div>
+            
+            <div className="flex items-center gap-2 border-l border-gray-300 pl-4 flex-shrink-0">
+              <span className="text-xs text-gray-500 italic">Updating every 3 sec</span>
+            </div>
+          </div>
+        </div>
+
         {/* Notifications */}
         {notifications.length > 0 && (
           <div className="fixed top-20 right-4 z-50 space-y-2 max-w-md" data-testid="notifications-container">
