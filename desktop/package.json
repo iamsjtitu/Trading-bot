@@ -1,6 +1,6 @@
 {
   "name": "ai-trading-bot",
-  "version": "1.0.7",
+  "version": "1.0.8",
   "description": "AI-powered automated options trading bot with Upstox integration",
   "main": "main.js",
   "author": "AI Trading Bot",
@@ -56,7 +56,8 @@
       "allowToChangeInstallationDirectory": true,
       "createDesktopShortcut": true,
       "createStartMenuShortcut": true,
-      "shortcutName": "AI Trading Bot"
+      "shortcutName": "AI Trading Bot",
+      "artifactName": "AI-Trading-Bot-Setup-${version}.${ext}"
     },
     "mac": {
       "target": [
