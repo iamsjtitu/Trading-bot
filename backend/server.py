@@ -252,17 +252,23 @@ async def get_active_signals():
 
 @api_router.get("/trades/active")
 async def get_active_trades():
-    """Get active paper trades"""
+    """Get active paper trades with live P&L"""
     try:
         trades = await db.paper_trades.find(
             {"status": "OPEN"},
             {"_id": 0}
         ).to_list(100)
         
+        # Add live P&L to each trade
+        trades_with_pnl = []
+        for trade in trades:
+            trade_with_pnl = await trading_engine.get_trade_with_live_pnl(trade)
+            trades_with_pnl.append(trade_with_pnl)
+        
         return {
             "status": "success",
-            "count": len(trades),
-            "trades": trades
+            "count": len(trades_with_pnl),
+            "trades": trades_with_pnl
         }
     except Exception as e:
         logger.error(f"Get active trades error: {e}")
