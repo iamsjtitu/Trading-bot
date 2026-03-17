@@ -300,8 +300,131 @@ export default function SettingsPanel({ onClose, onSave }) {
 
             {/* Advanced Tab */}
             <TabsContent value="advanced" className="space-y-4">
+              {/* AI Model Settings */}
+              <div className="bg-gradient-to-r from-purple-50 to-blue-50 p-4 rounded-lg border border-purple-200">
+                <h3 className="font-bold text-gray-800 mb-3">🤖 AI Model Configuration</h3>
+                <div className="space-y-3">
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                      Emergent LLM Key (Universal Key)
+                    </label>
+                    <input
+                      type="password"
+                      value={settings.ai?.emergent_llm_key || 'sk-emergent-754BdB27f511c159cC'}
+                      readOnly
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg bg-gray-50"
+                      placeholder="Emergent Universal Key"
+                    />
+                    <p className="text-xs text-green-600 mt-1">
+                      ✅ Pre-configured for you! Supports OpenAI, Claude, Gemini
+                    </p>
+                  </div>
+                  <div className="bg-blue-50 p-3 rounded border border-blue-200">
+                    <p className="text-sm text-gray-700">
+                      <strong>💡 What is Emergent LLM Key?</strong><br/>
+                      A single universal key that works with OpenAI GPT, Claude, and Gemini models. 
+                      No need for separate API keys!
+                    </p>
+                    <p className="text-xs text-gray-600 mt-2">
+                      Currently using: <Badge className="bg-blue-600">GPT-4.1-mini</Badge> for news sentiment analysis
+                    </p>
+                  </div>
+                </div>
+              </div>
+
+              {/* News Sources Settings */}
               <div className="bg-white p-4 rounded-lg border border-gray-200">
-                <h3 className="font-bold text-gray-800 mb-3">Auto-Trading Controls</h3>
+                <h3 className="font-bold text-gray-800 mb-3">📰 News Source Configuration</h3>
+                
+                <div className="space-y-4">
+                  {/* Current Source Display */}
+                  <div className="bg-blue-50 p-3 rounded border border-blue-200">
+                    <p className="text-sm font-semibold text-gray-800">Current Mode:</p>
+                    <Badge className="bg-blue-600 mt-1">
+                      {settings.news.sources?.includes('newsapi') ? 'NewsAPI (Premium)' :
+                       settings.news.sources?.includes('alphavantage') ? 'Alpha Vantage (Premium)' :
+                       'Demo News (Free)'}
+                    </Badge>
+                  </div>
+
+                  {/* News Source Selection */}
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                      Select News Source
+                    </label>
+                    <select
+                      value={settings.news.sources?.[0] || 'demo'}
+                      onChange={(e) => {
+                        const newSources = [e.target.value];
+                        updateField('news', 'sources', newSources);
+                      }}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg"
+                    >
+                      <option value="demo">Demo News (Free - For Testing)</option>
+                      <option value="newsapi">NewsAPI.org (Premium - Real Market News)</option>
+                      <option value="alphavantage">Alpha Vantage (Premium - Financial Data)</option>
+                    </select>
+                  </div>
+
+                  {/* NewsAPI Configuration */}
+                  <div className="border-l-4 border-green-500 pl-4">
+                    <h4 className="font-semibold text-gray-800 mb-2">📈 NewsAPI.org (Premium)</h4>
+                    <input
+                      type="text"
+                      value={settings.news.newsapi_key}
+                      onChange={(e) => updateField('news', 'newsapi_key', e.target.value)}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg mb-2"
+                      placeholder="Enter NewsAPI.org key"
+                    />
+                    <div className="text-xs text-gray-600 space-y-1">
+                      <p>• Get from: <a href="https://newsapi.org" target="_blank" rel="noreferrer" className="text-blue-600 underline">newsapi.org</a></p>
+                      <p>• Free tier: 100 requests/day</p>
+                      <p>• Pro: $449/month (100K requests)</p>
+                      <p>• Sources: Reuters, Bloomberg, Financial Times, etc.</p>
+                    </div>
+                  </div>
+
+                  {/* Alpha Vantage Configuration */}
+                  <div className="border-l-4 border-purple-500 pl-4">
+                    <h4 className="font-semibold text-gray-800 mb-2">📊 Alpha Vantage (Premium)</h4>
+                    <input
+                      type="text"
+                      value={settings.news.alphavantage_key}
+                      onChange={(e) => updateField('news', 'alphavantage_key', e.target.value)}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg mb-2"
+                      placeholder="Enter Alpha Vantage key"
+                    />
+                    <div className="text-xs text-gray-600 space-y-1">
+                      <p>• Get from: <a href="https://www.alphavantage.co" target="_blank" rel="noreferrer" className="text-blue-600 underline">alphavantage.co</a></p>
+                      <p>• Free tier: 500 calls/day</p>
+                      <p>• Premium: $49.99/month</p>
+                      <p>• Data: Stock news, market sentiment, financial reports</p>
+                    </div>
+                  </div>
+
+                  {/* Minimum Confidence */}
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                      Minimum Confidence for Trading (%)
+                    </label>
+                    <input
+                      type="number"
+                      value={settings.news.min_confidence}
+                      onChange={(e) => updateField('news', 'min_confidence', parseInt(e.target.value))}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg"
+                      min="50"
+                      max="95"
+                    />
+                    <p className="text-xs text-gray-500 mt-1">
+                      Only trade on signals with confidence ≥ this value (Current: {settings.news.min_confidence}%)
+                    </p>
+                  </div>
+                </div>
+              </div>
+
+              {/* Auto-Trading Controls */}
+              <div className="bg-white p-4 rounded-lg border border-gray-200">
+                <h3 className="font-bold text-gray-800 mb-3">⚙️ Auto-Trading Controls</h3>
                 <div className="space-y-3">
                   <div className="flex items-center justify-between">
                     <div>
@@ -339,31 +462,21 @@ export default function SettingsPanel({ onClose, onSave }) {
                       {settings.auto_trading.auto_analysis ? 'ON' : 'OFF'}
                     </Button>
                   </div>
-                </div>
-              </div>
-
-              <div className="bg-white p-4 rounded-lg border border-gray-200">
-                <h3 className="font-bold text-gray-800 mb-3">News API Keys</h3>
-                <div className="space-y-3">
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">NewsAPI.org Key</label>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                      Analysis Interval (minutes)
+                    </label>
                     <input
-                      type="text"
-                      value={settings.news.newsapi_key}
-                      onChange={(e) => updateField('news', 'newsapi_key', e.target.value)}
+                      type="number"
+                      value={settings.auto_trading.analysis_interval_minutes}
+                      onChange={(e) => updateField('auto_trading', 'analysis_interval_minutes', parseInt(e.target.value))}
                       className="w-full px-3 py-2 border border-gray-300 rounded-lg"
-                      placeholder="Optional - for real news"
+                      min="1"
+                      max="60"
                     />
-                  </div>
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">Alpha Vantage Key</label>
-                    <input
-                      type="text"
-                      value={settings.news.alphavantage_key}
-                      onChange={(e) => updateField('news', 'alphavantage_key', e.target.value)}
-                      className="w-full px-3 py-2 border border-gray-300 rounded-lg"
-                      placeholder="Optional - for market data"
-                    />
+                    <p className="text-xs text-gray-500 mt-1">
+                      How often to analyze news (Current: every {settings.auto_trading.analysis_interval_minutes} minutes)
+                    </p>
                   </div>
                 </div>
               </div>
