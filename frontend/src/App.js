@@ -264,6 +264,89 @@ function App() {
       </header>
 
       <div className="container mx-auto px-4 py-6">
+        {/* Notifications */}
+        {notifications.length > 0 && (
+          <div className="fixed top-20 right-4 z-50 space-y-2 max-w-md" data-testid="notifications-container">
+            {notifications.map((notif) => (
+              <div
+                key={notif.id}
+                className={`p-4 rounded-lg shadow-lg border-l-4 animate-slide-in ${
+                  notif.type === 'success' ? 'bg-green-50 border-green-500 text-green-800' :
+                  notif.type === 'error' ? 'bg-red-50 border-red-500 text-red-800' :
+                  notif.type === 'warning' ? 'bg-yellow-50 border-yellow-500 text-yellow-800' :
+                  'bg-blue-50 border-blue-500 text-blue-800'
+                }`}
+                data-testid={`notification-${notif.type}`}
+              >
+                <div className="flex items-center justify-between">
+                  <p className="font-medium text-sm">{notif.message}</p>
+                  <button
+                    onClick={() => setNotifications(prev => prev.filter(n => n.id !== notif.id))}
+                    className="ml-4 text-gray-500 hover:text-gray-700"
+                  >
+                    ✕
+                  </button>
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+
+        {/* Risk Management Panel */}
+        <Card className="bg-gradient-to-r from-orange-50 to-red-50 border-orange-200 p-4 mb-6 shadow-lg" data-testid="risk-management-panel">
+          <div className="flex items-center justify-between">
+            <div className="flex-1">
+              <h2 className="text-lg font-bold text-gray-800 mb-3 flex items-center gap-2">
+                ⚙️ Risk Management
+                {emergencyStop && <Badge className="bg-red-600">🛑 STOPPED</Badge>}
+              </h2>
+              <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
+                <div>
+                  <p className="text-xs text-gray-600 font-medium">Daily Used</p>
+                  <p className="text-lg font-bold text-gray-900">{formatCurrency(riskMetrics.dailyUsed)}</p>
+                  <p className="text-xs text-gray-500">of {formatCurrency(riskMetrics.dailyLimit)}</p>
+                  <div className="mt-1 h-2 bg-gray-200 rounded-full overflow-hidden">
+                    <div 
+                      className={`h-full ${riskMetrics.dailyUsed / riskMetrics.dailyLimit > 0.8 ? 'bg-red-500' : 'bg-green-500'}`}
+                      style={{ width: `${Math.min((riskMetrics.dailyUsed / riskMetrics.dailyLimit) * 100, 100)}%` }}
+                    />
+                  </div>
+                </div>
+                <div>
+                  <p className="text-xs text-gray-600 font-medium">Max Per Trade</p>
+                  <p className="text-lg font-bold text-gray-900">{formatCurrency(riskMetrics.maxPerTrade)}</p>
+                </div>
+                <div>
+                  <p className="text-xs text-gray-600 font-medium">Today's Trades</p>
+                  <p className="text-lg font-bold text-gray-900">{riskMetrics.todayTrades}</p>
+                </div>
+                <div>
+                  <p className="text-xs text-gray-600 font-medium">Today's P&L</p>
+                  <p className={`text-lg font-bold ${riskMetrics.todayPnL >= 0 ? 'text-green-600' : 'text-red-600'}`}>
+                    {formatCurrency(riskMetrics.todayPnL)}
+                  </p>
+                </div>
+                <div>
+                  <p className="text-xs text-gray-600 font-medium">Stop Loss</p>
+                  <p className="text-lg font-bold text-orange-600">25%</p>
+                  <p className="text-xs text-gray-500">Medium Risk</p>
+                </div>
+              </div>
+            </div>
+            <div className="ml-6">
+              <Button
+                onClick={handleEmergencyStop}
+                className={emergencyStop 
+                  ? "bg-green-600 hover:bg-green-700 text-white text-lg px-6 py-6 shadow-xl" 
+                  : "bg-red-600 hover:bg-red-700 text-white text-lg px-6 py-6 shadow-xl animate-pulse"}
+                data-testid="emergency-stop-button"
+              >
+                {emergencyStop ? '▶️ Resume' : '🛑 STOP'}
+              </Button>
+            </div>
+          </div>
+        </Card>
+
         {/* Portfolio Summary Cards */}
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
           <Card className="bg-white border-gray-200 p-4 shadow-md hover:shadow-lg transition-shadow" data-testid="portfolio-value-card">
