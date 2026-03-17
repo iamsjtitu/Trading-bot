@@ -14,6 +14,7 @@ from datetime import datetime, timezone
 from news_service import NewsService
 from sentiment_service import SentimentService
 from trading_engine import TradingEngine
+from settings_manager import SettingsManager
 
 ROOT_DIR = Path(__file__).parent
 load_dotenv(ROOT_DIR / '.env')
