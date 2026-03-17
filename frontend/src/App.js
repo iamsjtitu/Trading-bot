@@ -20,6 +20,15 @@ function App() {
   const [fetchingNews, setFetchingNews] = useState(false);
   const [autoAnalyze, setAutoAnalyze] = useState(true);
   const [nextAnalysis, setNextAnalysis] = useState(null);
+  const [emergencyStop, setEmergencyStop] = useState(false);
+  const [notifications, setNotifications] = useState([]);
+  const [riskMetrics, setRiskMetrics] = useState({
+    dailyUsed: 0,
+    dailyLimit: 100000,
+    maxPerTrade: 20000,
+    todayTrades: 0,
+    todayPnL: 0
+  });
 
   useEffect(() => {
     initializeApp();
