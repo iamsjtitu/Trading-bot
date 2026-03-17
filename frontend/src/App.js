@@ -85,8 +85,22 @@ function App() {
       setSignals(signalsRes.data.signals || []);
       setTrades(tradesRes.data.trades || []);
       setStats(statsRes.data.stats || {});
+      
+      // Calculate risk metrics
+      const todayTradesData = tradesRes.data.trades || [];
+      const dailyUsed = todayTradesData.reduce((sum, t) => sum + (t.investment || 0), 0);
+      const todayPnL = todayTradesData.reduce((sum, t) => sum + (t.pnl || 0), 0);
+      
+      setRiskMetrics({
+        dailyUsed,
+        dailyLimit: 100000,
+        maxPerTrade: 20000,
+        todayTrades: todayTradesData.length,
+        todayPnL
+      });
     } catch (error) {
       console.error('Load data error:', error);
+      addNotification('error', 'Failed to load data');
     } finally {
       setLoading(false);
     }
