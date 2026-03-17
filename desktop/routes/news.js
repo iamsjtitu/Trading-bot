@@ -35,16 +35,50 @@ module.exports = function (db) {
   }
 
   // ============ Sentiment Analysis ============
+
+  // Keyword-based fallback when no AI key
+  function keywordSentiment(article) {
+    const text = `${article.title || ''} ${article.description || ''}`.toLowerCase();
+
+    const bullish = ['rally', 'surge', 'gain', 'rise', 'bull', 'high', 'record', 'positive', 'strong', 'boost', 'growth', 'profit', 'earnings beat', 'upgrade', 'outperform', 'breakout', 'recovery', 'optimism', 'buy', 'inflows', 'fii buying', 'all-time high', 'green', 'uptrend', 'bullish'];
+    const bearish = ['crash', 'fall', 'drop', 'decline', 'bear', 'low', 'sell', 'negative', 'weak', 'loss', 'fear', 'panic', 'downgrade', 'underperform', 'correction', 'recession', 'inflation', 'outflows', 'fii selling', 'red', 'downtrend', 'bearish', 'pressure', 'slump', 'warning'];
+
+    let bullScore = 0, bearScore = 0;
+    for (const kw of bullish) { if (text.includes(kw)) bullScore++; }
+    for (const kw of bearish) { if (text.includes(kw)) bearScore++; }
+
+    const total = bullScore + bearScore;
+    if (total === 0) return { sentiment: 'NEUTRAL', confidence: 55, impact: 'LOW', reason: 'No strong keywords detected (keyword analysis)', trading_signal: 'HOLD' };
+
+    const dominant = bullScore > bearScore ? 'BULLISH' : bearScore > bullScore ? 'BEARISH' : 'NEUTRAL';
+    const diff = Math.abs(bullScore - bearScore);
+    const confidence = Math.min(85, 55 + diff * 8);
+    const impact = diff >= 3 ? 'HIGH' : diff >= 2 ? 'MEDIUM' : 'LOW';
+
+    let signal = 'HOLD';
+    if (dominant === 'BULLISH' && confidence >= 63) signal = 'BUY_CALL';
+    else if (dominant === 'BEARISH' && confidence >= 63) signal = 'BUY_PUT';
+
+    const matchedBull = bullish.filter(kw => text.includes(kw)).slice(0, 3).join(', ');
+    const matchedBear = bearish.filter(kw => text.includes(kw)).slice(0, 3).join(', ');
+    const reason = dominant === 'BULLISH'
+      ? `Bullish keywords: ${matchedBull} (keyword analysis)`
+      : dominant === 'BEARISH'
+        ? `Bearish keywords: ${matchedBear} (keyword analysis)`
+        : 'Mixed signals (keyword analysis)';
+
+    return { sentiment: dominant, confidence, impact, reason, trading_signal: signal };
+  }
+
   async function analyzeSentiment(article) {
     const aiKey = db.data.settings?.ai?.emergent_llm_key || '';
-    if (!aiKey || !OpenAI) {
-      return { sentiment: 'NEUTRAL', confidence: 50, impact: 'LOW', reason: 'No AI key configured', trading_signal: 'HOLD' };
-    }
 
-    try {
-      const client = new OpenAI({ apiKey: aiKey, baseURL: 'https://integrations.emergentagent.com/llm' });
+    // Use AI if key available
+    if (aiKey && OpenAI) {
+      try {
+        const client = new OpenAI({ apiKey: aiKey, baseURL: 'https://integrations.emergentagent.com/llm' });
 
-      const systemMsg = `You are a professional financial market analyst specializing in sentiment analysis for options trading.
+        const systemMsg = `You are a professional financial market analyst specializing in sentiment analysis for options trading.
 Analyze news articles and determine their impact on the Indian stock market (Nifty 50, Bank Nifty).
 Provide analysis in this EXACT format:
 SENTIMENT: [BULLISH/BEARISH/NEUTRAL]
@@ -53,19 +87,22 @@ IMPACT: [HIGH/MEDIUM/LOW]
 REASON: [One line explanation]
 TRADING_SIGNAL: [BUY_CALL/BUY_PUT/HOLD]`;
 
-      const userMsg = `Title: ${article.title || ''}\nDescription: ${article.description || ''}\nSource: ${article.source || ''}`;
+        const userMsg = `Title: ${article.title || ''}\nDescription: ${article.description || ''}\nSource: ${article.source || ''}`;
 
-      const completion = await client.chat.completions.create({
-        model: 'openai/gpt-4.1-mini',
-        messages: [{ role: 'system', content: systemMsg }, { role: 'user', content: userMsg }],
-        max_tokens: 300,
-      });
+        const completion = await client.chat.completions.create({
+          model: 'openai/gpt-4.1-mini',
+          messages: [{ role: 'system', content: systemMsg }, { role: 'user', content: userMsg }],
+          max_tokens: 300,
+        });
 
-      return parseSentiment(completion.choices?.[0]?.message?.content || '');
-    } catch (err) {
-      console.error('[Sentiment] AI error:', err.message);
-      return { sentiment: 'NEUTRAL', confidence: 50, impact: 'LOW', reason: 'AI analysis error: ' + err.message, trading_signal: 'HOLD' };
+        return parseSentiment(completion.choices?.[0]?.message?.content || '');
+      } catch (err) {
+        console.error('[Sentiment] AI error, falling back to keywords:', err.message);
+      }
     }
+
+    // Fallback: keyword-based analysis
+    return keywordSentiment(article);
   }
 
   function parseSentiment(text) {
