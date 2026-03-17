@@ -256,3 +256,132 @@ class TradingEngine:
             trade['pnl_percentage'] = round(pnl_percentage, 2)
         
         return trade
+    
+    async def check_and_execute_exits(self) -> Dict:
+        """Check all open trades and auto-exit if target/stop-loss hit"""
+        if not self.auto_exit_enabled:
+            return {'exits': 0, 'new_trades': 0}
+        
+        import random
+        
+        open_trades = await self.db.paper_trades.find({'status': 'OPEN'}).to_list(1000)
+        exits_count = 0
+        new_trades_count = 0
+        exit_details = []
+        
+        for trade in open_trades:
+            # Simulate current price
+            price_change = random.uniform(-0.15, 0.15)
+            current_price = trade['entry_price'] * (1 + price_change)
+            
+            # Get target and stop-loss percentages
+            target_pct = self.custom_target_pct if self.custom_target_pct else self.risk_params[self.risk_tolerance]['target_pct']
+            stoploss_pct = self.custom_stoploss_pct if self.custom_stoploss_pct else self.risk_params[self.risk_tolerance]['stop_loss_pct']
+            
+            # Calculate target and stop-loss prices
+            target_price = trade['entry_price'] * (1 + target_pct / 100)
+            stoploss_price = trade['entry_price'] * (1 - stoploss_pct / 100)
+            
+            should_exit = False
+            exit_reason = ''
+            
+            # Check if target hit
+            if current_price >= target_price:
+                should_exit = True
+                exit_reason = 'TARGET_HIT'
+            
+            # Check if stop-loss hit
+            elif current_price <= stoploss_price:
+                should_exit = True
+                exit_reason = 'STOPLOSS_HIT'
+            
+            if should_exit:
+                # Calculate P&L
+                current_value = current_price * trade['quantity']
+                investment = trade['investment']
+                pnl = current_value - investment
+                pnl_percentage = (pnl / investment) * 100
+                
+                # Close the trade
+                await self.db.paper_trades.update_one(
+                    {'id': trade['id']},
+                    {
+                        '$set': {
+                            'status': 'CLOSED',
+                            'exit_time': datetime.now(timezone.utc).isoformat(),
+                            'exit_price': current_price,
+                            'pnl': pnl,
+                            'pnl_percentage': pnl_percentage,
+                            'exit_reason': exit_reason
+                        }
+                    }
+                )
+                
+                # Update portfolio
+                portfolio = await self.db.portfolio.find_one({'type': 'paper'})
+                new_available = portfolio['available_capital'] + current_value
+                new_invested = portfolio['invested_amount'] - investment
+                new_total_pnl = portfolio['total_pnl'] + pnl
+                new_total_trades = portfolio['total_trades'] + 1
+                
+                winning = portfolio['winning_trades']
+                losing = portfolio['losing_trades']
+                if pnl > 0:
+                    winning += 1
+                else:
+                    losing += 1
+                
+                await self.db.portfolio.update_one(
+                    {'type': 'paper'},
+                    {
+                        '$set': {
+                            'available_capital': new_available,
+                            'invested_amount': new_invested,
+                            'total_pnl': new_total_pnl,
+                            'total_trades': new_total_trades,
+                            'winning_trades': winning,
+                            'losing_trades': losing,
+                            'last_updated': datetime.now(timezone.utc).isoformat()
+                        }
+                    }
+                )
+                
+                # Update signal status
+                await self.db.trading_signals.update_one(
+                    {'id': trade['signal_id']},
+                    {'$set': {'status': 'CLOSED'}}
+                )
+                
+                exits_count += 1
+                exit_details.append({
+                    'trade_id': trade['id'],
+                    'symbol': trade['symbol'],
+                    'type': trade['trade_type'],
+                    'entry': trade['entry_price'],
+                    'exit': current_price,
+                    'pnl': pnl,
+                    'pnl_pct': pnl_percentage,
+                    'reason': exit_reason
+                })
+                
+                logger.info(f"Auto-exited trade: {trade['trade_type']} {trade['symbol']} @ ₹{current_price} | P&L: ₹{pnl} ({exit_reason})")
+                
+                # If auto-entry enabled, generate new trade
+                if self.auto_entry_enabled and exit_reason == 'TARGET_HIT':
+                    # Get latest news for new signal
+                    latest_news = await self.db.news_articles.find(
+                        {},
+                        {"_id": 0}
+                    ).sort('created_at', -1).limit(1).to_list(1)
+                    
+                    if latest_news and len(latest_news) > 0:
+                        new_signal = await self.generate_trading_signal(latest_news[0])
+                        if new_signal:
+                            new_trades_count += 1
+                            logger.info(f"Auto-generated new trade after exit")
+        
+        return {
+            'exits': exits_count,
+            'new_trades': new_trades_count,
+            'details': exit_details
+        }
