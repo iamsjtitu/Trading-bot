@@ -998,6 +998,18 @@ function App() {
           <p className="text-xs mt-1 text-gray-500">Trading involves risk. Past performance does not guarantee future results.</p>
         </div>
       </footer>
+
+      {/* Settings Modal */}
+      {showSettings && (
+        <SettingsPanel 
+          onClose={() => setShowSettings(false)}
+          onSave={(settings) => {
+            console.log('Settings saved:', settings);
+            setShowSettings(false);
+            loadData();
+          }}
+        />
+      )}
     </div>
   );
 }
