@@ -3,13 +3,14 @@
  * Architecture: Express server inside Electron (same as Mill Entry System)
  */
 
-const { app, BrowserWindow, ipcMain, dialog, shell, Menu, Tray, nativeImage } = require('electron');
+const { app, BrowserWindow, ipcMain, dialog, shell, Menu, Tray, nativeImage, Notification } = require('electron');
 const { autoUpdater } = require('electron-updater');
 const path = require('path');
 const fs = require('fs');
 const express = require('express');
 const cors = require('cors');
 const compression = require('compression');
+const axios = require('axios');
 
 // ============ ERROR LOGGING ============
 const errorLogPath = path.join(app.getPath('userData'), 'ai-trader-error.log');
@@ -62,7 +63,9 @@ class JsonDatabase {
         schedule: { enabled: false, trading_days: ['Monday','Tuesday','Wednesday','Thursday','Friday'], start_time: '09:15', end_time: '15:30' },
         news: { sources: ['demo'], newsapi_key: '', alphavantage_key: '', min_confidence: 60 },
         auto_trading: { auto_exit: true, auto_entry: false, auto_analysis: true, target_pct: 10, stoploss_pct: 25, analysis_interval_minutes: 5 },
-        ai: { emergent_llm_key: '' }
+        ai: { emergent_llm_key: '' },
+        telegram: { enabled: false, bot_token: '', chat_id: '' },
+        notifications: { desktop: true, telegram: false, on_signal: true, on_entry: true, on_exit: true },
       },
       portfolio: { initial_capital: 500000, current_value: 500000, total_pnl: 0, active_positions: 0, total_trades: 0, winning_trades: 0 },
       trades: [],
@@ -92,6 +95,40 @@ function createApiServer(db) {
   apiApp.use(compression());
   apiApp.use(cors());
   apiApp.use(express.json({ limit: '5mb' }));
+
+  // ============ NOTIFICATION SYSTEM ============
+  db.notify = function (type, title, body) {
+    const settings = db.data?.settings || {};
+    const notifSettings = settings.notifications || {};
+
+    // Check if this notification type is enabled
+    if (type === 'signal' && !notifSettings.on_signal) return;
+    if (type === 'entry' && !notifSettings.on_entry) return;
+    if (type === 'exit' && !notifSettings.on_exit) return;
+
+    // Desktop notification (works even when minimized)
+    if (notifSettings.desktop !== false) {
+      try {
+        if (Notification.isSupported()) {
+          const notif = new Notification({ title: `AI Trading Bot - ${title}`, body, icon: path.join(__dirname, 'assets', 'icon.png'), silent: false });
+          notif.on('click', () => { if (mainWindow) { mainWindow.show(); mainWindow.focus(); } });
+          notif.show();
+        }
+      } catch (e) { console.error('[Notify] Desktop error:', e.message); }
+    }
+
+    // Telegram notification
+    if (notifSettings.telegram && settings.telegram?.enabled && settings.telegram?.bot_token && settings.telegram?.chat_id) {
+      const telegramUrl = `https://api.telegram.org/bot${settings.telegram.bot_token}/sendMessage`;
+      axios.post(telegramUrl, {
+        chat_id: settings.telegram.chat_id,
+        text: `*${title}*\n${body}`,
+        parse_mode: 'Markdown',
+      }).catch(e => console.error('[Notify] Telegram error:', e.message));
+    }
+
+    console.log(`[Notify] [${type}] ${title}: ${body}`);
+  };
 
   // Load route modules
   const routeModules = [

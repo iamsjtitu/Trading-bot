@@ -155,6 +155,10 @@ module.exports = function (db) {
           pnl: Math.round(pnl * 100) / 100, pnl_pct: Math.round(pnlPct * 100) / 100, reason: exitReason,
         });
 
+        // Desktop + Telegram notification for exit
+        const pnlSign = pnl >= 0 ? '+' : '';
+        if (db.notify) db.notify('exit', `${exitReason === 'TARGET_HIT' ? 'Target Hit' : 'Stoploss Hit'} - ${trade.trade_type}`, `${trade.symbol} | P&L: ${pnlSign}${Math.round(pnl)} (${pnlSign}${Math.round(pnlPct)}%) | Exit: ${Math.round(currentPrice * 100) / 100}`);
+
         // Auto-entry on profitable exit
         if (autoEntryEnabled && exitReason === 'TARGET_HIT') {
           const news = (db.data.news_articles || [])

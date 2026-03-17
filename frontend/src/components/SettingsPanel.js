@@ -383,6 +383,52 @@ export default function SettingsPanel({ onClose, onSave }) {
                   </div>
                 </div>
               </div>
+
+              <div className="bg-white p-4 rounded-lg border border-gray-200">
+                <h3 className="font-bold text-gray-800 mb-3">Notifications</h3>
+                <div className="space-y-3">
+                  <div className="flex items-center justify-between">
+                    <div><p className="font-medium text-gray-800">Desktop Notifications</p><p className="text-xs text-gray-600">Windows popup on signal/entry/exit</p></div>
+                    <Button onClick={() => updateField('notifications', 'desktop', !(settings.notifications?.desktop !== false))} className={(settings.notifications?.desktop !== false) ? 'bg-green-600' : 'bg-gray-400'}>{(settings.notifications?.desktop !== false) ? 'ON' : 'OFF'}</Button>
+                  </div>
+                  <div className="flex items-center justify-between">
+                    <div><p className="font-medium text-gray-800">On Signal</p><p className="text-xs text-gray-600">Notify when BUY_CALL/PUT detected</p></div>
+                    <Button onClick={() => updateField('notifications', 'on_signal', !(settings.notifications?.on_signal !== false))} className={(settings.notifications?.on_signal !== false) ? 'bg-green-600' : 'bg-gray-400'}>{(settings.notifications?.on_signal !== false) ? 'ON' : 'OFF'}</Button>
+                  </div>
+                  <div className="flex items-center justify-between">
+                    <div><p className="font-medium text-gray-800">On Entry</p><p className="text-xs text-gray-600">Notify on trade entry</p></div>
+                    <Button onClick={() => updateField('notifications', 'on_entry', !(settings.notifications?.on_entry !== false))} className={(settings.notifications?.on_entry !== false) ? 'bg-green-600' : 'bg-gray-400'}>{(settings.notifications?.on_entry !== false) ? 'ON' : 'OFF'}</Button>
+                  </div>
+                  <div className="flex items-center justify-between">
+                    <div><p className="font-medium text-gray-800">On Exit</p><p className="text-xs text-gray-600">Notify on trade exit (target/SL)</p></div>
+                    <Button onClick={() => updateField('notifications', 'on_exit', !(settings.notifications?.on_exit !== false))} className={(settings.notifications?.on_exit !== false) ? 'bg-green-600' : 'bg-gray-400'}>{(settings.notifications?.on_exit !== false) ? 'ON' : 'OFF'}</Button>
+                  </div>
+                </div>
+              </div>
+
+              <div className="bg-white p-4 rounded-lg border border-gray-200">
+                <h3 className="font-bold text-gray-800 mb-3">Telegram Notifications</h3>
+                <div className="space-y-3">
+                  <div className="flex items-center justify-between">
+                    <div><p className="font-medium text-gray-800">Enable Telegram</p><p className="text-xs text-gray-600">Send alerts to Telegram</p></div>
+                    <Button onClick={() => { updateField('telegram', 'enabled', !settings.telegram?.enabled); updateField('notifications', 'telegram', !settings.telegram?.enabled); }} className={settings.telegram?.enabled ? 'bg-green-600' : 'bg-gray-400'}>{settings.telegram?.enabled ? 'ON' : 'OFF'}</Button>
+                  </div>
+                  {settings.telegram?.enabled && (
+                    <>
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-1">Bot Token</label>
+                        <input type="password" value={settings.telegram?.bot_token || ''} onChange={(e) => updateField('telegram', 'bot_token', e.target.value)} className="w-full px-3 py-2 border border-gray-300 rounded-lg" placeholder="123456:ABCdefGH..." data-testid="telegram-token" />
+                        <p className="text-xs text-gray-500 mt-1">Create bot: Message @BotFather on Telegram, /newbot</p>
+                      </div>
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-1">Chat ID</label>
+                        <input type="text" value={settings.telegram?.chat_id || ''} onChange={(e) => updateField('telegram', 'chat_id', e.target.value)} className="w-full px-3 py-2 border border-gray-300 rounded-lg" placeholder="Your Chat ID" data-testid="telegram-chatid" />
+                        <p className="text-xs text-gray-500 mt-1">Get ID: Message @userinfobot on Telegram</p>
+                      </div>
+                    </>
+                  )}
+                </div>
+              </div>
             </TabsContent>
           </Tabs>
 

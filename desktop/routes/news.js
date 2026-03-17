@@ -331,14 +331,19 @@ TRADING_SIGNAL: [BUY_CALL/BUY_PUT/HOLD]`;
           if (signal) {
             db.data.signals.push(signal);
 
+            // Notify: New Signal
+            if (db.notify) db.notify('signal', `${signal.signal_type} Signal`, `${signal.symbol} | ${sentiment.sentiment} ${sentiment.confidence}% | ${sentiment.reason}`);
+
             // LIVE mode → place real Upstox order, PAPER mode → paper trade
             const mode = db.data.settings?.trading_mode || 'PAPER';
             const token = db.data.settings?.broker?.access_token;
 
             if (mode === 'LIVE' && token) {
-              await executeLiveTrade(signal, token);
+              const result = await executeLiveTrade(signal, token);
+              if (db.notify) db.notify('entry', `LIVE ${signal.signal_type} Entry`, `${signal.symbol} | Qty: ${signal.quantity} | ${result.success ? 'Order ID: ' + result.order_id : 'FAILED: ' + (result.error || '')}`);
             } else {
               executePaperTrade(signal);
+              if (db.notify) db.notify('entry', `Paper ${signal.signal_type} Entry`, `${signal.symbol} | Qty: ${signal.quantity} | Investment: ${signal.investment_amount}`);
             }
             signalGenerated = true;
           }
