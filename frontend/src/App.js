@@ -70,8 +70,48 @@ function App() {
     try {
       await axios.post(`${API}/initialize`);
       await loadData();
+      await loadAutoSettings();
     } catch (error) {
       console.error('Initialize error:', error);
+    }
+  };
+
+  const loadAutoSettings = async () => {
+    try {
+      const response = await axios.get(`${API}/auto-settings`);
+      if (response.data.status === 'success') {
+        setAutoSettings(response.data.settings);
+      }
+    } catch (error) {
+      console.error('Load auto settings error:', error);
+    }
+  };
+
+  const updateAutoSettings = async (newSettings) => {
+    try {
+      const response = await axios.post(`${API}/auto-settings/update`, newSettings);
+      if (response.data.status === 'success') {
+        setAutoSettings(response.data.settings);
+        addNotification('success', '✅ Auto-trading settings updated!');
+      }
+    } catch (error) {
+      console.error('Update settings error:', error);
+      addNotification('error', '❌ Failed to update settings');
+    }
+  };
+
+  const checkAutoExits = async () => {
+    try {
+      const response = await axios.post(`${API}/auto-exit/check`);
+      if (response.data.exits_executed > 0) {
+        addNotification('info', `🎯 ${response.data.exits_executed} trade(s) auto-exited!`);
+        if (response.data.new_trades_generated > 0) {
+          addNotification('success', `🚀 ${response.data.new_trades_generated} new trade(s) opened!`);
+        }
+        await loadData();
+      }
+    } catch (error) {
+      console.error('Check auto exits error:', error);
     }
   };
 
