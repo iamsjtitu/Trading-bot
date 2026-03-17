@@ -28,6 +28,7 @@ db = client[os.environ['DB_NAME']]
 news_service = NewsService()
 sentiment_service = SentimentService()
 trading_engine = TradingEngine(db)
+settings_manager = SettingsManager(db)
 
 # Create the main app without a prefix
 app = FastAPI(title="AI Trading Bot API")
