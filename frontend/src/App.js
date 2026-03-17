@@ -18,6 +18,8 @@ function App() {
   const [stats, setStats] = useState(null);
   const [loading, setLoading] = useState(false);
   const [fetchingNews, setFetchingNews] = useState(false);
+  const [autoAnalyze, setAutoAnalyze] = useState(true);
+  const [nextAnalysis, setNextAnalysis] = useState(null);
 
   useEffect(() => {
     initializeApp();
