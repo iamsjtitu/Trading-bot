@@ -274,6 +274,37 @@ async def get_active_trades():
         logger.error(f"Get active trades error: {e}")
         return {"status": "error", "message": str(e)}
 
+@api_router.get("/trades/today")
+async def get_today_trades_summary():
+    """Get today's trades summary including closed trades"""
+    try:
+        # Get today's start time
+        today_start = datetime.now(timezone.utc).replace(hour=0, minute=0, second=0, microsecond=0)
+        
+        # Get all trades from today (both open and closed)
+        all_trades = await db.paper_trades.find({
+            'entry_time': {'$gte': today_start.isoformat()}
+        }).to_list(1000)
+        
+        # Calculate today's P&L from closed trades
+        closed_trades = [t for t in all_trades if t.get('status') == 'CLOSED']
+        today_pnl = sum(trade.get('pnl', 0) for trade in closed_trades)
+        
+        # Get active trades count
+        open_trades = [t for t in all_trades if t.get('status') == 'OPEN']
+        
+        return {
+            "status": "success",
+            "total_trades_today": len(all_trades),
+            "closed_trades": len(closed_trades),
+            "open_trades": len(open_trades),
+            "today_pnl": today_pnl,
+            "today_invested": sum(t.get('investment', 0) for t in all_trades)
+        }
+    except Exception as e:
+        logger.error(f"Get today trades error: {e}")
+        return {"status": "error", "message": str(e)}
+
 @api_router.get("/trades/history")
 async def get_trade_history(limit: int = 50):
     """Get trade history"""
