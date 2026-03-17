@@ -29,6 +29,15 @@ const API_PORT = 9877;
 const dataDir = path.join(app.getPath('userData'), 'data');
 if (!fs.existsSync(dataDir)) fs.mkdirSync(dataDir, { recursive: true });
 
+// Update state - accessible via /api/update-status
+const updateState = {
+  status: 'idle', // idle, checking, available, downloading, downloaded, error, up-to-date
+  currentVersion: '',
+  newVersion: '',
+  progress: 0,
+  message: '',
+};
+
 // ============ JSON DATABASE ============
 class JsonDatabase {
   constructor(folder) {
@@ -102,7 +111,30 @@ function createApiServer(db) {
 
   // Health endpoint
   apiApp.get('/api/health', (req, res) => {
-    res.json({ status: 'healthy', timestamp: new Date().toISOString(), services: { news: 'active', sentiment: 'active', trading: 'active' } });
+    res.json({ status: 'healthy', timestamp: new Date().toISOString(), version: app.getVersion(), services: { news: 'active', sentiment: 'active', trading: 'active' } });
+  });
+
+  // Update status endpoint - frontend can poll this
+  apiApp.get('/api/update-status', (req, res) => {
+    res.json(updateState);
+  });
+
+  // Trigger update check
+  apiApp.post('/api/check-update', (req, res) => {
+    autoUpdater.checkForUpdates().catch(() => {});
+    res.json({ status: 'success', message: 'Checking for updates...' });
+  });
+
+  // Trigger download
+  apiApp.post('/api/download-update', (req, res) => {
+    autoUpdater.downloadUpdate().catch(() => {});
+    res.json({ status: 'success', message: 'Downloading...' });
+  });
+
+  // Install update
+  apiApp.post('/api/install-update', (req, res) => {
+    app.isQuitting = true;
+    autoUpdater.quitAndInstall();
   });
 
   // Serve frontend - check multiple possible locations
@@ -228,34 +260,70 @@ function createTray() {
 
 // ============ AUTO UPDATER ============
 function setupAutoUpdater() {
+  updateState.currentVersion = app.getVersion();
   autoUpdater.autoDownload = false;
   autoUpdater.autoInstallOnAppQuit = true;
 
+  autoUpdater.on('checking-for-update', () => {
+    updateState.status = 'checking';
+    updateState.message = 'Checking for updates...';
+    sendUpdateToRenderer();
+  });
+
   autoUpdater.on('update-available', (info) => {
-    if (!mainWindow) return;
-    dialog.showMessageBox(mainWindow, {
-      type: 'info', title: 'Update Available',
-      message: `v${info.version} available!`,
-      detail: `Current: v${app.getVersion()}\nDownload karein?`,
-      buttons: ['Download', 'Later']
-    }).then(r => { if (r.response === 0) autoUpdater.downloadUpdate(); });
+    updateState.status = 'available';
+    updateState.newVersion = info.version;
+    updateState.message = `v${info.version} available! Current: v${app.getVersion()}`;
+    sendUpdateToRenderer();
+  });
+
+  autoUpdater.on('update-not-available', () => {
+    updateState.status = 'up-to-date';
+    updateState.message = `v${app.getVersion()} is the latest version`;
+    sendUpdateToRenderer();
   });
 
   autoUpdater.on('download-progress', (p) => {
+    updateState.status = 'downloading';
+    updateState.progress = Math.round(p.percent);
+    updateState.message = `Downloading: ${Math.round(p.percent)}% (${formatBytes(p.transferred)}/${formatBytes(p.total)})`;
     if (mainWindow) mainWindow.setProgressBar(Math.round(p.percent) / 100);
+    sendUpdateToRenderer();
   });
 
-  autoUpdater.on('update-downloaded', () => {
+  autoUpdater.on('update-downloaded', (info) => {
+    updateState.status = 'downloaded';
+    updateState.newVersion = info.version;
+    updateState.progress = 100;
+    updateState.message = `v${info.version} ready to install! Restart to update.`;
     if (mainWindow) mainWindow.setProgressBar(-1);
-    dialog.showMessageBox(mainWindow, {
-      type: 'info', title: 'Update Ready',
-      message: 'Update ready! Restart karein?',
-      buttons: ['Restart', 'Later']
-    }).then(r => { if (r.response === 0) { app.isQuitting = true; autoUpdater.quitAndInstall(); } });
+    sendUpdateToRenderer();
   });
 
-  autoUpdater.on('error', (e) => logError('UPDATER', e));
+  autoUpdater.on('error', (e) => {
+    updateState.status = 'error';
+    updateState.message = `Update error: ${e.message || e}`;
+    logError('UPDATER', e);
+    sendUpdateToRenderer();
+  });
+
   setTimeout(() => autoUpdater.checkForUpdates().catch(() => {}), 5000);
+}
+
+function sendUpdateToRenderer() {
+  if (mainWindow && !mainWindow.isDestroyed()) {
+    mainWindow.webContents.executeJavaScript(`
+      window.dispatchEvent(new CustomEvent('app-update', { detail: ${JSON.stringify(updateState)} }));
+    `).catch(() => {});
+  }
+}
+
+function formatBytes(bytes) {
+  if (!bytes) return '0 B';
+  const k = 1024;
+  const sizes = ['B', 'KB', 'MB', 'GB'];
+  const i = Math.floor(Math.log(bytes) / Math.log(k));
+  return (bytes / Math.pow(k, i)).toFixed(1) + ' ' + sizes[i];
 }
 
 // ============ APP LIFECYCLE ============
