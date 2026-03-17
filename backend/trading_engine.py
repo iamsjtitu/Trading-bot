@@ -201,15 +201,14 @@ class TradingEngine:
             await self.initialize_portfolio()
             portfolio = await self.db.portfolio.find_one({'type': 'paper'})
         
-        # Calculate current P&L from open positions
+        # Calculate current P&L from open positions with live simulation
         open_trades = await self.db.paper_trades.find({'status': 'OPEN'}).to_list(1000)
         current_value = portfolio['available_capital']
         
-        # In real scenario, would fetch current option prices
-        # For demo, simulate some profit/loss
+        # Simulate price movements for demo
+        import random
         for trade in open_trades:
             # Simulate 5-15% random movement
-            import random
             price_change = random.uniform(-0.15, 0.15)
             current_price = trade['entry_price'] * (1 + price_change)
             position_value = current_price * trade['quantity']
@@ -229,3 +228,25 @@ class TradingEngine:
             'winning_trades': portfolio['winning_trades'],
             'losing_trades': portfolio['losing_trades']
         }
+    
+    async def get_trade_with_live_pnl(self, trade: Dict) -> Dict:
+        """Calculate live P&L for a trade"""
+        import random
+        
+        # Simulate current price movement
+        price_change = random.uniform(-0.15, 0.15)
+        current_price = trade['entry_price'] * (1 + price_change)
+        
+        # Calculate P&L
+        if trade['status'] == 'OPEN':
+            current_value = current_price * trade['quantity']
+            investment = trade['investment']
+            pnl = current_value - investment
+            pnl_percentage = (pnl / investment) * 100
+            
+            trade['current_price'] = round(current_price, 2)
+            trade['current_value'] = round(current_value, 2)
+            trade['live_pnl'] = round(pnl, 2)
+            trade['pnl_percentage'] = round(pnl_percentage, 2)
+        
+        return trade
