@@ -166,12 +166,13 @@ function App() {
   const loadData = async () => {
     setLoading(true);
     try {
-      const [portfolioRes, newsRes, signalsRes, tradesRes, statsRes] = await Promise.all([
+      const [portfolioRes, newsRes, signalsRes, tradesRes, statsRes, todayRes] = await Promise.all([
         axios.get(`${API}/portfolio`),
         axios.get(`${API}/news/latest?limit=10`),
         axios.get(`${API}/signals/latest?limit=10`),
         axios.get(`${API}/trades/active`),
-        axios.get(`${API}/stats`)
+        axios.get(`${API}/stats`),
+        axios.get(`${API}/trades/today`)
       ]);
 
       setPortfolio(portfolioRes.data);
@@ -180,17 +181,15 @@ function App() {
       setTrades(tradesRes.data.trades || []);
       setStats(statsRes.data.stats || {});
       
-      // Calculate risk metrics
-      const todayTradesData = tradesRes.data.trades || [];
-      const dailyUsed = todayTradesData.reduce((sum, t) => sum + (t.investment || 0), 0);
-      const todayPnL = todayTradesData.reduce((sum, t) => sum + (t.pnl || 0), 0);
+      // Calculate risk metrics with today's data
+      const todayData = todayRes.data;
       
       setRiskMetrics({
-        dailyUsed,
+        dailyUsed: todayData.today_invested || 0,
         dailyLimit: 100000,
         maxPerTrade: 20000,
-        todayTrades: todayTradesData.length,
-        todayPnL
+        todayTrades: todayData.total_trades_today || 0,
+        todayPnL: todayData.today_pnl || 0
       });
     } catch (error) {
       console.error('Load data error:', error);
