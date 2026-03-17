@@ -380,6 +380,25 @@ function App() {
       </header>
 
       <div className="container mx-auto px-4 py-6">
+        {/* LIVE Trading Warning Banner */}
+        {tradingMode === 'LIVE' && (
+          <div className="bg-gradient-to-r from-red-600 to-orange-600 text-white p-4 rounded-lg mb-4 shadow-lg border-2 border-red-700 animate-pulse">
+            <div className="flex items-center gap-3">
+              <div className="text-3xl">⚠️</div>
+              <div className="flex-1">
+                <h3 className="font-bold text-lg">🔴 LIVE TRADING MODE ACTIVE</h3>
+                <p className="text-sm">You are trading with REAL MONEY! All trades will be executed on Upstox. Be careful!</p>
+              </div>
+              <Button
+                onClick={() => setShowSettings(true)}
+                className="bg-white text-red-600 hover:bg-gray-100"
+              >
+                ⚙️ Settings
+              </Button>
+            </div>
+          </div>
+        )}
+
         {/* Live Market Indices Ticker */}
         <div className="bg-white border border-gray-200 rounded-lg shadow-md p-3 mb-4 overflow-hidden" data-testid="market-ticker">
           <div className="flex items-center gap-6 overflow-x-auto">
