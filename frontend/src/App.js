@@ -107,13 +107,31 @@ function App() {
   };
 
   const fetchNewNews = async () => {
+    if (emergencyStop) {
+      addNotification('warning', '🛑 Trading stopped! Enable trading first.');
+      return;
+    }
+    
     setFetchingNews(true);
     try {
       const response = await axios.get(`${API}/news/fetch`);
       console.log('News fetched:', response.data);
+      
+      // Check for high confidence signals
+      const articles = response.data.articles || [];
+      const highConfidence = articles.filter(a => 
+        a.sentiment_analysis?.confidence >= 80 && a.signal_generated
+      );
+      
+      if (highConfidence.length > 0) {
+        addNotification('success', `🎯 ${highConfidence.length} high-confidence signal(s) generated!`);
+      }
+      
+      addNotification('info', `📰 Analyzed ${articles.length} news articles`);
       await loadData(); // Reload all data
     } catch (error) {
       console.error('Fetch news error:', error);
+      addNotification('error', '❌ Failed to fetch news');
     } finally {
       setFetchingNews(false);
     }
