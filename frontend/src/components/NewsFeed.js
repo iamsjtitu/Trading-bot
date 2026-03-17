@@ -54,6 +54,9 @@ export default function NewsFeed({ news, formatTime }) {
                   <>
                     <span>Confidence: {article.sentiment_analysis.confidence}%</span>
                     <span>{article.sentiment_analysis.impact} Impact</span>
+                    {article.sentiment_analysis.sector && article.sentiment_analysis.sector !== 'BROAD_MARKET' && (
+                      <Badge className="bg-purple-100 text-purple-700 text-xs">{article.sentiment_analysis.sector}</Badge>
+                    )}
                   </>
                 )}
               </div>

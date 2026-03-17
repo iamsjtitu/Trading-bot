@@ -415,7 +415,7 @@ function App() {
           <TabsContent value="news"><NewsFeed news={news} formatTime={formatTime} /></TabsContent>
           <TabsContent value="signals"><SignalsList signals={signals} formatCurrency={formatCurrency} formatTime={formatTime} /></TabsContent>
           <TabsContent value="trades"><TradesList trades={trades} formatCurrency={formatCurrency} formatTime={formatTime} /></TabsContent>
-          <TabsContent value="history"><TradeHistory orders={upstoxOrders} formatCurrency={formatCurrency} /></TabsContent>
+          <TabsContent value="history"><TradeHistory formatCurrency={formatCurrency} /></TabsContent>
           <TabsContent value="calculator"><PositionCalculator riskMetrics={riskMetrics} formatCurrency={formatCurrency} /></TabsContent>
           <TabsContent value="analytics"><TradeAnalytics /></TabsContent>
         </Tabs>

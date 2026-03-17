@@ -36,38 +36,81 @@ module.exports = function (db) {
 
   // ============ Sentiment Analysis ============
 
-  // Keyword-based fallback when no AI key
+  // Track recent sentiments for trend-aware scoring
+  const recentSentiments = [];
+
+  function getTrendAdjustment(currentSentiment) {
+    if (recentSentiments.length < 3) return 0;
+    const recent = recentSentiments.slice(-5);
+    const sameCount = recent.filter(s => s.sentiment === currentSentiment).length;
+    if (sameCount >= 4) return 8;
+    if (sameCount >= 3) return 4;
+    if (sameCount <= 1) return -5;
+    return 0;
+  }
+
+  function detectSector(text) {
+    const t = text.toLowerCase();
+    const sectors = {
+      BANKING: ['bank', 'nifty bank', 'banknifty', 'rbi', 'interest rate', 'repo rate', 'credit', 'loan', 'npa', 'hdfc', 'icici', 'sbi', 'kotak', 'axis bank'],
+      IT: ['it sector', 'tech', 'infosys', 'tcs', 'wipro', 'hcl tech', 'software', 'digital', 'ai ', 'artificial intelligence'],
+      PHARMA: ['pharma', 'drug', 'medicine', 'health', 'hospital', 'vaccine', 'fda', 'cipla', 'sun pharma', 'dr reddy'],
+      AUTO: ['auto', 'vehicle', 'car', 'tata motors', 'maruti', 'mahindra', 'ev ', 'electric vehicle'],
+      ENERGY: ['oil', 'gas', 'energy', 'reliance', 'ongc', 'crude', 'petrol', 'diesel', 'power', 'solar', 'renewable'],
+      METAL: ['metal', 'steel', 'iron', 'copper', 'aluminium', 'tata steel', 'jsw', 'hindalco', 'vedanta'],
+      FMCG: ['fmcg', 'consumer', 'itc', 'hindustan unilever', 'nestle', 'britannia', 'food', 'retail'],
+    };
+    for (const [sector, keywords] of Object.entries(sectors)) {
+      if (keywords.some(kw => t.includes(kw))) return sector;
+    }
+    return 'BROAD_MARKET';
+  }
+
+  // Enhanced keyword-based fallback with weighted scoring
   function keywordSentiment(article) {
     const text = `${article.title || ''} ${article.description || ''}`.toLowerCase();
 
-    const bullish = ['rally', 'surge', 'gain', 'rise', 'bull', 'high', 'record', 'positive', 'strong', 'boost', 'growth', 'profit', 'earnings beat', 'upgrade', 'outperform', 'breakout', 'recovery', 'optimism', 'buy', 'inflows', 'fii buying', 'all-time high', 'green', 'uptrend', 'bullish'];
-    const bearish = ['crash', 'fall', 'drop', 'decline', 'bear', 'low', 'sell', 'negative', 'weak', 'loss', 'fear', 'panic', 'downgrade', 'underperform', 'correction', 'recession', 'inflation', 'outflows', 'fii selling', 'red', 'downtrend', 'bearish', 'pressure', 'slump', 'warning'];
+    const bullishHigh = ['all-time high', 'record high', 'massive rally', 'strong earnings', 'rate cut', 'fii buying', 'breakout'];
+    const bullishMid = ['rally', 'surge', 'gain', 'bull', 'positive', 'boost', 'growth', 'profit', 'upgrade', 'outperform', 'recovery', 'inflows', 'green', 'uptrend', 'bullish', 'optimism'];
+    const bullishLow = ['rise', 'high', 'strong', 'buy', 'good', 'better', 'stable'];
 
-    let bullScore = 0, bearScore = 0;
-    for (const kw of bullish) { if (text.includes(kw)) bullScore++; }
-    for (const kw of bearish) { if (text.includes(kw)) bearScore++; }
+    const bearishHigh = ['crash', 'panic selling', 'circuit break', 'recession', 'rate hike', 'fii selling', 'meltdown'];
+    const bearishMid = ['fall', 'drop', 'decline', 'bear', 'negative', 'weak', 'loss', 'fear', 'downgrade', 'underperform', 'correction', 'outflows', 'red', 'downtrend', 'bearish', 'pressure', 'slump'];
+    const bearishLow = ['sell', 'low', 'warning', 'concern', 'risk', 'inflation', 'uncertainty'];
+
+    let bullScore = bullishHigh.filter(kw => text.includes(kw)).length * 3;
+    bullScore += bullishMid.filter(kw => text.includes(kw)).length * 2;
+    bullScore += bullishLow.filter(kw => text.includes(kw)).length;
+
+    let bearScore = bearishHigh.filter(kw => text.includes(kw)).length * 3;
+    bearScore += bearishMid.filter(kw => text.includes(kw)).length * 2;
+    bearScore += bearishLow.filter(kw => text.includes(kw)).length;
 
     const total = bullScore + bearScore;
-    if (total === 0) return { sentiment: 'NEUTRAL', confidence: 55, impact: 'LOW', reason: 'No strong keywords detected (keyword analysis)', trading_signal: 'HOLD' };
+    const sector = detectSector(text);
+
+    if (total === 0) return { sentiment: 'NEUTRAL', confidence: 50, impact: 'LOW', sector, reason: 'No strong keywords detected (keyword analysis)', trading_signal: 'HOLD' };
 
     const dominant = bullScore > bearScore ? 'BULLISH' : bearScore > bullScore ? 'BEARISH' : 'NEUTRAL';
     const diff = Math.abs(bullScore - bearScore);
-    const confidence = Math.min(85, 55 + diff * 8);
-    const impact = diff >= 3 ? 'HIGH' : diff >= 2 ? 'MEDIUM' : 'LOW';
+    let confidence = Math.min(90, 50 + diff * 5);
+    const impact = diff >= 6 ? 'HIGH' : diff >= 3 ? 'MEDIUM' : 'LOW';
+
+    // Apply trend adjustment
+    const trendAdj = getTrendAdjustment(dominant);
+    confidence = Math.max(30, Math.min(95, confidence + trendAdj));
 
     let signal = 'HOLD';
-    if (dominant === 'BULLISH' && confidence >= 63) signal = 'BUY_CALL';
-    else if (dominant === 'BEARISH' && confidence >= 63) signal = 'BUY_PUT';
+    if (dominant === 'BULLISH' && confidence >= 63 && impact !== 'LOW') signal = 'BUY_CALL';
+    else if (dominant === 'BEARISH' && confidence >= 63 && impact !== 'LOW') signal = 'BUY_PUT';
 
-    const matchedBull = bullish.filter(kw => text.includes(kw)).slice(0, 3).join(', ');
-    const matchedBear = bearish.filter(kw => text.includes(kw)).slice(0, 3).join(', ');
-    const reason = dominant === 'BULLISH'
-      ? `Bullish keywords: ${matchedBull} (keyword analysis)`
-      : dominant === 'BEARISH'
-        ? `Bearish keywords: ${matchedBear} (keyword analysis)`
-        : 'Mixed signals (keyword analysis)';
+    const allKw = dominant === 'BULLISH' ? [...bullishHigh, ...bullishMid] : [...bearishHigh, ...bearishMid];
+    const matched = allKw.filter(kw => text.includes(kw)).slice(0, 4);
+    const reason = dominant !== 'NEUTRAL'
+      ? `${dominant.charAt(0) + dominant.slice(1).toLowerCase()} signals [${sector}]: ${matched.join(', ')} (keyword analysis)`
+      : `Mixed signals [${sector}] (keyword analysis)`;
 
-    return { sentiment: dominant, confidence, impact, reason, trading_signal: signal };
+    return { sentiment: dominant, confidence, impact, sector, reason, trading_signal: signal };
   }
 
   async function analyzeSentiment(article) {
@@ -78,40 +121,74 @@ module.exports = function (db) {
       try {
         const client = new OpenAI({ apiKey: aiKey, baseURL: 'https://integrations.emergentagent.com/llm' });
 
-        const systemMsg = `You are a professional financial market analyst specializing in sentiment analysis for options trading.
-Analyze news articles and determine their impact on the Indian stock market (Nifty 50, Bank Nifty).
+        const systemMsg = `You are an expert Indian stock market analyst with deep knowledge of Nifty 50, Bank Nifty, and sectoral indices. You specialize in options trading sentiment analysis.
+
+Analyze the given news article considering:
+1. DIRECT MARKET IMPACT - How will this news move Nifty/BankNifty in the next 1-3 hours?
+2. SECTOR IMPACT - Which sector is most affected?
+3. FII/DII FLOW IMPACT - Will this attract or repel institutional money?
+4. GLOBAL CORRELATION - Is this aligned with global market trends?
+5. HISTORICAL PATTERN - Similar news in the past led to what market movement?
+
 Provide analysis in this EXACT format:
 SENTIMENT: [BULLISH/BEARISH/NEUTRAL]
 CONFIDENCE: [0-100]
 IMPACT: [HIGH/MEDIUM/LOW]
-REASON: [One line explanation]
-TRADING_SIGNAL: [BUY_CALL/BUY_PUT/HOLD]`;
+SECTOR: [BANKING/IT/PHARMA/AUTO/ENERGY/METAL/FMCG/BROAD_MARKET]
+REASON: [Detailed one-line explanation with specific market impact prediction]
+TRADING_SIGNAL: [BUY_CALL/BUY_PUT/HOLD]
 
-        const userMsg = `Title: ${article.title || ''}\nDescription: ${article.description || ''}\nSource: ${article.source || ''}`;
+Confidence Guide:
+- 85-100: Clear directional news with strong precedent (rate cuts, major earnings, policy changes)
+- 70-84: Strong sentiment with moderate certainty (sector rotation, FII data, global cues)
+- 55-69: Mild sentiment, mixed signals
+- Below 55: Unclear impact, recommend HOLD
+
+Be conservative - only recommend BUY_CALL/BUY_PUT when confidence >= 65 and impact is MEDIUM or HIGH.`;
+
+        const userMsg = `Title: ${article.title || ''}\nDescription: ${article.description || ''}\nSource: ${article.source || ''}\nPublished: ${article.published_at || ''}`;
 
         const completion = await client.chat.completions.create({
           model: 'openai/gpt-4.1-mini',
           messages: [{ role: 'system', content: systemMsg }, { role: 'user', content: userMsg }],
-          max_tokens: 300,
+          max_tokens: 400,
         });
 
-        return parseSentiment(completion.choices?.[0]?.message?.content || '');
+        const result = parseSentiment(completion.choices?.[0]?.message?.content || '');
+
+        // Apply trend adjustment
+        const trendAdj = getTrendAdjustment(result.sentiment);
+        result.confidence = Math.max(30, Math.min(98, result.confidence + trendAdj));
+        if (trendAdj !== 0) result.trend_note = `Confidence adjusted by ${trendAdj > 0 ? '+' : ''}${trendAdj} based on recent trend`;
+
+        // Detect sector if AI didn't provide
+        if (!result.sector) {
+          result.sector = detectSector(`${article.title || ''} ${article.description || ''}`);
+        }
+
+        recentSentiments.push(result);
+        if (recentSentiments.length > 20) recentSentiments.splice(0, recentSentiments.length - 20);
+        return result;
       } catch (err) {
         console.error('[Sentiment] AI error, falling back to keywords:', err.message);
       }
     }
 
     // Fallback: keyword-based analysis
-    return keywordSentiment(article);
+    const result = keywordSentiment(article);
+    recentSentiments.push(result);
+    if (recentSentiments.length > 20) recentSentiments.splice(0, recentSentiments.length - 20);
+    return result;
   }
 
   function parseSentiment(text) {
-    const result = { sentiment: 'NEUTRAL', confidence: 50, impact: 'LOW', reason: '', trading_signal: 'HOLD' };
+    const result = { sentiment: 'NEUTRAL', confidence: 50, impact: 'LOW', sector: 'BROAD_MARKET', reason: '', trading_signal: 'HOLD' };
     for (const line of text.split('\n')) {
       const l = line.trim();
       if (l.startsWith('SENTIMENT:')) result.sentiment = l.split(':').slice(1).join(':').trim();
       else if (l.startsWith('CONFIDENCE:')) result.confidence = parseInt(l.split(':').slice(1).join(':').trim()) || 50;
       else if (l.startsWith('IMPACT:')) result.impact = l.split(':').slice(1).join(':').trim();
+      else if (l.startsWith('SECTOR:')) result.sector = l.split(':').slice(1).join(':').trim();
       else if (l.startsWith('REASON:')) result.reason = l.split(':').slice(1).join(':').trim();
       else if (l.startsWith('TRADING_SIGNAL:')) result.trading_signal = l.split(':').slice(1).join(':').trim();
     }

@@ -80,14 +80,149 @@ module.exports = function (db) {
     });
   });
 
-  // GET /api/trades/history
+  // GET /api/trades/history (enhanced with filters)
   router.get('/api/trades/history', (req, res) => {
-    const limit = parseInt(req.query.limit) || 50;
-    const trades = (db.data.trades || [])
-      .slice()
-      .sort((a, b) => (b.entry_time || '').localeCompare(a.entry_time || ''))
-      .slice(0, limit);
-    res.json({ status: 'success', count: trades.length, trades });
+    const limit = parseInt(req.query.limit) || 200;
+    const { trade_type, status, date_from, date_to, sort_by, sort_order } = req.query;
+
+    let trades = (db.data.trades || []).slice();
+
+    // Apply filters
+    if (trade_type && trade_type !== 'all') {
+      trades = trades.filter(t => t.trade_type === trade_type);
+    }
+    if (status && status !== 'all') {
+      trades = trades.filter(t => t.status === status);
+    }
+    if (date_from) {
+      trades = trades.filter(t => (t.entry_time || '') >= date_from);
+    }
+    if (date_to) {
+      trades = trades.filter(t => (t.entry_time || '') <= date_to + 'T23:59:59');
+    }
+
+    // Sort
+    const field = ['entry_time', 'pnl', 'investment', 'pnl_percentage'].includes(sort_by) ? sort_by : 'entry_time';
+    const dir = sort_order === 'asc' ? 1 : -1;
+    trades.sort((a, b) => {
+      const va = a[field] || 0;
+      const vb = b[field] || 0;
+      if (typeof va === 'string') return dir * va.localeCompare(vb);
+      return dir * (va - vb);
+    });
+
+    trades = trades.slice(0, limit);
+
+    // Summary stats
+    const closed = trades.filter(t => t.status === 'CLOSED');
+    const wins = closed.filter(t => (t.pnl || 0) > 0);
+    const losses = closed.filter(t => (t.pnl || 0) <= 0);
+    const totalPnl = closed.reduce((s, t) => s + (t.pnl || 0), 0);
+    const avgWin = wins.length ? wins.reduce((s, t) => s + t.pnl, 0) / wins.length : 0;
+    const avgLoss = losses.length ? losses.reduce((s, t) => s + t.pnl, 0) / losses.length : 0;
+    const totalInvestment = trades.reduce((s, t) => s + (t.investment || 0), 0);
+
+    const summary = {
+      total_trades: trades.length,
+      closed_trades: closed.length,
+      open_trades: trades.filter(t => t.status === 'OPEN').length,
+      winning_trades: wins.length,
+      losing_trades: losses.length,
+      win_rate: closed.length ? Math.round((wins.length / closed.length) * 1000) / 10 : 0,
+      total_pnl: Math.round(totalPnl * 100) / 100,
+      avg_win: Math.round(avgWin * 100) / 100,
+      avg_loss: Math.round(avgLoss * 100) / 100,
+      total_investment: Math.round(totalInvestment * 100) / 100,
+      best_trade: closed.length ? Math.round(Math.max(...closed.map(t => t.pnl || 0)) * 100) / 100 : 0,
+      worst_trade: closed.length ? Math.round(Math.min(...closed.map(t => t.pnl || 0)) * 100) / 100 : 0,
+    };
+
+    res.json({ status: 'success', count: trades.length, trades, summary });
+  });
+
+  // GET /api/daily-summary
+  router.get('/api/daily-summary', (req, res) => {
+    const todayStart = new Date(); todayStart.setHours(0, 0, 0, 0);
+    const todayISO = todayStart.toISOString();
+
+    const allTrades = (db.data.trades || []).filter(t => (t.entry_time || '') >= todayISO);
+    const closed = allTrades.filter(t => t.status === 'CLOSED');
+    const open = allTrades.filter(t => t.status === 'OPEN');
+    const wins = closed.filter(t => (t.pnl || 0) > 0);
+    const totalPnl = closed.reduce((s, t) => s + (t.pnl || 0), 0);
+    const totalInvested = allTrades.reduce((s, t) => s + (t.investment || 0), 0);
+    const signals = (db.data.signals || []).filter(s => (s.created_at || '') >= todayISO);
+    const newsCount = (db.data.news_articles || []).filter(n => (n.created_at || '') >= todayISO).length;
+
+    res.json({
+      status: 'success',
+      summary: {
+        date: todayStart.toISOString().split('T')[0],
+        total_trades: allTrades.length,
+        closed_trades: closed.length,
+        open_trades: open.length,
+        winning_trades: wins.length,
+        losing_trades: closed.length - wins.length,
+        win_rate: closed.length ? Math.round((wins.length / closed.length) * 1000) / 10 : 0,
+        total_pnl: Math.round(totalPnl * 100) / 100,
+        total_invested: Math.round(totalInvested * 100) / 100,
+        signals_generated: signals.length,
+        news_analyzed: newsCount,
+        best_trade: closed.length ? Math.round(Math.max(...closed.map(t => t.pnl || 0)) * 100) / 100 : 0,
+        worst_trade: closed.length ? Math.round(Math.min(...closed.map(t => t.pnl || 0)) * 100) / 100 : 0,
+      },
+    });
+  });
+
+  // POST /api/telegram/send-daily-summary
+  router.post('/api/telegram/send-daily-summary', async (req, res) => {
+    try {
+      const settings = db.data.settings || {};
+      const telegram = settings.telegram || {};
+      if (!telegram.enabled || !telegram.bot_token || !telegram.chat_id) {
+        return res.json({ status: 'error', message: 'Telegram not configured. Enable it in Settings > Advanced > Telegram.' });
+      }
+
+      const todayStart = new Date(); todayStart.setHours(0, 0, 0, 0);
+      const todayISO = todayStart.toISOString();
+      const allTrades = (db.data.trades || []).filter(t => (t.entry_time || '') >= todayISO);
+      const closed = allTrades.filter(t => t.status === 'CLOSED');
+      const open = allTrades.filter(t => t.status === 'OPEN');
+      const wins = closed.filter(t => (t.pnl || 0) > 0);
+      const totalPnl = closed.reduce((s, t) => s + (t.pnl || 0), 0);
+      const portfolio = db.data.portfolio || {};
+      const mode = settings.trading_mode || 'PAPER';
+      const pnlSign = totalPnl >= 0 ? '+' : '';
+
+      const message = `*AI Trading Bot - Daily Summary*
+*Date:* ${todayStart.toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' })}
+*Mode:* ${mode}
+
+*Today's Performance:*
+Total Trades: ${allTrades.length}
+Closed: ${closed.length} | Open: ${open.length}
+Winning: ${wins.length} | Losing: ${closed.length - wins.length}
+Win Rate: ${closed.length ? Math.round((wins.length / closed.length) * 1000) / 10 : 0}%
+
+*P&L: ${pnlSign}${Math.round(totalPnl).toLocaleString()}*
+
+*Portfolio:*
+Value: ${Math.round(portfolio.current_value || 500000).toLocaleString()}
+Total P&L: ${Math.round(portfolio.total_pnl || 0).toLocaleString()}
+
+_Sent automatically by AI Trading Bot_`;
+
+      const telegramUrl = `https://api.telegram.org/bot${telegram.bot_token}/sendMessage`;
+      const resp = await axios.post(telegramUrl, { chat_id: telegram.chat_id, text: message, parse_mode: 'Markdown' }, { timeout: 15000 });
+      if (resp.data?.ok) {
+        res.json({ status: 'success', message: 'Daily summary sent to Telegram!' });
+      } else {
+        res.json({ status: 'error', message: `Telegram error: ${resp.data?.description || 'Unknown'}` });
+      }
+    } catch (err) {
+      console.error('[Telegram] Daily summary error:', err.message);
+      res.json({ status: 'error', message: err.message });
+    }
   });
 
   // POST /api/auto-exit/check

@@ -8,7 +8,8 @@ from pathlib import Path
 from pydantic import BaseModel, Field, ConfigDict
 from typing import List, Dict, Optional
 import uuid
-from datetime import datetime, timezone
+from datetime import datetime, timezone, timedelta
+import httpx
 
 # Import our services
 from news_service import NewsService
@@ -317,21 +318,151 @@ async def get_today_trades_summary():
         return {"status": "error", "message": str(e)}
 
 @api_router.get("/trades/history")
-async def get_trade_history(limit: int = 50):
-    """Get trade history"""
+async def get_trade_history(limit: int = 200, trade_type: str = None, status: str = None, date_from: str = None, date_to: str = None, sort_by: str = 'entry_time', sort_order: str = 'desc'):
+    """Get trade history with advanced filtering"""
     try:
-        trades = await db.paper_trades.find(
-            {},
-            {"_id": 0}
-        ).sort('entry_time', -1).limit(limit).to_list(limit)
-        
+        query = {}
+        if trade_type and trade_type != 'all':
+            query['trade_type'] = trade_type
+        if status and status != 'all':
+            query['status'] = status
+        if date_from:
+            query.setdefault('entry_time', {})['$gte'] = date_from
+        if date_to:
+            query.setdefault('entry_time', {})['$lte'] = date_to + 'T23:59:59'
+
+        sort_dir = -1 if sort_order == 'desc' else 1
+        valid_sorts = {'entry_time': 'entry_time', 'pnl': 'pnl', 'investment': 'investment', 'pnl_percentage': 'pnl_percentage'}
+        sort_field = valid_sorts.get(sort_by, 'entry_time')
+
+        trades = await db.paper_trades.find(query, {"_id": 0}).sort(sort_field, sort_dir).limit(limit).to_list(limit)
+
+        # Calculate summary stats
+        closed = [t for t in trades if t.get('status') == 'CLOSED']
+        wins = [t for t in closed if (t.get('pnl') or 0) > 0]
+        losses = [t for t in closed if (t.get('pnl') or 0) <= 0]
+        total_pnl = sum(t.get('pnl', 0) for t in closed)
+        avg_win = sum(t.get('pnl', 0) for t in wins) / len(wins) if wins else 0
+        avg_loss = sum(t.get('pnl', 0) for t in losses) / len(losses) if losses else 0
+        total_investment = sum(t.get('investment', 0) for t in trades)
+
+        summary = {
+            'total_trades': len(trades),
+            'closed_trades': len(closed),
+            'open_trades': len([t for t in trades if t.get('status') == 'OPEN']),
+            'winning_trades': len(wins),
+            'losing_trades': len(losses),
+            'win_rate': (len(wins) / max(len(closed), 1)) * 100,
+            'total_pnl': round(total_pnl, 2),
+            'avg_win': round(avg_win, 2),
+            'avg_loss': round(avg_loss, 2),
+            'total_investment': round(total_investment, 2),
+            'best_trade': round(max((t.get('pnl', 0) for t in closed), default=0), 2),
+            'worst_trade': round(min((t.get('pnl', 0) for t in closed), default=0), 2),
+        }
+
         return {
             "status": "success",
             "count": len(trades),
-            "trades": trades
+            "trades": trades,
+            "summary": summary
         }
     except Exception as e:
         logger.error(f"Get trade history error: {e}")
+        return {"status": "error", "message": str(e)}
+
+@api_router.get("/daily-summary")
+async def get_daily_summary():
+    """Get daily P&L summary for today"""
+    try:
+        today_start = datetime.now(timezone.utc).replace(hour=0, minute=0, second=0, microsecond=0)
+        all_trades = await db.paper_trades.find({'entry_time': {'$gte': today_start.isoformat()}}, {"_id": 0}).to_list(1000)
+        closed = [t for t in all_trades if t.get('status') == 'CLOSED']
+        open_trades = [t for t in all_trades if t.get('status') == 'OPEN']
+        wins = [t for t in closed if (t.get('pnl') or 0) > 0]
+        total_pnl = sum(t.get('pnl', 0) for t in closed)
+        total_invested = sum(t.get('investment', 0) for t in all_trades)
+
+        # Get today's signals
+        signals = await db.trading_signals.find({'created_at': {'$gte': today_start.isoformat()}}, {"_id": 0}).to_list(1000)
+        news_count = await db.news_articles.count_documents({'created_at': {'$gte': today_start.isoformat()}})
+
+        summary = {
+            'date': today_start.strftime('%Y-%m-%d'),
+            'total_trades': len(all_trades),
+            'closed_trades': len(closed),
+            'open_trades': len(open_trades),
+            'winning_trades': len(wins),
+            'losing_trades': len(closed) - len(wins),
+            'win_rate': round((len(wins) / max(len(closed), 1)) * 100, 1),
+            'total_pnl': round(total_pnl, 2),
+            'total_invested': round(total_invested, 2),
+            'signals_generated': len(signals),
+            'news_analyzed': news_count,
+            'best_trade': round(max((t.get('pnl', 0) for t in closed), default=0), 2),
+            'worst_trade': round(min((t.get('pnl', 0) for t in closed), default=0), 2),
+        }
+        return {"status": "success", "summary": summary}
+    except Exception as e:
+        logger.error(f"Daily summary error: {e}")
+        return {"status": "error", "message": str(e)}
+
+@api_router.post("/telegram/send-daily-summary")
+async def send_daily_summary_telegram():
+    """Send daily P&L summary to Telegram"""
+    try:
+        settings = await settings_manager.get_settings()
+        telegram = settings.get('telegram', {})
+        if not telegram.get('enabled') or not telegram.get('bot_token') or not telegram.get('chat_id'):
+            return {"status": "error", "message": "Telegram not configured. Enable it in Settings > Advanced > Telegram."}
+
+        # Get daily summary data
+        today_start = datetime.now(timezone.utc).replace(hour=0, minute=0, second=0, microsecond=0)
+        all_trades = await db.paper_trades.find({'entry_time': {'$gte': today_start.isoformat()}}).to_list(1000)
+        closed = [t for t in all_trades if t.get('status') == 'CLOSED']
+        open_trades = [t for t in all_trades if t.get('status') == 'OPEN']
+        wins = [t for t in closed if (t.get('pnl') or 0) > 0]
+        total_pnl = sum(t.get('pnl', 0) for t in closed)
+
+        portfolio = await trading_engine.get_portfolio_summary()
+
+        pnl_emoji = "+" if total_pnl >= 0 else ""
+        mode = settings.get('trading_mode', 'PAPER')
+
+        message = f"""*AI Trading Bot - Daily Summary*
+*Date:* {today_start.strftime('%d %b %Y')}
+*Mode:* {mode}
+
+*Today's Performance:*
+Total Trades: {len(all_trades)}
+Closed: {len(closed)} | Open: {len(open_trades)}
+Winning: {len(wins)} | Losing: {len(closed) - len(wins)}
+Win Rate: {round((len(wins) / max(len(closed), 1)) * 100, 1)}%
+
+*P&L: {pnl_emoji}{round(total_pnl):,}*
+
+*Portfolio:*
+Value: {round(portfolio.get('current_value', 0)):,}
+Total P&L: {round(portfolio.get('total_pnl', 0)):,}
+
+_Sent automatically by AI Trading Bot_"""
+
+        # Send via Telegram API
+        telegram_url = f"https://api.telegram.org/bot{telegram['bot_token']}/sendMessage"
+        async with httpx.AsyncClient() as client:
+            resp = await client.post(telegram_url, json={
+                'chat_id': telegram['chat_id'],
+                'text': message,
+                'parse_mode': 'Markdown',
+            }, timeout=15)
+            data = resp.json()
+            if data.get('ok'):
+                return {"status": "success", "message": "Daily summary sent to Telegram!"}
+            else:
+                return {"status": "error", "message": f"Telegram API error: {data.get('description', 'Unknown')}"}
+
+    except Exception as e:
+        logger.error(f"Telegram summary error: {e}")
         return {"status": "error", "message": str(e)}
 
 @api_router.get("/portfolio", response_model=Portfolio)

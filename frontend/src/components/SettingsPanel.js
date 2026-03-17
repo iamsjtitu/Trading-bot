@@ -20,6 +20,7 @@ export default function SettingsPanel({ onClose, onSave }) {
   const [upstoxStatus, setUpstoxStatus] = useState({ connected: false, message: '' });
   const [authCode, setAuthCode] = useState('');
   const [connectingUpstox, setConnectingUpstox] = useState(false);
+  const [sendingSummary, setSendingSummary] = useState(false);
 
   useEffect(() => {
     loadSettings();
@@ -104,6 +105,24 @@ export default function SettingsPanel({ onClose, onSave }) {
       alert('Connection failed. Please try again.');
     } finally {
       setConnectingUpstox(false);
+    }
+  };
+
+  const sendDailySummary = async () => {
+    setSendingSummary(true);
+    try {
+      // Save settings first to ensure latest telegram config
+      await saveSettings();
+      const res = await axios.post(`${API}/telegram/send-daily-summary`);
+      if (res.data.status === 'success') {
+        alert('Daily summary sent to Telegram!');
+      } else {
+        alert(res.data.message || 'Failed to send summary');
+      }
+    } catch (e) {
+      alert('Error sending summary: ' + (e.response?.data?.message || e.message));
+    } finally {
+      setSendingSummary(false);
     }
   };
 
@@ -425,6 +444,13 @@ export default function SettingsPanel({ onClose, onSave }) {
                         <input type="text" value={settings.telegram?.chat_id || ''} onChange={(e) => updateField('telegram', 'chat_id', e.target.value)} className="w-full px-3 py-2 border border-gray-300 rounded-lg" placeholder="Your Chat ID" data-testid="telegram-chatid" />
                         <p className="text-xs text-gray-500 mt-1">Get ID: Message @userinfobot on Telegram</p>
                       </div>
+                      <div className="flex items-center justify-between">
+                        <div><p className="font-medium text-gray-800">Daily P&L Summary</p><p className="text-xs text-gray-600">Auto-send daily report after market close</p></div>
+                        <Button onClick={() => updateField('telegram', 'daily_summary', !settings.telegram?.daily_summary)} className={settings.telegram?.daily_summary ? 'bg-green-600' : 'bg-gray-400'}>{settings.telegram?.daily_summary ? 'ON' : 'OFF'}</Button>
+                      </div>
+                      <Button onClick={sendDailySummary} disabled={sendingSummary} className="bg-gradient-to-r from-blue-500 to-purple-500 text-white w-full" data-testid="send-daily-summary-btn">
+                        {sendingSummary ? 'Sending...' : 'Send Daily Summary Now'}
+                      </Button>
                     </>
                   )}
                 </div>
