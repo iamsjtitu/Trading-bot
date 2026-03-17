@@ -146,10 +146,16 @@ function App() {
     try {
       const response = await axios.post(`${API}/auto-exit/check`);
       if (response.data.exits_executed > 0) {
-        addNotification('info', `🎯 ${response.data.exits_executed} trade(s) auto-exited!`);
+        const exitMsg = `🎯 ${response.data.exits_executed} trade(s) auto-exited!`;
+        addNotification('info', exitMsg);
+        
         if (response.data.new_trades_generated > 0) {
           addNotification('success', `🚀 ${response.data.new_trades_generated} new trade(s) opened!`);
+        } else if (autoSettings.auto_entry) {
+          // Auto-entry is ON but no new trade generated
+          addNotification('warning', '⚠️ Auto-entry ON but no high-confidence signal found. Will try on next news cycle.');
         }
+        
         await loadData();
       }
     } catch (error) {
