@@ -413,6 +413,67 @@ async def get_auto_settings():
         logger.error(f"Get settings error: {e}")
         return {"status": "error", "message": str(e)}
 
+@api_router.post("/test/generate-trade")
+async def test_generate_trade():
+    """Test endpoint to manually trigger trade generation"""
+    try:
+        # Get or create demo news
+        latest_news = await db.news_articles.find(
+            {},
+            {"_id": 0}
+        ).sort('created_at', -1).limit(1).to_list(1)
+        
+        if not latest_news or len(latest_news) == 0:
+            # Create demo news
+            from news_service import NewsService
+            from sentiment_service import SentimentService
+            
+            news_svc = NewsService()
+            sent_svc = SentimentService()
+            
+            demo_articles = await news_svc.fetch_market_news(max_articles=1)
+            if demo_articles:
+                article = demo_articles[0]
+                article_id = str(uuid.uuid4())
+                sentiment = await sent_svc.analyze_news_sentiment(article)
+                
+                news_doc = {
+                    'id': article_id,
+                    'title': article['title'],
+                    'description': article['description'],
+                    'content': article.get('content', ''),
+                    'source': article['source'],
+                    'url': article['url'],
+                    'published_at': article['published_at'],
+                    'sentiment_analysis': sentiment,
+                    'created_at': datetime.now(timezone.utc).isoformat()
+                }
+                
+                await db.news_articles.insert_one(news_doc)
+                latest_news = [news_doc]
+        
+        if latest_news and len(latest_news) > 0:
+            signal = await trading_engine.generate_trading_signal(latest_news[0])
+            if signal:
+                return {
+                    "status": "success",
+                    "message": "New trade generated",
+                    "signal": signal
+                }
+            else:
+                return {
+                    "status": "failed",
+                    "message": "Could not generate signal - check confidence or limits"
+                }
+        
+        return {
+            "status": "failed",
+            "message": "No news available"
+        }
+    except Exception as e:
+        logger.error(f"Test generate trade error: {e}")
+        return {"status": "error", "message": str(e)}
+
 # Include the router in the main app
 app.include_router(api_router)
 
