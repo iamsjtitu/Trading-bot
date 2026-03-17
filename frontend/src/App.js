@@ -35,6 +35,13 @@ function App() {
     target_pct: 10,
     stoploss_pct: 25
   });
+  const [showAutoSettings, setShowAutoSettings] = useState(false);
+  const [marketIndices, setMarketIndices] = useState({
+    nifty50: { value: 24125.50, change: 0, changePct: 0 },
+    sensex: { value: 79850.25, change: 0, changePct: 0 },
+    banknifty: { value: 52340.75, change: 0, changePct: 0 },
+    finnifty: { value: 23890.30, change: 0, changePct: 0 }
+  });
 
   useEffect(() => {
     initializeApp();
