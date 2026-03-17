@@ -3,6 +3,8 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 
 export default function RiskPanel({ riskMetrics, emergencyStop, onEmergencyStop, formatCurrency }) {
+  const isLive = riskMetrics?.isLive || false;
+
   return (
     <Card className="bg-gradient-to-r from-orange-50 to-red-50 border-orange-200 p-4 mb-4 shadow-lg" data-testid="risk-management-panel">
       <div className="flex items-center justify-between">
@@ -10,32 +12,38 @@ export default function RiskPanel({ riskMetrics, emergencyStop, onEmergencyStop,
           <h2 className="text-lg font-bold text-gray-800 mb-3 flex items-center gap-2">
             Risk Management
             {emergencyStop && <Badge className="bg-red-600">STOPPED</Badge>}
+            {isLive && <Badge className="bg-green-600 text-xs" data-testid="risk-live-badge">LIVE</Badge>}
           </h2>
           <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
             <div>
-              <p className="text-xs text-gray-600 font-medium">Daily Used</p>
+              <p className="text-xs text-gray-600 font-medium">{isLive ? 'Margin Used' : 'Daily Used'}</p>
               <p className="text-lg font-bold text-gray-900">{formatCurrency(riskMetrics.dailyUsed)}</p>
-              <p className="text-xs text-gray-500">of {formatCurrency(riskMetrics.dailyLimit)}</p>
-              <div className="mt-1 h-2 bg-gray-200 rounded-full overflow-hidden">
-                <div
-                  className={`h-full ${riskMetrics.dailyUsed / riskMetrics.dailyLimit > 0.8 ? 'bg-red-500' : 'bg-green-500'}`}
-                  style={{ width: `${Math.min((riskMetrics.dailyUsed / riskMetrics.dailyLimit) * 100, 100)}%` }}
-                />
-              </div>
+              {!isLive && <p className="text-xs text-gray-500">of {formatCurrency(riskMetrics.dailyLimit)}</p>}
+              {isLive && <p className="text-xs text-green-600">Live from Upstox</p>}
+              {!isLive && (
+                <div className="mt-1 h-2 bg-gray-200 rounded-full overflow-hidden">
+                  <div
+                    className={`h-full ${riskMetrics.dailyUsed / riskMetrics.dailyLimit > 0.8 ? 'bg-red-500' : 'bg-green-500'}`}
+                    style={{ width: `${Math.min((riskMetrics.dailyUsed / riskMetrics.dailyLimit) * 100, 100)}%` }}
+                  />
+                </div>
+              )}
             </div>
             <div>
               <p className="text-xs text-gray-600 font-medium">Max Per Trade</p>
               <p className="text-lg font-bold text-gray-900">{formatCurrency(riskMetrics.maxPerTrade)}</p>
             </div>
             <div>
-              <p className="text-xs text-gray-600 font-medium">Today's Trades</p>
+              <p className="text-xs text-gray-600 font-medium">{isLive ? 'Orders Today' : "Today's Trades"}</p>
               <p className="text-lg font-bold text-gray-900">{riskMetrics.todayTrades}</p>
+              {isLive && <p className="text-xs text-green-600">Live from Upstox</p>}
             </div>
             <div>
               <p className="text-xs text-gray-600 font-medium">Today's P&L</p>
               <p className={`text-lg font-bold ${riskMetrics.todayPnL >= 0 ? 'text-green-600' : 'text-red-600'}`}>
                 {formatCurrency(riskMetrics.todayPnL)}
               </p>
+              {isLive && <p className="text-xs text-green-600">Live from Upstox</p>}
             </div>
             <div>
               <p className="text-xs text-gray-600 font-medium">Stop Loss</p>

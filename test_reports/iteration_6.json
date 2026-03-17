@@ -1,0 +1,77 @@
+{
+  "summary": "Testing for LIVE mode fix - When Upstox connected, show LIVE data; otherwise show paper data. Found 1 issue: When in LIVE mode but Upstox NOT connected, Risk Panel shows zeros instead of paper trading fallback data. Backend APIs working correctly (15/15 passed). Frontend tabs and features working.",
+  "backend_issues": {
+    "critical": [],
+    "minor": []
+  },
+  "frontend_issues": {
+    "ui_bugs": [
+      {
+        "component": "RiskPanel / App.js loadData()",
+        "issue": "When mode is LIVE but Upstox is NOT connected, Risk Panel shows zeros (initial state) instead of paper trading data. This is because loadData() skips paper data when mode=LIVE (line 94), and loadUpstoxData() only sets metrics when upstox_connected=true (line 124). Result: zeros displayed in Risk Panel for Daily Used, Today's Trades, Today's P&L",
+        "selector": "[data-testid='risk-management-panel']",
+        "priority": "MEDIUM",
+        "root_cause": "App.js lines 92-109: Paper data is skipped when mode=LIVE, but loadUpstoxData() doesn't set fallback when Upstox disconnected",
+        "suggested_fix": "In loadUpstoxData(), when data.upstox_connected is false AND mode is LIVE, fetch paper trading data as fallback: const fallback = await axios.get(`${API}/trades/today`); setRiskMetrics({...fallbackData, isLive: false})"
+      }
+    ],
+    "integration_issues": [],
+    "design_issues": [
+      {
+        "screen": "Trade History - Exit Price column",
+        "issues": ["Minor: Exit price shows raw float numbers (e.g., 171.23) - cosmetic, carried from previous iteration"]
+      }
+    ]
+  },
+  "test_report_links": [
+    "/app/test_reports/pytest/live_mode_results.xml",
+    "/app/backend/tests/test_live_mode_features.py"
+  ],
+  "action_items": [
+    "FIX NEEDED: In App.js loadUpstoxData(), add fallback to paper data when Upstox is disconnected but mode is LIVE. Otherwise Risk Panel shows zeros instead of paper trading data.",
+    "Alternative fix: In loadData(), change line 94 from `if (mode !== 'LIVE')` to `if (mode !== 'LIVE' || !upstoxConnected)` - but this requires upstoxConnected to be set first from combined-status"
+  ],
+  "critical_code_review_comments": [
+    "App.js lines 92-109: Logic gap - when mode=LIVE but Upstox disconnected, neither paper nor live data is set for riskMetrics",
+    "Portfolio cards correctly show paper data because displayPortfolio (line 279) checks BOTH tradingMode AND upstoxConnected AND livePortfolio",
+    "RiskPanel.js correctly accepts isLive flag and displays appropriate labels",
+    "TradeHistory.js correctly accepts tradingMode, upstoxConnected, upstoxOrders props"
+  ],
+  "updated_files": [
+    "/app/backend/tests/test_live_mode_features.py"
+  ],
+  "success_rate": {
+    "backend": "100% (15/15 tests passed)",
+    "frontend": "90% (Risk Panel zero values issue when LIVE+disconnected)"
+  },
+  "test_credentials": "None required - uses public preview URL",
+  "seed_data_creation": "Existing: 5 closed trades with +12,853 P&L, 100% win rate",
+  "retest_needed": true,
+  "main_agent_can_self_test": true,
+  "context_for_next_testing_agent": "Current state: App is in LIVE mode but Upstox is NOT connected. This causes Risk Panel to show zeros instead of paper trading fallback. The fix is in App.js loadUpstoxData() - need to set paper data as fallback when !upstox_connected. All other features working: Trade History filters/sort/CSV, Trade Analytics charts, Settings panel tabs, all backend APIs.",
+  "tested_features": {
+    "1_paper_mode_risk_data": "PARTIAL - Not in PAPER mode (currently LIVE), but code structure is correct for PAPER mode",
+    "2_paper_mode_portfolio": "PASS - Portfolio cards show paper data when Upstox not connected",
+    "3_risk_panel_labels": "PASS - Shows 'Daily Used', 'Today's Trades' labels (PAPER mode labels)",
+    "4_portfolio_live_text": "PASS - No 'Live from Upstox' text when Upstox disconnected",
+    "5_win_rate_vs_orders": "PASS - Shows 'Win Rate' (not 'Orders Today') since Upstox disconnected",
+    "6_trade_history_filters": "PASS - Status/Type filters, date range, sort working",
+    "7_trade_history_props": "PASS - Component receives tradingMode, upstoxConnected, upstoxOrders props",
+    "8_combined_status_api": "PASS - Returns upstox_connected, portfolio, orders, market_data",
+    "9_trades_history_api": "PASS - Returns trades with summary stats",
+    "10_dashboard_loads": "PASS - No console errors",
+    "11_settings_panel": "PASS - All tabs (Broker, Risk, Schedule, Advanced) working",
+    "12_trade_analytics": "PASS - Charts and stats visible"
+  },
+  "rca_of_issue": {
+    "bug": "Risk Panel shows zeros when in LIVE mode but Upstox not connected",
+    "reproduction_steps": [
+      "1. App is configured with trading_mode=LIVE",
+      "2. Upstox is NOT connected (no access token)",
+      "3. Dashboard loads - Risk Panel shows Daily Used: ₹0, Today's Trades: 0, Today's P&L: ₹0",
+      "4. But /api/trades/today returns actual paper data: 5 trades, ₹12,853 P&L"
+    ],
+    "root_cause": "In App.js loadData() line 94, paper data loading is skipped when mode=LIVE. Then loadUpstoxData() is called (line 108), but it only sets riskMetrics when data.upstox_connected=true (line 124). When Upstox is disconnected, riskMetrics remains at initial useState zeros.",
+    "mitigation": "Add else clause in loadUpstoxData() to fetch and set paper trading data as fallback when !data.upstox_connected"
+  }
+}

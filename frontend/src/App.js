@@ -89,16 +89,21 @@ function App() {
       const mode = settingsRes.data?.settings?.trading_mode || 'PAPER';
       setTradingMode(mode);
 
-      const todayData = todayRes.data;
-      setRiskMetrics({
-        dailyUsed: todayData.today_invested || 0,
-        dailyLimit: 100000,
-        maxPerTrade: 20000,
-        todayTrades: todayData.total_trades_today || 0,
-        todayPnL: todayData.today_pnl || 0
-      });
+      // Only set risk metrics from paper data if NOT in LIVE mode
+      // In LIVE mode, loadUpstoxData() will set live risk metrics
+      if (mode !== 'LIVE') {
+        const todayData = todayRes.data;
+        setRiskMetrics({
+          dailyUsed: todayData.today_invested || 0,
+          dailyLimit: 100000,
+          maxPerTrade: 20000,
+          todayTrades: todayData.total_trades_today || 0,
+          todayPnL: todayData.today_pnl || 0,
+          isLive: false,
+        });
+      }
 
-      // If LIVE mode, fetch Upstox data
+      // If LIVE mode, fetch Upstox data (this will set live risk metrics)
       if (mode === 'LIVE') {
         await loadUpstoxData();
       }
@@ -121,6 +126,21 @@ function App() {
         if (data.portfolio) setLivePortfolio(data.portfolio);
         if (data.orders) setUpstoxOrders(data.orders);
         if (data.profile) setUpstoxProfile(data.profile);
+
+        // Update risk metrics from Upstox live data
+        if (data.portfolio) {
+          const lp = data.portfolio;
+          const todayOrders = (data.orders || []).filter(o => o.status === 'complete' || o.status === 'traded');
+          const completedOrders = data.orders || [];
+          setRiskMetrics({
+            dailyUsed: lp.funds?.used_margin || 0,
+            dailyLimit: (lp.funds?.total || 0) > 0 ? lp.funds.total : 100000,
+            maxPerTrade: 20000,
+            todayTrades: completedOrders.length,
+            todayPnL: lp.total_pnl || 0,
+            isLive: true,
+          });
+        }
       }
     } catch (e) {
       console.error('Upstox data error:', e);
@@ -260,6 +280,9 @@ function App() {
     current_value: (livePortfolio.funds?.total || 0),
     total_pnl: livePortfolio.total_pnl || 0,
     active_positions: livePortfolio.active_positions || 0,
+    total_trades: upstoxOrders.length,
+    winning_trades: upstoxOrders.filter(o => (o.status === 'complete' || o.status === 'traded')).length,
+    isLive: true,
   } : portfolio;
 
   return (
@@ -365,7 +388,7 @@ function App() {
               <div>
                 <p className="text-sm text-gray-600 font-medium">Portfolio Value</p>
                 <p className="text-2xl font-bold text-gray-900">{formatCurrency(displayPortfolio?.current_value || 0)}</p>
-                {tradingMode === 'LIVE' && upstoxConnected && <p className="text-xs text-green-600 mt-1">Live from Upstox</p>}
+                {displayPortfolio?.isLive && <p className="text-xs text-green-600 mt-1">Live from Upstox</p>}
               </div>
               <FaWallet className="text-3xl text-blue-500" />
             </div>
@@ -377,6 +400,7 @@ function App() {
                 <p className={`text-2xl font-bold ${(displayPortfolio?.total_pnl || 0) >= 0 ? 'text-green-600' : 'text-red-600'}`}>
                   {formatCurrency(displayPortfolio?.total_pnl || 0)}
                 </p>
+                {displayPortfolio?.isLive && <p className="text-xs text-green-600 mt-1">Live from Upstox</p>}
               </div>
               <FaChartLine className="text-3xl text-green-500" />
             </div>
@@ -386,6 +410,7 @@ function App() {
               <div>
                 <p className="text-sm text-gray-600 font-medium">Active Positions</p>
                 <p className="text-2xl font-bold text-gray-900">{displayPortfolio?.active_positions || 0}</p>
+                {displayPortfolio?.isLive && <p className="text-xs text-green-600 mt-1">Live from Upstox</p>}
               </div>
               <FaBullseye className="text-3xl text-purple-500" />
             </div>
@@ -393,8 +418,11 @@ function App() {
           <Card className="bg-white border-gray-200 p-4 shadow-md hover:shadow-lg transition-shadow" data-testid="win-rate-card">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm text-gray-600 font-medium">Win Rate</p>
-                <p className="text-2xl font-bold text-gray-900">{stats?.win_rate?.toFixed(1) || 0}%</p>
+                <p className="text-sm text-gray-600 font-medium">{displayPortfolio?.isLive ? 'Orders Today' : 'Win Rate'}</p>
+                <p className="text-2xl font-bold text-gray-900">
+                  {displayPortfolio?.isLive ? (displayPortfolio?.total_trades || 0) : `${stats?.win_rate?.toFixed(1) || 0}%`}
+                </p>
+                {displayPortfolio?.isLive && <p className="text-xs text-green-600 mt-1">Live from Upstox</p>}
               </div>
               <FaBullseye className="text-3xl text-yellow-500" />
             </div>
@@ -415,7 +443,7 @@ function App() {
           <TabsContent value="news"><NewsFeed news={news} formatTime={formatTime} /></TabsContent>
           <TabsContent value="signals"><SignalsList signals={signals} formatCurrency={formatCurrency} formatTime={formatTime} /></TabsContent>
           <TabsContent value="trades"><TradesList trades={trades} formatCurrency={formatCurrency} formatTime={formatTime} /></TabsContent>
-          <TabsContent value="history"><TradeHistory formatCurrency={formatCurrency} /></TabsContent>
+          <TabsContent value="history"><TradeHistory formatCurrency={formatCurrency} tradingMode={tradingMode} upstoxConnected={upstoxConnected} upstoxOrders={upstoxOrders} /></TabsContent>
           <TabsContent value="calculator"><PositionCalculator riskMetrics={riskMetrics} formatCurrency={formatCurrency} /></TabsContent>
           <TabsContent value="analytics"><TradeAnalytics /></TabsContent>
         </Tabs>
