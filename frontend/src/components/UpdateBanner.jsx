@@ -1,7 +1,11 @@
 import { useState, useEffect, useCallback } from 'react';
 import { FaDownload, FaSync, FaCheckCircle, FaExclamationTriangle, FaRedo } from 'react-icons/fa';
 
-const BACKEND_URL = process.env.REACT_APP_BACKEND_URL || '';
+const BACKEND_URL = (() => {
+  const envUrl = process.env.REACT_APP_BACKEND_URL || '';
+  if (typeof window !== 'undefined' && (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1')) return '';
+  return envUrl;
+})();
 const API = `${BACKEND_URL}/api`;
 
 export default function UpdateBanner() {

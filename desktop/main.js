@@ -104,14 +104,27 @@ function createApiServer(db) {
 
   let loaded = 0;
   for (const rm of routeModules) {
-    try { apiApp.use(rm.load()); loaded++; }
-    catch (e) { logError('ROUTE_' + rm.name, e); }
+    try { apiApp.use(rm.load()); loaded++; console.log(`[Route OK] ${rm.name}`); }
+    catch (e) { console.error(`[Route FAIL] ${rm.name}: ${e.message}`); logError('ROUTE_' + rm.name, e); }
   }
   console.log(`[Routes] ${loaded}/${routeModules.length} loaded`);
 
   // Health endpoint
   apiApp.get('/api/health', (req, res) => {
-    res.json({ status: 'healthy', timestamp: new Date().toISOString(), version: app.getVersion(), services: { news: 'active', sentiment: 'active', trading: 'active' } });
+    res.json({ status: 'healthy', timestamp: new Date().toISOString(), version: app.getVersion(), routes_loaded: loaded, services: { news: 'active', sentiment: 'active', trading: 'active' } });
+  });
+
+  // Debug endpoint - helps diagnose desktop issues
+  apiApp.get('/api/debug', (req, res) => {
+    res.json({
+      version: app.getVersion(),
+      routes_loaded: loaded,
+      db_keys: Object.keys(db.data || {}),
+      settings_sources: db.data?.settings?.news?.sources || [],
+      news_count: (db.data?.news_articles || []).length,
+      trades_count: (db.data?.trades || []).length,
+      signals_count: (db.data?.signals || []).length,
+    });
   });
 
   // Update status endpoint - frontend can poll this
@@ -149,17 +162,24 @@ function createApiServer(db) {
 
   if (fs.existsSync(frontendDir)) {
     apiApp.use(express.static(frontendDir, { index: false, maxAge: '1y' }));
-    apiApp.get('{*path}', (req, res) => {
-      if (!req.path.startsWith('/api')) {
+
+    // Catch-all: ONLY serve HTML for non-API routes
+    apiApp.use((req, res, next) => {
+      if (req.path.startsWith('/api')) return next();
+      try {
         let html = fs.readFileSync(path.join(frontendDir, 'index.html'), 'utf8');
         const port = server ? server.address().port : API_PORT;
-        html = html.replace('</head>', `<script>window.REACT_APP_BACKEND_URL='http://127.0.0.1:${port}';</script></head>`);
+        html = html.replace('</head>', `<script>window.__API_PORT__=${port};</script></head>`);
         res.type('html').send(html);
-      } else {
-        res.status(404).json({ detail: 'Not found' });
-      }
+      } catch (e) { next(e); }
     });
   }
+
+  // Global error handler - catches all unhandled errors
+  apiApp.use((err, req, res, next) => {
+    console.error(`[API Error] ${req.method} ${req.path}:`, err.message || err);
+    res.status(500).json({ status: 'error', message: err.message || 'Internal server error' });
+  });
 
   return new Promise((resolve, reject) => {
     server = apiApp.listen(API_PORT, '127.0.0.1', () => {

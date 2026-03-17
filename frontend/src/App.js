@@ -17,7 +17,16 @@ import PositionCalculator from '@/components/PositionCalculator';
 import TradeHistory from '@/components/TradeHistory';
 import UpdateBanner from '@/components/UpdateBanner';
 
-const BACKEND_URL = process.env.REACT_APP_BACKEND_URL || '';
+// Detect if running in desktop (localhost) or web mode
+const BACKEND_URL = (() => {
+  const envUrl = process.env.REACT_APP_BACKEND_URL || '';
+  // In desktop/Electron: use relative URLs (same server)
+  if (typeof window !== 'undefined') {
+    const host = window.location.hostname;
+    if (host === 'localhost' || host === '127.0.0.1') return '';
+  }
+  return envUrl;
+})();
 const API = `${BACKEND_URL}/api`;
 
 function App() {
