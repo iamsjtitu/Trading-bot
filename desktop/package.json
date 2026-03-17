@@ -99,22 +99,13 @@
     "files": [
       "main.js",
       "preload.js",
+      "routes/**/*",
       "assets/**/*"
     ],
     "extraResources": [
       {
-        "from": "../backend",
-        "to": "backend",
-        "filter": [
-          "**/*.py",
-          "requirements.txt",
-          ".env.template",
-          "data/**"
-        ]
-      },
-      {
         "from": "../frontend/build",
-        "to": "backend/../frontend/build",
+        "to": "frontend-build",
         "filter": [
           "**/*"
         ]

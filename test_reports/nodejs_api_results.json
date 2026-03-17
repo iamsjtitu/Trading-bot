@@ -1,0 +1,172 @@
+{
+  "total": 23,
+  "passed": 23,
+  "failed": 0,
+  "tests": [
+    {
+      "name": "GET /api/settings - returns default settings if none exist",
+      "passed": {
+        "type": "main",
+        "trading_mode": "PAPER",
+        "broker": {
+          "api_key": "",
+          "api_secret": "",
+          "redirect_uri": "",
+          "access_token": "",
+          "token_timestamp": ""
+        },
+        "risk": {
+          "initial_capital": 500000,
+          "daily_limit": 100000,
+          "max_per_trade": 20000,
+          "risk_tolerance": "medium",
+          "stop_loss_pct": 25,
+          "target_pct": 50
+        },
+        "schedule": {
+          "enabled": true,
+          "trading_days": [
+            "Monday",
+            "Tuesday",
+            "Wednesday",
+            "Thursday",
+            "Friday"
+          ],
+          "start_time": "09:15",
+          "end_time": "15:30",
+          "timezone": "Asia/Kolkata"
+        },
+        "news": {
+          "sources": [
+            "demo"
+          ],
+          "newsapi_key": "",
+          "alphavantage_key": "",
+          "min_confidence": 60
+        },
+        "auto_trading": {
+          "auto_exit": true,
+          "auto_entry": false,
+          "auto_analysis": true,
+          "target_pct": 10,
+          "stoploss_pct": 25,
+          "analysis_interval_minutes": 5
+        },
+        "ai": {
+          "emergent_llm_key": ""
+        }
+      },
+      "details": ""
+    },
+    {
+      "name": "POST /api/settings/update - updates settings with deep merge",
+      "passed": true,
+      "details": ""
+    },
+    {
+      "name": "POST /api/settings/update - validates risk limits (daily < max)",
+      "passed": true,
+      "details": ""
+    },
+    {
+      "name": "POST /api/settings/update - validates max_per_trade >= 1000",
+      "passed": true,
+      "details": ""
+    },
+    {
+      "name": "GET /api/settings/trading-status - checks trading schedule",
+      "passed": true,
+      "details": ""
+    },
+    {
+      "name": "POST /api/initialize - initializes portfolio",
+      "passed": true,
+      "details": ""
+    },
+    {
+      "name": "GET /api/portfolio - returns portfolio with simulated P&L",
+      "passed": true,
+      "details": ""
+    },
+    {
+      "name": "GET /api/stats - returns overall statistics",
+      "passed": true,
+      "details": ""
+    },
+    {
+      "name": "GET /api/combined-status - returns dashboard status for PAPER mode",
+      "passed": true,
+      "details": ""
+    },
+    {
+      "name": "GET /api/news/fetch - fetches demo news, runs sentiment analysis",
+      "passed": true,
+      "details": ""
+    },
+    {
+      "name": "GET /api/news/latest - returns stored news sorted by date",
+      "passed": true,
+      "details": ""
+    },
+    {
+      "name": "GET /api/signals/latest - returns signals sorted by date",
+      "passed": true,
+      "details": ""
+    },
+    {
+      "name": "GET /api/signals/active - returns active signals only",
+      "passed": true,
+      "details": ""
+    },
+    {
+      "name": "GET /api/trades/active - returns open trades with simulated live P&L",
+      "passed": true,
+      "details": ""
+    },
+    {
+      "name": "GET /api/trades/today - returns today's trade summary",
+      "passed": true,
+      "details": ""
+    },
+    {
+      "name": "GET /api/trades/history - returns all trades sorted by date",
+      "passed": true,
+      "details": ""
+    },
+    {
+      "name": "POST /api/auto-exit/check - checks open trades for target/stoploss exit",
+      "passed": true,
+      "details": ""
+    },
+    {
+      "name": "POST /api/auto-settings/update - updates auto-trading settings",
+      "passed": true,
+      "details": ""
+    },
+    {
+      "name": "GET /api/auto-settings - returns current auto-trading settings",
+      "passed": true,
+      "details": ""
+    },
+    {
+      "name": "POST /api/test/generate-trade - generates trade from existing news",
+      "passed": true,
+      "details": ""
+    },
+    {
+      "name": "GET /api/upstox/auth-url - returns error without broker config",
+      "passed": true,
+      "details": ""
+    },
+    {
+      "name": "GET /api/upstox/connection - returns disconnected without token",
+      "passed": true,
+      "details": ""
+    },
+    {
+      "name": "FULL PIPELINE: fetch news -> generate signal -> execute trade -> auto-exit",
+      "passed": true,
+      "details": ""
+    }
+  ]
+}
