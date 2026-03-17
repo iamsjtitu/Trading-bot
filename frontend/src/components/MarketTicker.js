@@ -30,7 +30,7 @@ export default function MarketTicker({ marketIndices }) {
           );
         })}
         <div className="flex items-center gap-2 border-l border-gray-300 pl-4 flex-shrink-0">
-          <span className="text-xs text-gray-500 italic">Updating every 3 sec</span>
+          <span className="text-xs text-gray-500 italic">Updating every 1 sec</span>
         </div>
       </div>
     </div>

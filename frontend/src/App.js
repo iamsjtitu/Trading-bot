@@ -188,6 +188,12 @@ function App() {
         await axios.post(`${API}/initialize`);
         await loadData();
         await loadAutoSettings();
+        // Load auto-analysis state from settings
+        try {
+          const settingsRes = await axios.get(`${API}/settings`);
+          const autoAnalysis = settingsRes.data?.settings?.auto_trading?.auto_analysis;
+          if (typeof autoAnalysis === 'boolean') setAutoAnalyze(autoAnalysis);
+        } catch (_) {}
       } catch (error) {
         console.error('Initialize error:', error);
       }
@@ -220,7 +226,7 @@ function App() {
           finnifty: { value: prev.finnifty.value + (Math.random() - 0.5) * 40, change: (Math.random() - 0.5) * 80, changePct: (Math.random() - 0.5) * 0.7 }
         }));
       }
-    }, tradingMode === 'LIVE' && upstoxConnected ? 10000 : 3000);
+    }, tradingMode === 'LIVE' && upstoxConnected ? 10000 : 1000);
 
     return () => {
       clearInterval(dataInterval);
