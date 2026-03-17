@@ -1,62 +1,52 @@
 # AI Trading Bot - Product Requirements Document
 
 ## Problem Statement
-AI-powered automated options trading bot that connects to world news, uses AI (GPT-4o) for sentiment analysis (Bullish/Bearish), and executes options (Call/Put) trades based on signals via Upstox broker.
-
-## Core Requirements
-- **Broker:** Upstox (OAuth integration with daily token refresh)
-- **AI Model:** Emergent LLM Key (GPT-4.1-mini)
-- **News Source:** NewsAPI.org / Alpha Vantage / Demo fallback
-- **Trading Style:** Intraday, weekly expiry
-- **Mode:** Paper Trading simulator + Live mode via Upstox
-- **Risk:** Max trade: 20K, Daily limit: 1L, Medium tolerance, SL automation, Emergency stop
-- **User Language:** Hinglish
-- **PWA:** Installable as desktop/mobile app
+AI-powered automated options trading bot with Upstox broker, AI sentiment analysis, live market data, and desktop app support.
 
 ## Architecture
 ```
 /app/
-├── backend/
-│   ├── server.py              # FastAPI API routes
-│   ├── upstox_service.py      # Upstox OAuth, market data, orders, portfolio
-│   ├── news_service.py        # News fetching (NewsAPI/Alpha Vantage/Demo)
-│   ├── sentiment_service.py   # AI sentiment analysis
-│   ├── trading_engine.py      # Paper trading simulation
-│   ├── settings_manager.py    # Settings CRUD via MongoDB
-│   └── tests/
-├── frontend/
+├── backend/                    # FastAPI Backend
+│   ├── server.py               # API routes
+│   ├── upstox_service.py       # Upstox OAuth, market data, orders
+│   ├── news_service.py         # NewsAPI / Alpha Vantage / Demo
+│   ├── sentiment_service.py    # AI sentiment (GPT-4.1-mini)
+│   ├── trading_engine.py       # Paper trading simulation
+│   └── settings_manager.py     # Settings CRUD
+├── frontend/                   # React PWA
 │   ├── public/
-│   │   ├── manifest.json      # PWA manifest
-│   │   ├── service-worker.js  # PWA service worker
-│   │   ├── icon-192.png       # PWA icon
-│   │   └── icon-512.png       # PWA icon
+│   │   ├── manifest.json       # PWA manifest
+│   │   ├── service-worker.js   # PWA service worker
+│   │   └── icon-*.png          # App icons
 │   └── src/
-│       ├── App.js             # Main dashboard
-│       └── components/
-│           ├── MarketTicker.js
-│           ├── RiskPanel.js
-│           ├── NewsFeed.js
-│           ├── TradesList.js
-│           ├── SignalsList.js
-│           ├── AutoTradingSettings.js
-│           ├── PositionCalculator.js
-│           ├── TradeHistory.js
-│           └── SettingsPanel.js
+│       ├── App.js              # Main dashboard
+│       └── components/         # 9 modular components
+├── desktop/                    # Electron Desktop App
+│   ├── main.js                 # Electron main process
+│   ├── preload.js              # Context bridge
+│   ├── package.json            # electron-builder config
+│   ├── assets/icon.png         # App icon
+│   ├── .github/workflows/      # CI/CD auto-build on tag push
+│   └── README.md               # Build instructions
 ```
 
 ## What's Implemented
 - [x] Full-stack app (React + FastAPI + MongoDB)
-- [x] AI Sentiment Analysis
+- [x] AI Sentiment Analysis (GPT-4.1-mini)
 - [x] Paper Trading Engine
 - [x] Real-time Dashboard
-- [x] Upstox OAuth Integration (live market data, portfolio, orders)
-- [x] Live News API Integration (NewsAPI.org + Alpha Vantage)
+- [x] Upstox OAuth Integration (live data, portfolio, orders)
+- [x] Live News API Integration
 - [x] Trade History tab
-- [x] Frontend Refactored into components
-- [x] **PWA Setup** - Installable as desktop/mobile app
+- [x] Frontend Refactored (9 components)
+- [x] PWA (installable from browser)
+- [x] **Electron Desktop App** (Windows .exe + Mac .dmg)
+- [x] **Auto-Update** via GitHub Releases
+- [x] **System Tray** support (minimize to tray)
+- [x] **GitHub Actions CI/CD** workflow for auto-build
 
 ## Backlog
-### P0 - Wire AI signals to Upstox order execution
-### P1 - Trade analytics with charts (P&L graph, CSV export)
+### P0 - Wire AI signals → Upstox auto order execution
+### P1 - Trade analytics with P&L charts, CSV export
 ### P2 - Telegram/Email notifications
-### P3 - Option chain analysis, multi-strategy, backtesting
+### P3 - Option chain, multi-strategy, backtesting

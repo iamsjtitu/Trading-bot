@@ -1,0 +1,87 @@
+{
+  "name": "ai-trading-bot",
+  "version": "1.0.0",
+  "description": "AI-powered automated options trading bot with Upstox integration",
+  "main": "main.js",
+  "author": "AI Trading Bot",
+  "license": "MIT",
+  "scripts": {
+    "start": "electron .",
+    "build:win": "electron-builder --win --publish=never",
+    "build:mac": "electron-builder --mac --publish=never",
+    "build:all": "electron-builder --win --mac --publish=never",
+    "publish:win": "electron-builder --win --publish=always",
+    "publish:mac": "electron-builder --mac --publish=always",
+    "publish:all": "electron-builder --win --mac --publish=always"
+  },
+  "dependencies": {
+    "electron-updater": "^6.3.9"
+  },
+  "devDependencies": {
+    "electron": "^33.3.1",
+    "electron-builder": "^25.1.8"
+  },
+  "build": {
+    "appId": "com.aitrader.bot",
+    "productName": "AI Trading Bot",
+    "copyright": "Copyright © 2026 AI Trading Bot",
+    "publish": [
+      {
+        "provider": "github",
+        "owner": "GITHUB_USERNAME",
+        "repo": "GITHUB_REPO",
+        "private": false
+      }
+    ],
+    "win": {
+      "target": [
+        {
+          "target": "nsis",
+          "arch": ["x64"]
+        }
+      ],
+      "icon": "assets/icon.png",
+      "signDll": false,
+      "signingHashAlgorithms": null,
+      "sign": null
+    },
+    "nsis": {
+      "oneClick": false,
+      "allowToChangeInstallationDirectory": true,
+      "installerIcon": "assets/icon.png",
+      "uninstallerIcon": "assets/icon.png",
+      "installerHeaderIcon": "assets/icon.png",
+      "createDesktopShortcut": true,
+      "createStartMenuShortcut": true,
+      "shortcutName": "AI Trading Bot"
+    },
+    "mac": {
+      "target": [
+        {
+          "target": "dmg",
+          "arch": ["x64", "arm64"]
+        }
+      ],
+      "icon": "assets/icon.png",
+      "identity": null,
+      "hardenedRuntime": false,
+      "gatekeeperAssess": false
+    },
+    "dmg": {
+      "contents": [
+        { "x": 130, "y": 220 },
+        { "x": 410, "y": 220, "type": "link", "path": "/Applications" }
+      ]
+    },
+    "directories": {
+      "output": "dist",
+      "buildResources": "assets"
+    },
+    "files": [
+      "main.js",
+      "preload.js",
+      "updater.html",
+      "assets/**/*"
+    ]
+  }
+}
