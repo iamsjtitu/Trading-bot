@@ -384,6 +384,16 @@ Be conservative - only recommend BUY_CALL/BUY_PUT when confidence >= 65 and impa
         allNews = getDemoNews();
       }
 
+      // Deduplicate articles by normalized title
+      const seenTitles = new Set();
+      const existingTitles = new Set((db.data.news_articles || []).slice(-100).map(n => (n.title || '').toLowerCase().trim()));
+      allNews = allNews.filter(a => {
+        const norm = (a.title || '').toLowerCase().trim();
+        if (!norm || seenTitles.has(norm) || existingTitles.has(norm)) return false;
+        seenTitles.add(norm);
+        return true;
+      });
+
       allNews = allNews.slice(0, 15);
 
       if (!db.data.news_articles) db.data.news_articles = [];
@@ -471,6 +481,29 @@ Be conservative - only recommend BUY_CALL/BUY_PUT when confidence >= 65 and impa
     const todayValue = todayTrades.reduce((s, t) => s + (t.investment || 0), 0);
     if (todayValue >= dailyLimit) return null;
 
+    // Historical pattern adjustment - check if this sentiment+sector combo has been profitable
+    let confidenceAdj = 0;
+    const patterns = db.data.historical_patterns || [];
+    const sectorPatterns = patterns.filter(p => p.sector === (sentiment.sector || 'BROAD_MARKET') && p.sentiment === sentiment.sentiment);
+    if (sectorPatterns.length >= 3) {
+      const winRate = sectorPatterns.filter(p => p.was_profitable).length / sectorPatterns.length;
+      if (winRate >= 0.7) confidenceAdj = 5;
+      else if (winRate <= 0.3) confidenceAdj = -8;
+    }
+    const adjustedConfidence = Math.max(30, Math.min(98, (sentiment.confidence || 50) + confidenceAdj));
+    if (adjustedConfidence < 55) return null;
+
+    // Check market hours - don't generate signals when market is closed
+    const now = new Date();
+    const istOffset = 5.5 * 60 * 60 * 1000;
+    const ist = new Date(now.getTime() + istOffset);
+    const istDay = ist.getUTCDay();
+    const istMins = ist.getUTCHours() * 60 + ist.getUTCMinutes();
+    if (istDay === 0 || istDay === 6 || istMins < 555 || istMins > 930) {
+      console.log('[Signal] Market closed, skipping signal generation');
+      return null;
+    }
+
     const positionSize = Math.min(maxTrade, available * rp.max_position_size, dailyLimit - todayValue);
     if (positionSize < 1000) return null;
 
@@ -485,8 +518,10 @@ Be conservative - only recommend BUY_CALL/BUY_PUT when confidence >= 65 and impa
       entry_price: optionPremium,
       stop_loss: Math.round(optionPremium * (1 - rp.stop_loss_pct / 100) * 100) / 100,
       target: Math.round(optionPremium * (1 + rp.target_pct / 100) * 100) / 100,
-      confidence: sentiment.confidence, sentiment: sentiment.sentiment,
-      reason: sentiment.reason, news_id: newsDoc.id, status: 'ACTIVE',
+      confidence: adjustedConfidence, sentiment: sentiment.sentiment,
+      sector: sentiment.sector || 'BROAD_MARKET',
+      reason: sentiment.reason + (confidenceAdj ? ` [Historical adj: ${confidenceAdj > 0 ? '+' : ''}${confidenceAdj}]` : ''),
+      news_id: newsDoc.id, status: 'ACTIVE',
       created_at: new Date().toISOString(),
       expires_at: new Date(Date.now() + 7 * 86400000).toISOString(),
     };

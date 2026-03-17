@@ -1,5 +1,6 @@
 const { Router } = require('express');
 const crypto = require('crypto');
+const axios = require('axios');
 
 function uuid() { return crypto.randomUUID(); }
 
@@ -226,7 +227,7 @@ _Sent automatically by AI Trading Bot_`;
   });
 
   // POST /api/auto-exit/check
-  router.post('/api/auto-exit/check', (req, res) => {
+  router.post('/api/auto-exit/check', async (req, res) => {
     if (!autoExitEnabled) {
       return res.json({ status: 'success', exits_executed: 0, new_trades_generated: 0 });
     }
@@ -242,9 +243,36 @@ _Sent automatically by AI Trading Bot_`;
     const targetPct = customTargetPct != null ? customTargetPct : rp.target_pct;
     const stoplossPct = customStoplossPct != null ? customStoplossPct : rp.stop_loss_pct;
 
+    const mode = db.data.settings?.trading_mode || 'PAPER';
+    const accessToken = db.data.settings?.broker?.access_token;
+
     for (const trade of openTrades) {
-      const change = (Math.random() - 0.5) * 0.3;
-      const currentPrice = trade.entry_price * (1 + change);
+      let currentPrice;
+
+      if (mode === 'LIVE' && accessToken && trade.instrument_token) {
+        // Fetch real-time price from Upstox for LIVE trades
+        try {
+          const ltp = await axios.get(`https://api.upstox.com/v2/market-quote/ltp?instrument_key=${encodeURIComponent(trade.instrument_token)}`, {
+            headers: { Accept: 'application/json', Authorization: `Bearer ${accessToken}`, 'Api-Version': '2.0' },
+            timeout: 10000,
+          });
+          const quotes = ltp.data?.data || {};
+          const key = Object.keys(quotes)[0];
+          currentPrice = quotes[key]?.last_price || null;
+          if (!currentPrice) {
+            console.log(`[AutoExit] No LTP for ${trade.instrument_token}, skipping`);
+            continue;
+          }
+        } catch (err) {
+          console.error(`[AutoExit] LTP fetch error for ${trade.symbol}:`, err.message);
+          continue;
+        }
+      } else {
+        // Paper mode: simulate price movement
+        const change = (Math.random() - 0.5) * 0.3;
+        currentPrice = trade.entry_price * (1 + change);
+      }
+
       const targetPrice = trade.entry_price * (1 + targetPct / 100);
       const stoplossPrice = trade.entry_price * (1 - stoplossPct / 100);
 
@@ -255,6 +283,33 @@ _Sent automatically by AI Trading Bot_`;
       else if (currentPrice <= stoplossPrice) { shouldExit = true; exitReason = 'STOPLOSS_HIT'; }
 
       if (shouldExit) {
+        // If LIVE mode, place sell order on Upstox
+        if (mode === 'LIVE' && accessToken && trade.instrument_token) {
+          try {
+            const sellBody = {
+              quantity: trade.quantity,
+              product: 'D',
+              validity: 'DAY',
+              price: 0,
+              instrument_token: trade.instrument_token,
+              order_type: 'MARKET',
+              transaction_type: 'SELL',
+              disclosed_quantity: 0,
+              trigger_price: 0,
+              is_amo: false,
+            };
+            const sellResp = await axios.post('https://api.upstox.com/v2/order/place', sellBody, {
+              headers: { Accept: 'application/json', Authorization: `Bearer ${accessToken}`, 'Api-Version': '2.0', 'Content-Type': 'application/json' },
+              timeout: 15000,
+            });
+            console.log(`[AutoExit] LIVE sell order placed: ${sellResp.data?.data?.order_id || 'unknown'} for ${trade.symbol}`);
+            trade.exit_order_id = sellResp.data?.data?.order_id || '';
+          } catch (err) {
+            console.error(`[AutoExit] LIVE sell order failed for ${trade.symbol}:`, err.message);
+            trade.exit_error = err.message;
+          }
+        }
+
         const currentValue = currentPrice * trade.quantity;
         const pnl = currentValue - trade.investment;
         const pnlPct = (pnl / trade.investment) * 100;
@@ -283,6 +338,23 @@ _Sent automatically by AI Trading Bot_`;
         const sig = (db.data.signals || []).find(s => s.id === trade.signal_id);
         if (sig) sig.status = 'CLOSED';
 
+        // Track historical pattern for AI
+        if (!db.data.historical_patterns) db.data.historical_patterns = [];
+        db.data.historical_patterns.push({
+          id: crypto.randomUUID(),
+          sentiment: trade.sentiment || sig?.sentiment,
+          sector: sig?.sector || 'BROAD_MARKET',
+          trade_type: trade.trade_type,
+          pnl: trade.pnl,
+          pnl_percentage: trade.pnl_percentage,
+          exit_reason: exitReason,
+          entry_time: trade.entry_time,
+          exit_time: trade.exit_time,
+          confidence: sig?.confidence,
+          was_profitable: pnl > 0,
+          created_at: new Date().toISOString(),
+        });
+
         exitsCount++;
         exitDetails.push({
           trade_id: trade.id, symbol: trade.symbol, type: trade.trade_type,
@@ -305,8 +377,14 @@ _Sent automatically by AI Trading Bot_`;
             const newSignal = _generateSignal(latestNews);
             if (newSignal) {
               db.data.signals.push(newSignal);
-              _executePaperTrade(newSignal);
-              newTradesCount++;
+              if (mode === 'LIVE' && accessToken) {
+                // Place live entry for new trade too
+                const newTrade = await executeLiveAutoEntry(newSignal, accessToken);
+                if (newTrade) newTradesCount++;
+              } else {
+                _executePaperTrade(newSignal);
+                newTradesCount++;
+              }
             }
           }
         }
@@ -453,6 +531,153 @@ _Sent automatically by AI Trading Bot_`;
       p.last_updated = new Date().toISOString();
     }
   }
+
+  // ============ Live Auto-Entry Helper ============
+  async function executeLiveAutoEntry(signal, accessToken) {
+    const headers = { Accept: 'application/json', Authorization: `Bearer ${accessToken}`, 'Api-Version': '2.0', 'Content-Type': 'application/json' };
+    try {
+      const optionType = signal.signal_type === 'CALL' ? 'CE' : 'PE';
+      const now = new Date();
+      const year = String(now.getFullYear()).slice(2);
+      const month = String(now.getMonth() + 1).padStart(2, '0');
+      const day = String(now.getDate()).padStart(2, '0');
+      const instrumentToken = `NSE_FO|NIFTY${year}${month}${day}${signal.strike_price}${optionType}`;
+
+      const orderBody = {
+        quantity: signal.quantity, product: 'D', validity: 'DAY', price: 0,
+        instrument_token: instrumentToken, order_type: 'MARKET', transaction_type: 'BUY',
+        disclosed_quantity: 0, trigger_price: 0, is_amo: false,
+      };
+
+      const orderResp = await axios.post('https://api.upstox.com/v2/order/place', orderBody, { headers, timeout: 15000 });
+      const orderId = orderResp.data?.data?.order_id || '';
+      const success = orderResp.data?.status === 'success';
+
+      if (!db.data.trades) db.data.trades = [];
+      const trade = {
+        id: crypto.randomUUID(), signal_id: signal.id, trade_type: signal.signal_type,
+        symbol: signal.symbol, entry_time: new Date().toISOString(),
+        entry_price: signal.entry_price, quantity: signal.quantity,
+        investment: signal.investment_amount, stop_loss: signal.stop_loss,
+        target: signal.target, status: success ? 'OPEN' : 'FAILED',
+        mode: 'LIVE', order_id: orderId, instrument_token: instrumentToken,
+        exit_time: null, exit_price: null, pnl: 0, pnl_percentage: 0,
+      };
+      db.data.trades.push(trade);
+      db.save();
+      console.log(`[AutoEntry] LIVE order ${success ? 'placed' : 'failed'}: ${orderId}`);
+      if (db.notify) db.notify('entry', `LIVE Re-Entry ${signal.signal_type}`, `${signal.symbol} | Qty: ${signal.quantity} | ${success ? 'Order: ' + orderId : 'FAILED'}`);
+      return success ? trade : null;
+    } catch (err) {
+      console.error(`[AutoEntry] LIVE error:`, err.message);
+      return null;
+    }
+  }
+
+  // ============ Market Hours Check ============
+  function isMarketOpen() {
+    const now = new Date();
+    const istOffset = 5.5 * 60 * 60 * 1000;
+    const ist = new Date(now.getTime() + istOffset);
+    const day = ist.getUTCDay();
+    if (day === 0 || day === 6) return false;
+    const h = ist.getUTCHours(), m = ist.getUTCMinutes();
+    const mins = h * 60 + m;
+    return mins >= 555 && mins <= 930; // 9:15-15:30
+  }
+
+  // ============ Auto Square-off Warning ============
+  router.post('/api/market/square-off-check', async (req, res) => {
+    try {
+      const openTrades = (db.data.trades || []).filter(t => t.status === 'OPEN');
+      if (openTrades.length === 0) {
+        return res.json({ status: 'success', message: 'No open positions', open_count: 0 });
+      }
+
+      const totalInvested = openTrades.reduce((s, t) => s + (t.investment || 0), 0);
+      const totalPnl = openTrades.reduce((s, t) => s + (t.pnl || 0), 0);
+
+      // Send Telegram warning
+      const settings = db.data.settings || {};
+      const telegram = settings.telegram || {};
+      let telegramSent = false;
+
+      if (telegram.enabled && telegram.bot_token && telegram.chat_id) {
+        const message = `*SQUARE-OFF WARNING*
+
+*${openTrades.length} position(s) still OPEN!*
+Total Invested: ${Math.round(totalInvested).toLocaleString()}
+Unrealized P&L: ${Math.round(totalPnl).toLocaleString()}
+
+Open Positions:
+${openTrades.map(t => `- ${t.trade_type} ${t.symbol} | Qty: ${t.quantity} | Entry: ${t.entry_price}`).join('\n')}
+
+_Market closes at 3:30 PM IST. Please square off or the positions may carry over._
+_Sent by AI Trading Bot_`;
+
+        try {
+          const telegramUrl = `https://api.telegram.org/bot${telegram.bot_token}/sendMessage`;
+          await axios.post(telegramUrl, { chat_id: telegram.chat_id, text: message, parse_mode: 'Markdown' }, { timeout: 15000 });
+          telegramSent = true;
+        } catch (err) {
+          console.error('[SquareOff] Telegram error:', err.message);
+        }
+      }
+
+      // Desktop notification
+      if (db.notify) {
+        db.notify('exit', 'Square-Off Warning', `${openTrades.length} open position(s) near market close! Total: ${Math.round(totalInvested).toLocaleString()}`);
+      }
+
+      res.json({
+        status: 'success',
+        open_count: openTrades.length,
+        total_invested: totalInvested,
+        telegram_sent: telegramSent,
+        trades: openTrades.map(t => ({ id: t.id, type: t.trade_type, symbol: t.symbol, qty: t.quantity, entry: t.entry_price, investment: t.investment })),
+      });
+    } catch (err) {
+      console.error('[SquareOff] Error:', err.message);
+      res.json({ status: 'error', message: err.message });
+    }
+  });
+
+  // ============ Historical Patterns ============
+  router.get('/api/historical-patterns', (req, res) => {
+    const patterns = db.data.historical_patterns || [];
+    const total = patterns.length;
+    const profitable = patterns.filter(p => p.was_profitable).length;
+
+    // Sector-wise stats
+    const sectorStats = {};
+    for (const p of patterns) {
+      const s = p.sector || 'BROAD_MARKET';
+      if (!sectorStats[s]) sectorStats[s] = { total: 0, profitable: 0, total_pnl: 0 };
+      sectorStats[s].total++;
+      if (p.was_profitable) sectorStats[s].profitable++;
+      sectorStats[s].total_pnl += p.pnl || 0;
+    }
+
+    // Sentiment-wise stats
+    const sentimentStats = {};
+    for (const p of patterns) {
+      const s = p.sentiment || 'NEUTRAL';
+      if (!sentimentStats[s]) sentimentStats[s] = { total: 0, profitable: 0, total_pnl: 0 };
+      sentimentStats[s].total++;
+      if (p.was_profitable) sentimentStats[s].profitable++;
+      sentimentStats[s].total_pnl += p.pnl || 0;
+    }
+
+    res.json({
+      status: 'success',
+      total_patterns: total,
+      profitable_patterns: profitable,
+      win_rate: total ? Math.round((profitable / total) * 1000) / 10 : 0,
+      sector_stats: sectorStats,
+      sentiment_stats: sentimentStats,
+      recent: patterns.slice(-20).reverse(),
+    });
+  });
 
   return router;
 };

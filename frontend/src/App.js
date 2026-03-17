@@ -236,6 +236,23 @@ function App() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
+  // Auto square-off check near market close (3:15 PM IST)
+  const checkSquareOff = useCallback(async () => {
+    const now = new Date();
+    const istOffset = 5.5 * 60;
+    const utcMinutes = now.getUTCHours() * 60 + now.getUTCMinutes();
+    const istMinutes = (utcMinutes + istOffset) % 1440;
+    // Trigger between 3:15 PM (915 min) and 3:25 PM (925 min) IST
+    if (istMinutes >= 915 && istMinutes <= 925) {
+      try {
+        const res = await axios.post(`${API}/market/square-off-check`);
+        if (res.data?.open_count > 0) {
+          addNotification('warning', `Square-off warning: ${res.data.open_count} position(s) open near market close!`);
+        }
+      } catch (_) {}
+    }
+  }, [addNotification]);
+
   useEffect(() => {
     const dataInterval = setInterval(loadData, 30000);
     const exitInterval = setInterval(() => {
@@ -247,6 +264,7 @@ function App() {
     const countdownInterval = setInterval(() => {
       if (autoAnalyze) setNextAnalysis(Math.ceil((300000 - (Date.now() % 300000)) / 1000));
     }, 1000);
+    const squareOffInterval = setInterval(checkSquareOff, 60000);
 
     // Market indices: use real data when live & connected, else simulate
     const marketInterval = setInterval(() => {
@@ -268,8 +286,9 @@ function App() {
       clearInterval(analysisInterval);
       clearInterval(countdownInterval);
       clearInterval(marketInterval);
+      clearInterval(squareOffInterval);
     };
-  }, [autoAnalyze, autoSettings.auto_exit, emergencyStop, tradingMode, upstoxConnected, checkAutoExits, fetchNewNews, loadData]);
+  }, [autoAnalyze, autoSettings.auto_exit, emergencyStop, tradingMode, upstoxConnected, checkAutoExits, fetchNewNews, loadData, checkSquareOff]);
 
   const formatCurrency = (amount) => new Intl.NumberFormat('en-IN', { style: 'currency', currency: 'INR', maximumFractionDigits: 0 }).format(amount);
   const formatTime = (isoString) => {

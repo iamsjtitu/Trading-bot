@@ -157,7 +157,20 @@ async def fetch_news(background_tasks: BackgroundTasks):
         
         processed_articles = []
         
+        # Deduplicate: check against recent articles in DB
+        existing_titles = set()
+        try:
+            recent = await db.news_articles.find({}, {"title": 1, "_id": 0}).sort('created_at', -1).limit(100).to_list(100)
+            existing_titles = {(a.get('title', '') or '').lower().strip() for a in recent}
+        except Exception:
+            pass
+        seen_titles = set()
+        
         for article in news_articles:
+            norm_title = (article.get('title', '') or '').lower().strip()
+            if not norm_title or norm_title in seen_titles or norm_title in existing_titles:
+                continue
+            seen_titles.add(norm_title)
             # Generate unique ID
             article_id = str(uuid.uuid4())
             
@@ -597,6 +610,101 @@ async def get_bot_settings():
         }
     except Exception as e:
         logger.error(f"Get bot settings error: {e}")
+        return {"status": "error", "message": str(e)}
+
+@api_router.post("/market/square-off-check")
+async def square_off_check():
+    """Check for open positions near market close and send Telegram warning"""
+    try:
+        open_trades = await db.paper_trades.find({"status": "OPEN"}, {"_id": 0}).to_list(100)
+        if not open_trades:
+            return {"status": "success", "message": "No open positions", "open_count": 0}
+
+        total_invested = sum(t.get('investment', 0) for t in open_trades)
+        total_pnl = sum(t.get('pnl', 0) for t in open_trades)
+
+        # Send Telegram warning
+        settings = await settings_manager.get_settings()
+        telegram = settings.get('telegram', {})
+        telegram_sent = False
+
+        if telegram.get('enabled') and telegram.get('bot_token') and telegram.get('chat_id'):
+            positions_text = "\n".join(
+                f"- {t.get('trade_type')} {t.get('symbol')} | Qty: {t.get('quantity')} | Entry: {t.get('entry_price')}"
+                for t in open_trades
+            )
+            message = f"""*SQUARE-OFF WARNING*
+
+*{len(open_trades)} position(s) still OPEN!*
+Total Invested: {round(total_invested):,}
+Unrealized P&L: {round(total_pnl):,}
+
+Open Positions:
+{positions_text}
+
+_Market closes at 3:30 PM IST. Please square off or positions may carry over._
+_Sent by AI Trading Bot_"""
+
+            try:
+                telegram_url = f"https://api.telegram.org/bot{telegram['bot_token']}/sendMessage"
+                async with httpx.AsyncClient() as client:
+                    resp = await client.post(telegram_url, json={
+                        'chat_id': telegram['chat_id'], 'text': message, 'parse_mode': 'Markdown'
+                    }, timeout=15)
+                    if resp.json().get('ok'):
+                        telegram_sent = True
+            except Exception as e:
+                logger.error(f"Telegram square-off error: {e}")
+
+        return {
+            "status": "success",
+            "open_count": len(open_trades),
+            "total_invested": total_invested,
+            "telegram_sent": telegram_sent,
+            "trades": [{"id": t.get("id"), "type": t.get("trade_type"), "symbol": t.get("symbol"), "qty": t.get("quantity"), "entry": t.get("entry_price"), "investment": t.get("investment")} for t in open_trades]
+        }
+    except Exception as e:
+        logger.error(f"Square-off check error: {e}")
+        return {"status": "error", "message": str(e)}
+
+@api_router.get("/historical-patterns")
+async def get_historical_patterns():
+    """Get historical trading pattern stats"""
+    try:
+        patterns = await db.historical_patterns.find({}, {"_id": 0}).to_list(500)
+        total = len(patterns)
+        profitable = sum(1 for p in patterns if p.get('was_profitable'))
+
+        sector_stats = {}
+        sentiment_stats = {}
+        for p in patterns:
+            s = p.get('sector', 'BROAD_MARKET')
+            if s not in sector_stats:
+                sector_stats[s] = {'total': 0, 'profitable': 0, 'total_pnl': 0}
+            sector_stats[s]['total'] += 1
+            if p.get('was_profitable'):
+                sector_stats[s]['profitable'] += 1
+            sector_stats[s]['total_pnl'] += p.get('pnl', 0)
+
+            sent = p.get('sentiment', 'NEUTRAL')
+            if sent not in sentiment_stats:
+                sentiment_stats[sent] = {'total': 0, 'profitable': 0, 'total_pnl': 0}
+            sentiment_stats[sent]['total'] += 1
+            if p.get('was_profitable'):
+                sentiment_stats[sent]['profitable'] += 1
+            sentiment_stats[sent]['total_pnl'] += p.get('pnl', 0)
+
+        return {
+            "status": "success",
+            "total_patterns": total,
+            "profitable_patterns": profitable,
+            "win_rate": round((profitable / max(total, 1)) * 100, 1),
+            "sector_stats": sector_stats,
+            "sentiment_stats": sentiment_stats,
+            "recent": patterns[-20:][::-1]
+        }
+    except Exception as e:
+        logger.error(f"Historical patterns error: {e}")
         return {"status": "error", "message": str(e)}
 
 @api_router.post("/settings/update")
