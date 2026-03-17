@@ -20,6 +20,9 @@ Build an AI-powered automated options trading bot that connects to world news, u
 - Settings panel (Broker, Risk, Schedule, Advanced tabs)
 - Auto-updater with in-app banner (Electron)
 - Emergency stop button
+- **Mode-aware dashboard: LIVE mode shows Upstox live data, PAPER mode shows paper data**
+- **Enhanced AI with sector detection, trend-aware confidence, weighted keywords**
+- **Advanced Trade History with filters, sort, CSV export**
 
 ## Completed Tasks
 - [x] Full backend rewrite (Python -> Node.js for desktop)
@@ -29,38 +32,27 @@ Build an AI-powered automated options trading bot that connects to world news, u
 - [x] Desktop Notifications
 - [x] Trade Analytics with P&L charts
 - [x] Telegram support in settings
-- [x] Trade Analytics tab added to App.js
-- [x] **Enhanced AI Decision-Making** - Multi-factor analysis, sector detection (BANKING/IT/PHARMA/AUTO/ENERGY/METAL/FMCG), trend-aware confidence scoring, weighted keyword analysis, improved AI prompt
-- [x] **Advanced Trade History** - Summary stats, date/type/status filters, sortable columns, CSV export, results count
-- [x] **Daily P&L Summary via Telegram** - New /api/daily-summary endpoint, /api/telegram/send-daily-summary endpoint, Daily P&L Summary toggle in settings, "Send Daily Summary Now" button
-- [x] News Feed sector badges (shows sector like BANKING, AUTO when detected)
-- [x] All testing passed: iteration_5.json - 15/15 features PASS, backend 17/17
+- [x] Enhanced AI Decision-Making (multi-factor, sector, trend)
+- [x] Advanced Trade History (filters, sort, CSV export, summary stats)
+- [x] Daily P&L Summary via Telegram
+- [x] **LIVE mode dashboard fix** - Risk Management, Portfolio cards, Trade History now show Upstox live data when connected
+- [x] **Fallback for LIVE mode when Upstox disconnected** - shows paper data instead of zeros
 
 ## Upcoming Tasks (P1)
 - Test Telegram Notifications end-to-end (needs user's Bot Token + Chat ID)
 - Auto-scheduled daily summary at market close (3:30 PM IST)
 
 ## Future/Backlog (P2+)
-- Enhance AI decision-making further (historical pattern matching)
-- Add support for additional brokers
-- More advanced analytics (sector-wise P&L breakdown, heat maps)
-
-## 3rd Party Integrations
-- OpenAI GPT-4.1-mini (via Emergent LLM Key)
-- Upstox (user API key)
-- NewsAPI.org (user API key)
-- Alpha Vantage (user API key)
-- Telegram (user Bot Token/Chat ID)
-- Chart.js for analytics
+- Historical pattern matching for AI
+- Additional brokers support
+- Sector-wise P&L breakdown, heat maps
 
 ## Key Files
-- `/app/frontend/src/App.js` - Main app with all tabs
-- `/app/frontend/src/components/TradeHistory.js` - Enhanced trade history with filters & CSV export
+- `/app/frontend/src/App.js` - Main app - mode-aware data loading
+- `/app/frontend/src/components/RiskPanel.js` - LIVE badge, Upstox labels
+- `/app/frontend/src/components/TradeHistory.js` - Upstox orders view in LIVE mode
 - `/app/frontend/src/components/TradeAnalytics.js` - P&L charts
-- `/app/frontend/src/components/SettingsPanel.js` - Settings with Notifications, Telegram, Daily Summary
-- `/app/frontend/src/components/NewsFeed.js` - News feed with sector badges
-- `/app/backend/server.py` - Python FastAPI backend (web preview)
-- `/app/backend/sentiment_service.py` - Enhanced AI sentiment with sector detection & trend scoring
-- `/app/desktop/main.js` - Electron main process
-- `/app/desktop/routes/news.js` - Node.js news + enhanced AI sentiment
-- `/app/desktop/routes/trading.js` - Trading routes + daily summary + telegram
+- `/app/frontend/src/components/SettingsPanel.js` - Telegram + Daily Summary
+- `/app/backend/server.py` - Python backend
+- `/app/backend/sentiment_service.py` - Enhanced AI
+- `/app/desktop/routes/` - Node.js routes (desktop)

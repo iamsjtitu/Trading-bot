@@ -130,7 +130,6 @@ function App() {
         // Update risk metrics from Upstox live data
         if (data.portfolio) {
           const lp = data.portfolio;
-          const todayOrders = (data.orders || []).filter(o => o.status === 'complete' || o.status === 'traded');
           const completedOrders = data.orders || [];
           setRiskMetrics({
             dailyUsed: lp.funds?.used_margin || 0,
@@ -141,6 +140,20 @@ function App() {
             isLive: true,
           });
         }
+      } else {
+        // Upstox not connected - fallback to paper data for Risk Panel
+        try {
+          const todayRes = await axios.get(`${API}/trades/today`);
+          const todayData = todayRes.data;
+          setRiskMetrics({
+            dailyUsed: todayData.today_invested || 0,
+            dailyLimit: 100000,
+            maxPerTrade: 20000,
+            todayTrades: todayData.total_trades_today || 0,
+            todayPnL: todayData.today_pnl || 0,
+            isLive: false,
+          });
+        } catch (_) {}
       }
     } catch (e) {
       console.error('Upstox data error:', e);
