@@ -34,8 +34,8 @@
     "publish": [
       {
         "provider": "github",
-        "owner": "GITHUB_USERNAME",
-        "repo": "GITHUB_REPO",
+        "owner": "iamsjtitu",
+        "repo": "Trading-bot",
         "private": false
       }
     ],
