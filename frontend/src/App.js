@@ -182,6 +182,33 @@ function App() {
     return `${mins}:${secs.toString().padStart(2, '0')}`;
   };
 
+  const addNotification = (type, message) => {
+    const id = Date.now();
+    const notification = { id, type, message, timestamp: new Date() };
+    setNotifications(prev => [notification, ...prev].slice(0, 5)); // Keep last 5
+    
+    // Auto remove after 5 seconds
+    setTimeout(() => {
+      setNotifications(prev => prev.filter(n => n.id !== id));
+    }, 5000);
+  };
+
+  const handleEmergencyStop = () => {
+    setEmergencyStop(!emergencyStop);
+    if (!emergencyStop) {
+      addNotification('warning', '🛑 Emergency Stop Activated! Trading paused.');
+      setAutoAnalyze(false);
+    } else {
+      addNotification('success', '✅ Trading resumed!');
+    }
+  };
+
+  const calculatePositionSize = (confidence) => {
+    const baseSize = riskMetrics.maxPerTrade;
+    const confidenceMultiplier = confidence / 100;
+    return Math.floor(baseSize * confidenceMultiplier);
+  };
+
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-purple-50 text-gray-900">
       {/* Header */}
