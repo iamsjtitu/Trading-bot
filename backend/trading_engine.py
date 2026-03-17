@@ -368,17 +368,31 @@ class TradingEngine:
                 
                 # If auto-entry enabled, generate new trade
                 if self.auto_entry_enabled and exit_reason == 'TARGET_HIT':
-                    # Get latest news for new signal
+                    # Get latest high-confidence news for new signal
                     latest_news = await self.db.news_articles.find(
-                        {},
+                        {
+                            'sentiment_analysis.confidence': {'$gte': 60},
+                            'sentiment_analysis.trading_signal': {'$in': ['BUY_CALL', 'BUY_PUT']}
+                        },
                         {"_id": 0}
                     ).sort('created_at', -1).limit(1).to_list(1)
+                    
+                    # If no high-confidence news, try any recent news
+                    if not latest_news or len(latest_news) == 0:
+                        latest_news = await self.db.news_articles.find(
+                            {},
+                            {"_id": 0}
+                        ).sort('created_at', -1).limit(1).to_list(1)
                     
                     if latest_news and len(latest_news) > 0:
                         new_signal = await self.generate_trading_signal(latest_news[0])
                         if new_signal:
                             new_trades_count += 1
-                            logger.info(f"Auto-generated new trade after exit")
+                            logger.info(f"Auto-generated new trade after profitable exit: {new_signal['signal_type']} {new_signal['symbol']}")
+                        else:
+                            logger.info(f"Could not generate new signal - confidence too low or daily limit reached")
+                    else:
+                        logger.info(f"No news available for auto-entry, skipping new trade generation")
         
         return {
             'exits': exits_count,
