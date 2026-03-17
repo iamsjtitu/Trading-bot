@@ -446,6 +446,57 @@ async def get_auto_settings():
         logger.error(f"Get settings error: {e}")
         return {"status": "error", "message": str(e)}
 
+@api_router.get("/settings")
+async def get_bot_settings():
+    """Get all bot settings"""
+    try:
+        settings = await settings_manager.get_settings()
+        return {
+            "status": "success",
+            "settings": settings
+        }
+    except Exception as e:
+        logger.error(f"Get bot settings error: {e}")
+        return {"status": "error", "message": str(e)}
+
+@api_router.post("/settings/update")
+async def update_bot_settings(request: dict):
+    """Update bot settings"""
+    try:
+        result = await settings_manager.update_settings(request)
+        
+        # Apply settings to trading engine
+        if 'risk' in request:
+            risk = request['risk']
+            trading_engine.max_trade_amount = risk.get('max_per_trade', 20000)
+            trading_engine.daily_limit = risk.get('daily_limit', 100000)
+            trading_engine.risk_tolerance = risk.get('risk_tolerance', 'medium')
+            trading_engine.custom_target_pct = risk.get('target_pct')
+            trading_engine.custom_stoploss_pct = risk.get('stop_loss_pct')
+        
+        if 'auto_trading' in request:
+            auto = request['auto_trading']
+            trading_engine.auto_exit_enabled = auto.get('auto_exit', True)
+            trading_engine.auto_entry_enabled = auto.get('auto_entry', False)
+        
+        return result
+    except Exception as e:
+        logger.error(f"Update bot settings error: {e}")
+        return {"status": "error", "message": str(e)}
+
+@api_router.get("/settings/trading-status")
+async def get_trading_status():
+    """Check if trading is allowed now"""
+    try:
+        status = await settings_manager.is_trading_allowed()
+        return {
+            "status": "success",
+            **status
+        }
+    except Exception as e:
+        logger.error(f"Trading status error: {e}")
+        return {"status": "error", "message": str(e)}
+
 @api_router.post("/test/generate-trade")
 async def test_generate_trade():
     """Test endpoint to manually trigger trade generation"""
