@@ -249,20 +249,20 @@ function App() {
           {/* Signals Tab */}
           <TabsContent value="signals" className="space-y-4">
             {signals.length === 0 ? (
-              <Card className="bg-gray-800/50 border-gray-700 p-8 text-center" data-testid="no-signals-message">
-                <FaBullseye className="text-5xl text-gray-600 mx-auto mb-4" />
-                <p className="text-gray-400">No trading signals generated yet</p>
+              <Card className="bg-white border-gray-200 p-8 text-center shadow-md" data-testid="no-signals-message">
+                <FaBullseye className="text-5xl text-gray-400 mx-auto mb-4" />
+                <p className="text-gray-600 font-medium">No trading signals generated yet</p>
               </Card>
             ) : (
               signals.map((signal, idx) => (
-                <Card key={idx} className="bg-gray-800/50 border-gray-700 p-4" data-testid={`signal-${idx}`}>
+                <Card key={idx} className="bg-white border-gray-200 p-4 shadow-md hover:shadow-lg transition-shadow" data-testid={`signal-${idx}`}>
                   <div className="flex items-center justify-between mb-3">
                     <div className="flex items-center gap-3">
                       <Badge className={signal.signal_type === 'CALL' ? 'bg-green-600' : 'bg-red-600'}>
                         {signal.signal_type === 'CALL' ? '🚀 CALL' : '📉 PUT'}
                       </Badge>
-                      <span className="font-semibold text-lg">{signal.symbol}</span>
-                      <Badge variant="outline" className="border-gray-600">Strike: {signal.strike_price}</Badge>
+                      <span className="font-semibold text-lg text-gray-800">{signal.symbol}</span>
+                      <Badge variant="outline" className="border-gray-400 text-gray-700">Strike: {signal.strike_price}</Badge>
                     </div>
                     <Badge className={getSentimentColor(signal.sentiment)}>
                       {signal.confidence}% Confident
@@ -270,23 +270,23 @@ function App() {
                   </div>
                   <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
                     <div>
-                      <p className="text-gray-400">Entry Price</p>
-                      <p className="font-semibold">{formatCurrency(signal.entry_price)}</p>
+                      <p className="text-gray-600 font-medium">Entry Price</p>
+                      <p className="font-semibold text-gray-900">{formatCurrency(signal.entry_price)}</p>
                     </div>
                     <div>
-                      <p className="text-gray-400">Target</p>
-                      <p className="font-semibold text-green-500">{formatCurrency(signal.target)}</p>
+                      <p className="text-gray-600 font-medium">Target</p>
+                      <p className="font-semibold text-green-600">{formatCurrency(signal.target)}</p>
                     </div>
                     <div>
-                      <p className="text-gray-400">Stop Loss</p>
-                      <p className="font-semibold text-red-500">{formatCurrency(signal.stop_loss)}</p>
+                      <p className="text-gray-600 font-medium">Stop Loss</p>
+                      <p className="font-semibold text-red-600">{formatCurrency(signal.stop_loss)}</p>
                     </div>
                     <div>
-                      <p className="text-gray-400">Investment</p>
-                      <p className="font-semibold">{formatCurrency(signal.investment_amount)}</p>
+                      <p className="text-gray-600 font-medium">Investment</p>
+                      <p className="font-semibold text-gray-900">{formatCurrency(signal.investment_amount)}</p>
                     </div>
                   </div>
-                  <p className="text-sm text-gray-400 mt-3 italic">💡 {signal.reason}</p>
+                  <p className="text-sm text-gray-600 mt-3 italic bg-gray-50 p-2 rounded">💡 {signal.reason}</p>
                   <p className="text-xs text-gray-500 mt-2">🕒 Generated: {formatTime(signal.created_at)}</p>
                 </Card>
               ))
@@ -296,39 +296,39 @@ function App() {
           {/* Active Trades Tab */}
           <TabsContent value="trades" className="space-y-4">
             {trades.length === 0 ? (
-              <Card className="bg-gray-800/50 border-gray-700 p-8 text-center" data-testid="no-trades-message">
-                <FaChartLine className="text-5xl text-gray-600 mx-auto mb-4" />
-                <p className="text-gray-400">No active trades</p>
+              <Card className="bg-white border-gray-200 p-8 text-center shadow-md" data-testid="no-trades-message">
+                <FaChartLine className="text-5xl text-gray-400 mx-auto mb-4" />
+                <p className="text-gray-600 font-medium">No active trades</p>
               </Card>
             ) : (
               trades.map((trade, idx) => (
-                <Card key={idx} className="bg-gray-800/50 border-gray-700 p-4" data-testid={`trade-${idx}`}>
+                <Card key={idx} className="bg-white border-gray-200 p-4 shadow-md hover:shadow-lg transition-shadow" data-testid={`trade-${idx}`}>
                   <div className="flex items-center justify-between mb-3">
                     <div className="flex items-center gap-3">
                       <Badge className={trade.trade_type === 'CALL' ? 'bg-green-600' : 'bg-red-600'}>
                         {trade.trade_type}
                       </Badge>
-                      <span className="font-semibold text-lg">{trade.symbol}</span>
-                      <Badge variant="outline" className="border-gray-600">Qty: {trade.quantity}</Badge>
+                      <span className="font-semibold text-lg text-gray-800">{trade.symbol}</span>
+                      <Badge variant="outline" className="border-gray-400 text-gray-700">Qty: {trade.quantity}</Badge>
                     </div>
                     <Badge className="bg-blue-600">{trade.status}</Badge>
                   </div>
                   <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
                     <div>
-                      <p className="text-gray-400">Entry</p>
-                      <p className="font-semibold">{formatCurrency(trade.entry_price)}</p>
+                      <p className="text-gray-600 font-medium">Entry</p>
+                      <p className="font-semibold text-gray-900">{formatCurrency(trade.entry_price)}</p>
                     </div>
                     <div>
-                      <p className="text-gray-400">Target</p>
-                      <p className="font-semibold text-green-500">{formatCurrency(trade.target)}</p>
+                      <p className="text-gray-600 font-medium">Target</p>
+                      <p className="font-semibold text-green-600">{formatCurrency(trade.target)}</p>
                     </div>
                     <div>
-                      <p className="text-gray-400">Stop Loss</p>
-                      <p className="font-semibold text-red-500">{formatCurrency(trade.stop_loss)}</p>
+                      <p className="text-gray-600 font-medium">Stop Loss</p>
+                      <p className="font-semibold text-red-600">{formatCurrency(trade.stop_loss)}</p>
                     </div>
                     <div>
-                      <p className="text-gray-400">Investment</p>
-                      <p className="font-semibold">{formatCurrency(trade.investment)}</p>
+                      <p className="text-gray-600 font-medium">Investment</p>
+                      <p className="font-semibold text-gray-900">{formatCurrency(trade.investment)}</p>
                     </div>
                   </div>
                   <p className="text-xs text-gray-500 mt-3">🕒 Entry: {formatTime(trade.entry_time)}</p>
@@ -340,10 +340,10 @@ function App() {
       </div>
 
       {/* Footer */}
-      <footer className="border-t border-gray-700 bg-gray-900/50 backdrop-blur-sm mt-8 py-4">
-        <div className="container mx-auto px-4 text-center text-sm text-gray-400">
+      <footer className="border-t border-gray-200 bg-white/80 backdrop-blur-sm mt-8 py-4 shadow-sm">
+        <div className="container mx-auto px-4 text-center text-sm text-gray-600">
           <p>⚠️ Paper Trading Mode • AI-Powered Options Trading Bot • For Educational Purposes Only</p>
-          <p className="text-xs mt-1">Trading involves risk. Past performance does not guarantee future results.</p>
+          <p className="text-xs mt-1 text-gray-500">Trading involves risk. Past performance does not guarantee future results.</p>
         </div>
       </footer>
     </div>
