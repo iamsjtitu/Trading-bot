@@ -10,6 +10,15 @@ module.exports = function (db) {
   const router = Router();
 
   // ============ Simple RSS Parser (no dependencies) ============
+  function stripHtml(str) {
+    return (str || '')
+      .replace(/<!\[CDATA\[|\]\]>/g, '')
+      .replace(/<[^>]*>/g, '')
+      .replace(/&amp;/g, '&').replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&quot;/g, '"').replace(/&#39;/g, "'").replace(/&#x27;/g, "'").replace(/#39;/g, "'")
+      .replace(/\s+/g, ' ')
+      .trim();
+  }
+
   function parseRSS(xml) {
     const items = [];
     const itemRegex = /<item>([\s\S]*?)<\/item>/gi;
@@ -18,12 +27,7 @@ module.exports = function (db) {
       const block = match[1];
       const get = (tag) => {
         const m = block.match(new RegExp(`<${tag}[^>]*><!\\[CDATA\\[([\\s\\S]*?)\\]\\]><\\/${tag}>|<${tag}[^>]*>([\\s\\S]*?)<\\/${tag}>`));
-        let val = (m && (m[1] || m[2] || '').trim()) || '';
-        // Clean HTML entities and tags
-        val = val.replace(/<!\[CDATA\[|\]\]>/g, '');
-        val = val.replace(/<[^>]+>/g, '');
-        val = val.replace(/&amp;/g, '&').replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&quot;/g, '"').replace(/&#39;/g, "'").replace(/&#x27;/g, "'").replace(/#39;/g, "'");
-        return val;
+        return stripHtml(m ? (m[1] || m[2] || '') : '');
       };
       items.push({ title: get('title'), description: get('description'), link: get('link'), pubDate: get('pubDate') });
     }

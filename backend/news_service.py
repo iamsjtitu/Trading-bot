@@ -1,10 +1,20 @@
 import os
+import re
 import requests
 from datetime import datetime, timezone, timedelta
 from typing import List, Dict, Optional
 import logging
 
 logger = logging.getLogger(__name__)
+
+
+def strip_html(text: str) -> str:
+    """Remove HTML tags and clean up text"""
+    text = re.sub(r'<!\[CDATA\[|\]\]>', '', text)
+    text = re.sub(r'<[^>]*>', '', text)
+    text = text.replace('&amp;', '&').replace('&lt;', '<').replace('&gt;', '>').replace('&quot;', '"').replace('&#39;', "'")
+    text = re.sub(r'\s+', ' ', text).strip()
+    return text
 
 
 class NewsService:
@@ -99,8 +109,8 @@ class NewsService:
                 resp.raise_for_status()
                 root = ET.fromstring(resp.text)
                 for item in root.findall('.//item')[:max_articles // len(feeds)]:
-                    title = item.findtext('title', '').strip()
-                    desc = item.findtext('description', '').strip()
+                    title = strip_html(item.findtext('title', ''))
+                    desc = strip_html(item.findtext('description', ''))
                     link = item.findtext('link', '').strip()
                     pub = item.findtext('pubDate', '')
                     articles.append({
@@ -126,8 +136,8 @@ class NewsService:
                 resp.raise_for_status()
                 root = ET.fromstring(resp.text)
                 for item in root.findall('.//item')[:max_articles // len(feeds)]:
-                    title = item.findtext('title', '').strip()
-                    desc = item.findtext('description', '').strip()
+                    title = strip_html(item.findtext('title', ''))
+                    desc = strip_html(item.findtext('description', ''))
                     link = item.findtext('link', '').strip()
                     pub = item.findtext('pubDate', '')
                     articles.append({
