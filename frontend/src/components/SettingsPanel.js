@@ -301,18 +301,44 @@ export default function SettingsPanel({ onClose, onSave }) {
                 <h3 className="font-bold text-gray-800 mb-3">News Source Configuration</h3>
                 <div className="space-y-4">
                   <div className="bg-blue-50 p-3 rounded border border-blue-200">
-                    <p className="text-sm font-semibold text-gray-800">Current Mode:</p>
-                    <Badge className="bg-blue-600 mt-1">
-                      {settings.news.sources?.includes('newsapi') ? 'NewsAPI (Premium)' : settings.news.sources?.includes('alphavantage') ? 'Alpha Vantage (Premium)' : 'Demo News (Free)'}
-                    </Badge>
+                    <p className="text-sm font-semibold text-gray-800">Active Sources:</p>
+                    <div className="flex flex-wrap gap-1 mt-1">
+                      {(settings.news.sources || ['demo']).map(s => (
+                        <Badge key={s} className="bg-blue-600 text-xs">{s}</Badge>
+                      ))}
+                    </div>
                   </div>
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">Select News Source</label>
-                    <select value={settings.news.sources?.[0] || 'demo'} onChange={(e) => updateField('news', 'sources', [e.target.value])} className="w-full px-3 py-2 border border-gray-300 rounded-lg">
-                      <option value="demo">Demo News (Free)</option>
-                      <option value="newsapi">NewsAPI.org (Premium)</option>
-                      <option value="alphavantage">Alpha Vantage (Premium)</option>
-                    </select>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">Select News Sources</label>
+                    <div className="space-y-2">
+                      {[
+                        { value: 'demo', label: 'Demo News (Free - Practice)', desc: 'Simulated news for paper trading' },
+                        { value: 'moneycontrol', label: 'Moneycontrol (Free)', desc: 'Live scraping from Moneycontrol RSS' },
+                        { value: 'economictimes', label: 'Economic Times (Free)', desc: 'Live scraping from ET Markets RSS' },
+                        { value: 'nse_india', label: 'NSE India (Free)', desc: 'Corporate announcements from NSE' },
+                        { value: 'newsapi', label: 'NewsAPI.org (API Key)', desc: 'Global news API - requires key' },
+                        { value: 'alphavantage', label: 'Alpha Vantage (API Key)', desc: 'Financial news with sentiment - requires key' },
+                      ].map(src => {
+                        const isSelected = (settings.news.sources || []).includes(src.value);
+                        return (
+                          <div key={src.value} className={`flex items-center justify-between p-3 rounded-lg border-2 cursor-pointer transition-all ${isSelected ? 'border-blue-500 bg-blue-50' : 'border-gray-200 bg-white hover:border-gray-300'}`}
+                            onClick={() => {
+                              const current = settings.news.sources || [];
+                              const newSources = isSelected ? current.filter(s => s !== src.value) : [...current, src.value];
+                              updateField('news', 'sources', newSources.length > 0 ? newSources : ['demo']);
+                            }}>
+                            <div>
+                              <p className="font-medium text-gray-800 text-sm">{src.label}</p>
+                              <p className="text-xs text-gray-500">{src.desc}</p>
+                            </div>
+                            <div className={`w-5 h-5 rounded border-2 flex items-center justify-center ${isSelected ? 'bg-blue-600 border-blue-600' : 'border-gray-300'}`}>
+                              {isSelected && <span className="text-white text-xs font-bold">&#10003;</span>}
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                    <p className="text-xs text-gray-500 mt-2">Selected: {(settings.news.sources || ['demo']).join(', ')}</p>
                   </div>
                   <div className="border-l-4 border-green-500 pl-4">
                     <h4 className="font-semibold text-gray-800 mb-2">NewsAPI.org</h4>

@@ -10,77 +10,50 @@ desktop/                        # Electron Desktop App (SELF-CONTAINED)
 ├── preload.js                  # IPC bridge
 ├── package.json                # electron-builder config (Win NSIS + Mac DMG)
 ├── assets/icon.png             # App icon
+├── .github/workflows/build.yml # CI/CD - auto build on release tag
 ├── routes/                     # Node.js API routes (COMPLETE)
 │   ├── settings.js             # Settings CRUD, trading schedule
 │   ├── portfolio.js            # Portfolio summary, stats, combined-status
-│   ├── news.js                 # News fetch (NewsAPI/AlphaVantage/Demo) + AI sentiment
+│   ├── news.js                 # News (Moneycontrol/ET/NSE/NewsAPI/AlphaVantage/Demo) + AI sentiment
 │   ├── trading.js              # Signals, trades, auto-exit/entry, trade generation
 │   └── upstox.js               # Upstox OAuth, market data, orders, P&L
-└── test_api.js                 # Backend test suite
 
-backend/                        # FastAPI Backend (WEB version - reference only)
-├── server.py, local_db.py, news_service.py, sentiment_service.py
-├── trading_engine.py, settings_manager.py, upstox_service.py
-
-frontend/                       # React PWA (bundled in Electron via extraResources)
-└── src/components/             # 9 modular components
+backend/                        # FastAPI Backend (WEB version)
+frontend/                       # React PWA (bundled in Electron via files)
 ```
 
 ## Key Features
-- [x] Fully local - no web server needed, no MongoDB install
-- [x] Local file-based DB (JSON) - data in AppData
-- [x] Electron desktop app (Windows .exe + Mac .dmg)
-- [x] Auto-update via GitHub Releases
-- [x] System tray (runs in background)
-- [x] Splash screen on startup
-- [x] Upstox OAuth integration
+- [x] Node.js backend routes (5 modules, 21+ endpoints)
 - [x] AI Sentiment Analysis (Emergent LLM Key → OpenAI GPT-4.1-mini)
+- [x] **Live News Scraping** - Moneycontrol, Economic Times, NSE India (FREE, no API key)
+- [x] NewsAPI + Alpha Vantage support (with API keys)
+- [x] Demo news mode for paper trading
 - [x] Paper + Live trading modes
-- [x] **Node.js backend routes complete** (5 modules, 21+ endpoints)
-- [x] Demo news mode for paper trading without API keys
-- [x] Full trading pipeline: news → sentiment → signal → trade → auto-exit
+- [x] Upstox OAuth integration
+- [x] Auto-update via GitHub Releases + update progress banner in UI
+- [x] GitHub Actions CI/CD (auto build .exe/.dmg on tag push)
+- [x] System tray, splash screen
+- [x] Express 5.x compatible (wildcard route fix)
+- [x] Multi-source news selection in Settings UI
 
-## API Endpoints (Node.js Desktop Backend)
-### Settings (3 endpoints)
-- GET /api/settings
-- POST /api/settings/update
-- GET /api/settings/trading-status
+## News Sources
+| Source | Type | Cost | Status |
+|--------|------|------|--------|
+| Moneycontrol | RSS Scraping | Free | ✅ Working |
+| Economic Times | RSS Scraping | Free | ✅ Working |
+| NSE India | API Scraping | Free | ✅ Working |
+| NewsAPI.org | API | Free tier (100/day) | ✅ Working |
+| Alpha Vantage | API | Free tier (500/day) | ✅ Working |
+| Demo | Built-in | Free | ✅ Working |
 
-### Portfolio (4 endpoints)
-- POST /api/initialize
-- GET /api/portfolio
-- GET /api/stats
-- GET /api/combined-status
-
-### News (2 endpoints)
-- GET /api/news/fetch
-- GET /api/news/latest
-
-### Trading (8 endpoints)
-- GET /api/signals/latest
-- GET /api/signals/active
-- GET /api/trades/active
-- GET /api/trades/today
-- GET /api/trades/history
-- POST /api/auto-exit/check
-- POST /api/auto-settings/update
-- GET /api/auto-settings
-- POST /api/test/generate-trade
-
-### Upstox (8 endpoints)
-- GET /api/upstox/auth-url
-- POST /api/upstox/callback
-- GET /api/upstox/connection
-- GET /api/upstox/profile
-- GET /api/upstox/market-data
-- GET /api/upstox/portfolio
-- POST /api/upstox/order
-- DELETE /api/upstox/order/:orderId
-- GET /api/upstox/orders
-- GET /api/upstox/pnl
+## GitHub CI/CD
+- Owner: iamsjtitu
+- Repo: Trading-bot
+- Trigger: Push tag `v*` → Auto build Windows .exe + Mac .dmg
+- Artifacts: .exe, latest.yml, .dmg, latest-mac.yml
 
 ## Backlog
-### P0 - Build & distribute .exe/.dmg (frontend build → electron-builder)
+### P0 - Frontend-build bundling in Electron (frontend-build path fix done)
 ### P1 - Wire AI signals → Upstox auto order execution
 ### P1 - Trade analytics with P&L charts, CSV export
 ### P2 - Telegram/Email notifications

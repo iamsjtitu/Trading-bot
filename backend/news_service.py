@@ -29,6 +29,33 @@ class NewsService:
         sources = news_settings.get('sources', ['demo'])
         all_news = []
 
+        # Try Moneycontrol
+        if 'moneycontrol' in sources:
+            try:
+                articles = self._fetch_from_moneycontrol(max_articles)
+                all_news.extend(articles)
+                logger.info(f"Fetched {len(articles)} articles from Moneycontrol")
+            except Exception as e:
+                logger.error(f"Moneycontrol fetch error: {e}")
+
+        # Try Economic Times
+        if 'economictimes' in sources:
+            try:
+                articles = self._fetch_from_economictimes(max_articles)
+                all_news.extend(articles)
+                logger.info(f"Fetched {len(articles)} articles from Economic Times")
+            except Exception as e:
+                logger.error(f"Economic Times fetch error: {e}")
+
+        # Try NSE India
+        if 'nse_india' in sources:
+            try:
+                articles = self._fetch_from_nse_india(max_articles)
+                all_news.extend(articles)
+                logger.info(f"Fetched {len(articles)} articles from NSE India")
+            except Exception as e:
+                logger.error(f"NSE India fetch error: {e}")
+
         # Try NewsAPI
         if 'newsapi' in sources:
             key = news_settings.get('newsapi_key', '')
@@ -57,6 +84,85 @@ class NewsService:
             logger.info("Using demo news (no API key configured or source set to demo)")
 
         return all_news[:max_articles]
+
+    def _fetch_from_moneycontrol(self, max_articles: int) -> List[Dict]:
+        """Fetch from Moneycontrol RSS feeds"""
+        import xml.etree.ElementTree as ET
+        feeds = [
+            'https://www.moneycontrol.com/rss/marketreports.xml',
+            'https://www.moneycontrol.com/rss/stocksnews.xml',
+        ]
+        articles = []
+        for url in feeds:
+            try:
+                resp = requests.get(url, timeout=10, headers={'User-Agent': 'Mozilla/5.0'})
+                resp.raise_for_status()
+                root = ET.fromstring(resp.text)
+                for item in root.findall('.//item')[:max_articles // len(feeds)]:
+                    title = item.findtext('title', '').strip()
+                    desc = item.findtext('description', '').strip()
+                    link = item.findtext('link', '').strip()
+                    pub = item.findtext('pubDate', '')
+                    articles.append({
+                        'title': title, 'description': desc, 'content': desc,
+                        'source': 'Moneycontrol', 'url': link,
+                        'published_at': pub, 'fetched_at': datetime.now(timezone.utc).isoformat(),
+                    })
+            except Exception as e:
+                logger.error(f"Moneycontrol RSS error for {url}: {e}")
+        return articles[:max_articles]
+
+    def _fetch_from_economictimes(self, max_articles: int) -> List[Dict]:
+        """Fetch from Economic Times RSS feeds"""
+        import xml.etree.ElementTree as ET
+        feeds = [
+            'https://economictimes.indiatimes.com/markets/rssfeeds/1977021501.cms',
+            'https://economictimes.indiatimes.com/markets/stocks/rssfeeds/2146842.cms',
+        ]
+        articles = []
+        for url in feeds:
+            try:
+                resp = requests.get(url, timeout=10, headers={'User-Agent': 'Mozilla/5.0'})
+                resp.raise_for_status()
+                root = ET.fromstring(resp.text)
+                for item in root.findall('.//item')[:max_articles // len(feeds)]:
+                    title = item.findtext('title', '').strip()
+                    desc = item.findtext('description', '').strip()
+                    link = item.findtext('link', '').strip()
+                    pub = item.findtext('pubDate', '')
+                    articles.append({
+                        'title': title, 'description': desc, 'content': desc,
+                        'source': 'Economic Times', 'url': link,
+                        'published_at': pub, 'fetched_at': datetime.now(timezone.utc).isoformat(),
+                    })
+            except Exception as e:
+                logger.error(f"ET RSS error for {url}: {e}")
+        return articles[:max_articles]
+
+    def _fetch_from_nse_india(self, max_articles: int) -> List[Dict]:
+        """Fetch from NSE India"""
+        articles = []
+        session = requests.Session()
+        session.headers.update({
+            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
+            'Accept': 'application/json', 'Accept-Language': 'en-US,en;q=0.9',
+        })
+        try:
+            session.get('https://www.nseindia.com', timeout=10)
+            resp = session.get('https://www.nseindia.com/api/corporate-announcements?index=equities', timeout=15)
+            data = resp.json() if resp.status_code == 200 else []
+            for ann in (data if isinstance(data, list) else [])[:max_articles]:
+                articles.append({
+                    'title': f"{ann.get('symbol', 'NSE')}: {ann.get('desc', ann.get('subject', 'Announcement'))}",
+                    'description': ann.get('desc', ann.get('subject', '')),
+                    'content': ann.get('desc', ''), 'source': 'NSE India',
+                    'url': f"https://www.nseindia.com{ann.get('attchmntFile', '')}" if ann.get('attchmntFile') else 'https://www.nseindia.com',
+                    'published_at': datetime.now(timezone.utc).isoformat(),
+                    'fetched_at': datetime.now(timezone.utc).isoformat(),
+                })
+        except Exception as e:
+            logger.error(f"NSE India error: {e}")
+        return articles[:max_articles]
 
     def _fetch_from_newsapi(self, api_key: str, max_articles: int) -> List[Dict]:
         """Fetch from NewsAPI.org"""
