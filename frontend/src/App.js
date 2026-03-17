@@ -72,11 +72,38 @@ function App() {
       }
     }, 1000);
     
+    // Update market indices every 3 seconds (simulate live prices)
+    const marketInterval = setInterval(() => {
+      setMarketIndices(prev => ({
+        nifty50: {
+          value: prev.nifty50.value + (Math.random() - 0.5) * 50,
+          change: (Math.random() - 0.5) * 100,
+          changePct: (Math.random() - 0.5) * 0.8
+        },
+        sensex: {
+          value: prev.sensex.value + (Math.random() - 0.5) * 150,
+          change: (Math.random() - 0.5) * 300,
+          changePct: (Math.random() - 0.5) * 0.8
+        },
+        banknifty: {
+          value: prev.banknifty.value + (Math.random() - 0.5) * 80,
+          change: (Math.random() - 0.5) * 150,
+          changePct: (Math.random() - 0.5) * 0.9
+        },
+        finnifty: {
+          value: prev.finnifty.value + (Math.random() - 0.5) * 40,
+          change: (Math.random() - 0.5) * 80,
+          changePct: (Math.random() - 0.5) * 0.7
+        }
+      }));
+    }, 3000);
+    
     return () => {
       clearInterval(dataInterval);
       clearInterval(exitInterval);
       clearInterval(analysisInterval);
       clearInterval(countdownInterval);
+      clearInterval(marketInterval);
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [autoAnalyze, autoSettings.auto_exit, emergencyStop]);
