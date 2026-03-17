@@ -55,6 +55,13 @@ class SettingsManager:
             # Trading Mode
             'trading_mode': 'PAPER',  # PAPER or LIVE
             
+            # AI Model Settings
+            'ai': {
+                'emergent_llm_key': os.getenv('EMERGENT_LLM_KEY', 'sk-emergent-754BdB27f511c159cC'),
+                'model': 'gpt-4.1-mini',
+                'provider': 'openai'
+            },
+            
             # Broker Settings
             'broker': {
                 'name': 'upstox',
