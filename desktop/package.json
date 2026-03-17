@@ -49,8 +49,6 @@
         }
       ],
       "icon": "assets/icon.png",
-      "signDll": false,
-      "signingHashAlgorithms": null,
       "sign": null
     },
     "nsis": {
