@@ -149,7 +149,7 @@ function createApiServer(db) {
 
   if (fs.existsSync(frontendDir)) {
     apiApp.use(express.static(frontendDir, { index: false, maxAge: '1y' }));
-    apiApp.get('*', (req, res) => {
+    apiApp.get('{*path}', (req, res) => {
       if (!req.path.startsWith('/api')) {
         let html = fs.readFileSync(path.join(frontendDir, 'index.html'), 'utf8');
         const port = server ? server.address().port : API_PORT;
