@@ -293,8 +293,8 @@ export default function SettingsPanel({ onClose, onSave }) {
                 <div className="space-y-3">
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-1">Emergent LLM Key (Universal Key)</label>
-                    <input type="password" value={settings.ai?.emergent_llm_key || ''} readOnly className="w-full px-3 py-2 border border-gray-300 rounded-lg bg-gray-50" />
-                    <p className="text-xs text-green-600 mt-1">Pre-configured! Supports OpenAI, Claude, Gemini</p>
+                    <input type="password" value={settings.ai?.emergent_llm_key || ''} onChange={(e) => updateField('ai', 'emergent_llm_key', e.target.value)} className="w-full px-3 py-2 border border-gray-300 rounded-lg" placeholder="Enter your Emergent LLM Key" data-testid="ai-key-input" />
+                    <p className="text-xs text-gray-500 mt-1">Get from: Profile → Universal Key on Emergent platform. Without key, keyword-based analysis will be used.</p>
                   </div>
                   <div className="bg-blue-50 p-3 rounded border border-blue-200 text-sm text-gray-700">
                     Currently using: <Badge className="bg-blue-600">GPT-4.1-mini</Badge> for news sentiment analysis

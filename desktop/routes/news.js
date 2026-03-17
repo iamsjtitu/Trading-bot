@@ -330,7 +330,16 @@ TRADING_SIGNAL: [BUY_CALL/BUY_PUT/HOLD]`;
           const signal = generateSignal(newsDoc);
           if (signal) {
             db.data.signals.push(signal);
-            executePaperTrade(signal);
+
+            // LIVE mode → place real Upstox order, PAPER mode → paper trade
+            const mode = db.data.settings?.trading_mode || 'PAPER';
+            const token = db.data.settings?.broker?.access_token;
+
+            if (mode === 'LIVE' && token) {
+              await executeLiveTrade(signal, token);
+            } else {
+              executePaperTrade(signal);
+            }
             signalGenerated = true;
           }
         }
@@ -422,6 +431,122 @@ TRADING_SIGNAL: [BUY_CALL/BUY_PUT/HOLD]`;
       p.last_updated = new Date().toISOString();
     }
     db.save();
+  }
+
+  // ============ LIVE Trade via Upstox ============
+  async function executeLiveTrade(signal, accessToken) {
+    const headers = { Accept: 'application/json', Authorization: `Bearer ${accessToken}`, 'Api-Version': '2.0', 'Content-Type': 'application/json' };
+
+    try {
+      // Step 1: Find the nearest weekly expiry option instrument
+      const optionType = signal.signal_type === 'CALL' ? 'CE' : 'PE';
+      const strikePrice = signal.strike_price;
+
+      // Search for NIFTY option instrument
+      const searchResp = await axios.get(`https://api.upstox.com/v2/option/chain?instrument_key=NSE_INDEX|Nifty 50&expiry_date=`, {
+        headers, timeout: 15000,
+      }).catch(() => null);
+
+      let instrumentToken = null;
+
+      if (searchResp?.data?.status === 'success' && searchResp.data.data) {
+        // Find closest strike price in option chain
+        const chain = searchResp.data.data;
+        let closest = null;
+        let minDiff = Infinity;
+
+        for (const item of chain) {
+          const opt = optionType === 'CE' ? item.call_options : item.put_options;
+          if (opt?.instrument_key) {
+            const diff = Math.abs((item.strike_price || 0) - strikePrice);
+            if (diff < minDiff) {
+              minDiff = diff;
+              closest = opt;
+              instrumentToken = opt.instrument_key;
+            }
+          }
+        }
+      }
+
+      if (!instrumentToken) {
+        // Fallback: construct instrument token manually
+        const now = new Date();
+        const year = String(now.getFullYear()).slice(2);
+        const month = String(now.getMonth() + 1).padStart(2, '0');
+        const day = String(now.getDate()).padStart(2, '0');
+        instrumentToken = `NSE_FO|NIFTY${year}${month}${day}${strikePrice}${optionType}`;
+        console.log(`[LiveTrade] Using constructed instrument: ${instrumentToken}`);
+      }
+
+      // Step 2: Place MARKET order
+      const orderBody = {
+        quantity: signal.quantity,
+        product: 'D',
+        validity: 'DAY',
+        price: 0,
+        instrument_token: instrumentToken,
+        order_type: 'MARKET',
+        transaction_type: 'BUY',
+        disclosed_quantity: 0,
+        trigger_price: 0,
+        is_amo: false,
+      };
+
+      console.log(`[LiveTrade] Placing ${signal.signal_type} order: ${instrumentToken} qty=${signal.quantity}`);
+
+      const orderResp = await axios.post('https://api.upstox.com/v2/order/place', orderBody, { headers, timeout: 15000 });
+
+      const orderId = orderResp.data?.data?.order_id || '';
+      const orderSuccess = orderResp.data?.status === 'success';
+
+      // Step 3: Track trade
+      if (!db.data.trades) db.data.trades = [];
+      const trade = {
+        id: uuid(), signal_id: signal.id, trade_type: signal.signal_type,
+        symbol: signal.symbol, entry_time: new Date().toISOString(),
+        entry_price: signal.entry_price, quantity: signal.quantity,
+        investment: signal.investment_amount, stop_loss: signal.stop_loss,
+        target: signal.target, status: orderSuccess ? 'OPEN' : 'FAILED',
+        mode: 'LIVE', order_id: orderId, instrument_token: instrumentToken,
+        exit_time: null, exit_price: null, pnl: 0, pnl_percentage: 0,
+        upstox_status: orderResp.data?.status || 'unknown',
+        upstox_message: orderResp.data?.message || '',
+      };
+      db.data.trades.push(trade);
+
+      // Update portfolio
+      if (orderSuccess) {
+        const p = db.data.portfolio;
+        if (p) {
+          p.invested_amount = (p.invested_amount || 0) + signal.investment_amount;
+          p.available_capital = (p.available_capital || 0) - signal.investment_amount;
+          if (!p.active_positions) p.active_positions = [];
+          p.active_positions.push(trade.id);
+          p.last_updated = new Date().toISOString();
+        }
+        console.log(`[LiveTrade] Order placed! ID: ${orderId}`);
+      } else {
+        console.error(`[LiveTrade] Order failed: ${orderResp.data?.message || 'Unknown error'}`);
+      }
+
+      db.save();
+      return { success: orderSuccess, order_id: orderId, trade };
+
+    } catch (err) {
+      console.error(`[LiveTrade] Error: ${err.message}`);
+      // Save failed trade for tracking
+      if (!db.data.trades) db.data.trades = [];
+      db.data.trades.push({
+        id: uuid(), signal_id: signal.id, trade_type: signal.signal_type,
+        symbol: signal.symbol, entry_time: new Date().toISOString(),
+        entry_price: signal.entry_price, quantity: signal.quantity,
+        investment: signal.investment_amount, status: 'FAILED',
+        mode: 'LIVE', error: err.message,
+        exit_time: null, exit_price: null, pnl: 0, pnl_percentage: 0,
+      });
+      db.save();
+      return { success: false, error: err.message };
+    }
   }
 
   return router;
