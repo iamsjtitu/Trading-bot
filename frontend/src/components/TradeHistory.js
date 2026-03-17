@@ -206,7 +206,7 @@ export default function TradeHistory({ formatCurrency }) {
                     </td>
                     <td className="px-3 py-2 font-medium text-gray-900">{t.symbol}</td>
                     <td className="px-3 py-2 text-right text-gray-700">{t.entry_price}</td>
-                    <td className="px-3 py-2 text-right text-gray-700">{t.exit_price || '-'}</td>
+                    <td className="px-3 py-2 text-right text-gray-700">{t.exit_price ? t.exit_price.toFixed(2) : '-'}</td>
                     <td className="px-3 py-2 text-right text-gray-700">{t.quantity}</td>
                     <td className="px-3 py-2 text-right text-gray-700">{Math.round(t.investment || 0).toLocaleString()}</td>
                     <td className={`px-3 py-2 text-right font-bold ${(t.pnl || 0) >= 0 ? 'text-green-600' : 'text-red-600'}`}>
