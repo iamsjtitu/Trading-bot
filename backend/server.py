@@ -25,7 +25,7 @@ client = AsyncIOMotorClient(mongo_url)
 db = client[os.environ['DB_NAME']]
 
 # Initialize services
-news_service = NewsService()
+news_service = NewsService(db)
 sentiment_service = SentimentService()
 trading_engine = TradingEngine(db)
 settings_manager = SettingsManager(db)
