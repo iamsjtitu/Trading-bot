@@ -146,15 +146,60 @@ export default function SettingsPanel({ onClose, onSave }) {
                     />
                   </div>
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">Redirect URI</label>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                      Redirect URI
+                      <span className="text-xs text-gray-500 ml-2">(Where to get? See below 👇)</span>
+                    </label>
                     <input
                       type="text"
                       value={settings.broker.redirect_uri}
                       onChange={(e) => updateField('broker', 'redirect_uri', e.target.value)}
-                      className="w-full px-3 py-2 border-gray-300 rounded-lg"
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg"
                       placeholder="https://yourapp.com/callback"
                     />
                   </div>
+                  
+                  {/* Redirect URI Guide */}
+                  <div className="bg-blue-50 p-4 rounded-lg border border-blue-200">
+                    <h4 className="font-semibold text-gray-800 mb-2">📍 How to Get Redirect URI?</h4>
+                    <div className="text-sm text-gray-700 space-y-2">
+                      <p><strong>Option 1: Use Your Domain (if you have)</strong></p>
+                      <code className="block bg-white p-2 rounded border text-xs">
+                        https://yourdomain.com/callback
+                      </code>
+                      
+                      <p className="mt-3"><strong>Option 2: Use localhost (for testing)</strong></p>
+                      <code className="block bg-white p-2 rounded border text-xs">
+                        http://localhost:3000/callback
+                      </code>
+                      
+                      <p className="mt-3"><strong>Option 3: Use Current Bot URL</strong></p>
+                      <code className="block bg-white p-2 rounded border text-xs">
+                        {window.location.origin}/callback
+                      </code>
+                      <button
+                        onClick={() => {
+                          updateField('broker', 'redirect_uri', `${window.location.origin}/callback`);
+                          alert('✅ Current URL copied to Redirect URI!');
+                        }}
+                        className="mt-2 px-3 py-1 bg-blue-600 text-white rounded text-xs hover:bg-blue-700"
+                      >
+                        📋 Use Current URL
+                      </button>
+                      
+                      <div className="mt-3 p-3 bg-yellow-50 rounded border border-yellow-200">
+                        <p className="font-semibold text-yellow-800">⚠️ Important Steps:</p>
+                        <ol className="list-decimal ml-4 mt-1 space-y-1 text-xs text-yellow-900">
+                          <li>Go to <a href="https://api.upstox.com" target="_blank" rel="noreferrer" className="underline">Upstox Developer Portal</a></li>
+                          <li>Create/Edit your app</li>
+                          <li>Add your Redirect URI in app settings</li>
+                          <li>Copy the SAME URI here</li>
+                          <li>Both must match exactly!</li>
+                        </ol>
+                      </div>
+                    </div>
+                  </div>
+                  
                   <p className="text-xs text-gray-500">
                     Get API credentials from <a href="https://api.upstox.com" target="_blank" rel="noreferrer" className="text-blue-600 underline">Upstox Developer Portal</a>
                   </p>
