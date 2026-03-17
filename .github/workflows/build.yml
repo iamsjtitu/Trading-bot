@@ -47,10 +47,12 @@ jobs:
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Upload .exe to Release
+      - name: Upload to Release
         uses: softprops/action-gh-release@v2
         with:
-          files: desktop/dist/*.exe
+          files: |
+            desktop/dist/*.exe
+            desktop/dist/latest.yml
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
@@ -88,11 +90,12 @@ jobs:
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Upload .dmg to Release
+      - name: Upload to Release
         uses: softprops/action-gh-release@v2
         with:
           files: |
             desktop/dist/*.dmg
             desktop/dist/*.zip
+            desktop/dist/latest-mac.yml
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
