@@ -169,13 +169,14 @@ function App() {
   const loadData = async () => {
     setLoading(true);
     try {
-      const [portfolioRes, newsRes, signalsRes, tradesRes, statsRes, todayRes] = await Promise.all([
+      const [portfolioRes, newsRes, signalsRes, tradesRes, statsRes, todayRes, settingsRes] = await Promise.all([
         axios.get(`${API}/portfolio`),
         axios.get(`${API}/news/latest?limit=10`),
         axios.get(`${API}/signals/latest?limit=10`),
         axios.get(`${API}/trades/active`),
         axios.get(`${API}/stats`),
-        axios.get(`${API}/trades/today`)
+        axios.get(`${API}/trades/today`),
+        axios.get(`${API}/settings`)
       ]);
 
       setPortfolio(portfolioRes.data);
@@ -183,6 +184,11 @@ function App() {
       setSignals(signalsRes.data.signals || []);
       setTrades(tradesRes.data.trades || []);
       setStats(statsRes.data.stats || {});
+      
+      // Get trading mode from settings
+      if (settingsRes.data.status === 'success') {
+        setTradingMode(settingsRes.data.settings.trading_mode || 'PAPER');
+      }
       
       // Calculate risk metrics with today's data
       const todayData = todayRes.data;
