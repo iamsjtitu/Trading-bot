@@ -23,10 +23,33 @@ function App() {
 
   useEffect(() => {
     initializeApp();
-    const interval = setInterval(loadData, 30000); // Refresh every 30 seconds
-    return () => clearInterval(interval);
+    
+    // Auto refresh data every 30 seconds
+    const dataInterval = setInterval(loadData, 30000);
+    
+    // Auto analyze news every 5 minutes if enabled
+    const analysisInterval = setInterval(() => {
+      if (autoAnalyze) {
+        fetchNewNews();
+      }
+    }, 5 * 60 * 1000); // 5 minutes
+    
+    // Update countdown timer
+    const countdownInterval = setInterval(() => {
+      if (autoAnalyze) {
+        const now = Date.now();
+        const nextTime = Math.ceil((300000 - (now % 300000)) / 1000); // seconds until next 5 min mark
+        setNextAnalysis(nextTime);
+      }
+    }, 1000);
+    
+    return () => {
+      clearInterval(dataInterval);
+      clearInterval(analysisInterval);
+      clearInterval(countdownInterval);
+    };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [autoAnalyze]);
 
   const initializeApp = async () => {
     try {
