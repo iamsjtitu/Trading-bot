@@ -105,8 +105,16 @@ function createApiServer(db) {
     res.json({ status: 'healthy', timestamp: new Date().toISOString(), services: { news: 'active', sentiment: 'active', trading: 'active' } });
   });
 
-  // Serve frontend
-  const frontendDir = path.join(__dirname, 'frontend-build');
+  // Serve frontend - check multiple possible locations
+  const possiblePaths = [
+    path.join(__dirname, 'frontend-build'),
+    path.join(process.resourcesPath || __dirname, 'frontend-build'),
+    path.join(__dirname, '..', 'frontend-build'),
+    path.join(__dirname, '..', 'frontend', 'build'),
+  ];
+  const frontendDir = possiblePaths.find(p => fs.existsSync(path.join(p, 'index.html'))) || possiblePaths[0];
+  console.log(`[Frontend] Looking in: ${frontendDir} (exists: ${fs.existsSync(frontendDir)})`);
+
   if (fs.existsSync(frontendDir)) {
     apiApp.use(express.static(frontendDir, { index: false, maxAge: '1y' }));
     apiApp.get('*', (req, res) => {

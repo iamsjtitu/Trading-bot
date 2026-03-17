@@ -95,16 +95,9 @@
       "main.js",
       "preload.js",
       "routes/**/*",
-      "assets/**/*"
+      "assets/**/*",
+      "frontend-build/**/*"
     ],
-    "extraResources": [
-      {
-        "from": "../frontend/build",
-        "to": "frontend-build",
-        "filter": [
-          "**/*"
-        ]
-      }
-    ]
+    "extraResources": []
   }
 }
