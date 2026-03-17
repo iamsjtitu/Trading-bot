@@ -347,6 +347,19 @@ async def check_auto_exits():
     """Check and execute auto-exits for trades"""
     try:
         result = await trading_engine.check_and_execute_exits()
+        
+        # If auto-entry is ON but no new trades generated, trigger news analysis
+        if (trading_engine.auto_entry_enabled and 
+            result['exits'] > 0 and 
+            result['new_trades'] == 0):
+            # Check if we need fresh news
+            recent_news_count = await db.news_articles.count_documents({
+                'created_at': {'$gte': (datetime.now(timezone.utc) - timedelta(minutes=10)).isoformat()}
+            })
+            
+            if recent_news_count == 0:
+                logger.info("No recent news for auto-entry, will wait for next news analysis cycle")
+        
         return {
             "status": "success",
             "exits_executed": result['exits'],
