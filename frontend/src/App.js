@@ -42,6 +42,13 @@ function App() {
     // Auto refresh data every 30 seconds
     const dataInterval = setInterval(loadData, 30000);
     
+    // Check auto-exits every 10 seconds if enabled
+    const exitInterval = setInterval(() => {
+      if (autoSettings.auto_exit && !emergencyStop) {
+        checkAutoExits();
+      }
+    }, 10000);
+    
     // Auto analyze news every 5 minutes if enabled
     const analysisInterval = setInterval(() => {
       if (autoAnalyze) {
@@ -60,11 +67,12 @@ function App() {
     
     return () => {
       clearInterval(dataInterval);
+      clearInterval(exitInterval);
       clearInterval(analysisInterval);
       clearInterval(countdownInterval);
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [autoAnalyze]);
+  }, [autoAnalyze, autoSettings.auto_exit, emergencyStop]);
 
   const initializeApp = async () => {
     try {
