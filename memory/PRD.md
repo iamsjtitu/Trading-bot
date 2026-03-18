@@ -3,14 +3,6 @@
 ## Original Problem Statement
 Build an AI-powered automated options trading bot that connects to world news, uses AI (GPT-4o) for sentiment analysis (Bullish/Bearish), and automatically executes options (Call/Put) trades on Upstox. Final form: standalone desktop app (.exe/.dmg) with auto-update.
 
-## Core Requirements
-- **Broker:** Upstox
-- **AI Model:** Emergent LLM Key (GPT-4o)
-- **News Sources:** NewsAPI.org, Alpha Vantage, Moneycontrol, Economic Times, NSE India
-- **Trading:** Intraday, weekly expiry. Paper + Live mode switchable
-- **Risk:** Configurable limits, stop-loss, emergency stop
-- **Desktop App:** Electron (.exe/.dmg), auto-update via GitHub releases
-
 ## Architecture
 - **Frontend:** React + Tailwind + Shadcn/UI + Chart.js
 - **Backend (Web):** Python FastAPI + MongoDB
@@ -19,60 +11,71 @@ Build an AI-powered automated options trading bot that connects to world news, u
 - **CI/CD:** GitHub Actions (Node.js 18 pinned)
 
 ## What's Implemented
+
+### Core Trading
 - Dashboard with real-time market ticker, risk panel, portfolio cards
-- News feed with AI sentiment analysis (multi-source)
-- Trading signals generation from news
 - Paper trading engine with auto-exit/entry
 - Live Upstox integration (OAuth, orders, portfolio, positions)
 - LIVE vs PAPER mode switching with proper data isolation
 - Trade history with filtering
+
+### AI Decision Engine (ENHANCED - March 18, 2026)
+- **Multi-Signal Correlation**: Aggregates signals from last 30 min, computes correlation score based on direction/sector alignment
+- **Market Regime Detection**: TRENDING_UP/DOWN, SIDEWAYS, VOLATILE, MIXED classification from 4h sentiment distribution + confidence variance
+- **Multi-Timeframe Sentiment**: Tracks 1hr, 4hr, daily windows with confluence scoring (0-100)
+- **Dynamic Position Sizing**: Kelly Criterion-inspired sizing factoring confidence, win rate, regime multiplier, sector performance, drawdown protection
+- **Sector Rotation Tracker**: Monitors bullish/bearish momentum per sector, identifies leaders/laggards
+- **AI-Powered Trade Review**: Post-trade analysis using GPT for learning insights
+- **News Freshness Decay**: Exponential decay (60-min half-life) for news relevance
+- **Enhanced AI Prompt**: 8-factor analysis framework with market context injection
+- **Composite Scoring**: Weighted score = 35% AI Confidence + 20% Correlation + 20% Confluence + 15% Freshness + 10% Historical
+- **Regime-Aware Thresholds**: VOLATILE requires 75%+ confidence, SIDEWAYS 70%, CLOSING_HOUR 80%
+- **AI Brain Dashboard**: New tab showing regime, sector rotation, performance, timeframe depth, decision factor weights
+- Enhanced signal cards showing composite score, correlation, confluence, freshness, volatility, sector badges
+
+### News & Sentiment
+- News feed with AI sentiment analysis (multi-source: NewsAPI, Alpha Vantage, Moneycontrol, ET)
+- HTML stripping on all sources + frontend safety net
+- News deduplication
+- Trading signals generation from news with composite scoring
+
+### Analytics & Reports
 - Trade analytics with Chart.js
 - Capital gains tax reporting (PDF/Excel export)
-- Desktop notification via Telegram
-- Auto square-off warning near market close
-- Historical pattern matching for AI decisions
-- Desktop app build pipeline (CI/CD)
+
+### Desktop & Notifications
+- Electron desktop app build pipeline (CI/CD)
 - Auto-updater for desktop app
+- Telegram desktop notifications
+- Auto square-off warning near market close
 
 ## Bug Fixes Completed (March 18, 2026)
-1. **P0 - Market Status Indicator:** Fixed MarketTicker to show correct status based on Upstox connection + market hours
-2. **P0 - LIVE Mode Data Mismatch:** Fixed both desktop (Node.js) and web (Python) backends - Active Trades now fetches real Upstox positions in LIVE mode, portfolio shows live funds, no paper data leakage
-3. **P0 - Market Data 0.00:** Upgraded from `/market-quote/ltp` to `/market-quote/quotes` endpoint for full OHLC data. Fixed close price field parsing (was `close_price`, now `ohlc.close`/`cp` with fallback chain). Added robust key matching.
-4. **P1 - HTML Tags in News:** Applied strip_html to all news sources (NewsAPI, Alpha Vantage) + frontend safety net
+1. P0 - Market Status Indicator: Fixed with Upstox-aware logic
+2. P0 - LIVE Mode Data Mismatch: Both backends fixed - no paper data leakage
+3. P0 - Market Data 0.00: Upgraded to full market quote API + correct field parsing
+4. P1 - HTML Tags in News: strip_html on all sources + frontend cleanText()
 
 ## Key Files
-### Frontend
-- `/app/frontend/src/App.js` - Main app with mode logic, displayTrades/displayPortfolio
-- `/app/frontend/src/components/MarketTicker.js` - Market status with Upstox-aware logic
-- `/app/frontend/src/components/NewsFeed.js` - News with cleanText() HTML stripping
-- `/app/frontend/src/components/SignalsList.js` - Trading signals with LIVE mode banner
-- `/app/frontend/src/components/TradesList.js` - Active trades with live/paper isolation
-- `/app/frontend/src/components/RiskPanel.js` - Risk panel with disconnected badge
-
-### Desktop Backend (Node.js)
-- `/app/desktop/routes/portfolio.js` - Portfolio + combined-status (fixed market data + live portfolio)
-- `/app/desktop/routes/upstox.js` - Upstox API routes (fixed market quote endpoint)
-- `/app/desktop/routes/trading.js` - Trades (fixed to fetch Upstox positions in LIVE mode)
-- `/app/desktop/main.js` - Electron shell + Express server
-
-### Web Backend (Python)
-- `/app/backend/server.py` - FastAPI backend
-- `/app/backend/upstox_service.py` - Upstox API integration (fixed market data parsing)
-- `/app/backend/news_service.py` - News fetching + HTML stripping
+- `/app/backend/ai_engine.py` - Python AI Decision Engine
+- `/app/backend/sentiment_service.py` - Enhanced sentiment with AI engine
+- `/app/backend/server.py` - FastAPI + /api/ai/insights endpoint
+- `/app/desktop/routes/ai_engine.js` - Node.js AI Decision Engine
+- `/app/desktop/routes/news.js` - Enhanced analyzeSentiment + signal generation
+- `/app/desktop/routes/trading.js` - Trading + AI trade review
+- `/app/frontend/src/components/AIInsights.js` - AI Brain dashboard
+- `/app/frontend/src/components/SignalsList.js` - Enhanced signal cards
 
 ## Pending/Upcoming Tasks
 ### P0
-- MCX & Commodities Trading (user requested)
+- MCX & Commodities Trading
 
 ### P1
-- End-to-end Telegram notification testing (needs user credentials)
-- AI model decision-making enhancements
+- Telegram notification e2e testing
+- Desktop app rebuild + test with Upstox
 
-### P2 (Backlog)
+### P2
 - Additional broker support
-- Advanced analytics & filtering on Trade History
-- CI/CD pipeline robustness improvements
+- Advanced trade history analytics
+- CI/CD pipeline stability
 
-## Version
-- Desktop: v1.3.3
-- Frontend: v0.1.0
+## Version: Desktop v1.3.3
