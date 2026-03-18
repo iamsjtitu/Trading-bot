@@ -1,0 +1,73 @@
+{
+  "summary": "Iteration 8 complete - Testing new Capital Gains Tax Report feature for Indian tax system. All 15 backend tests passed. All UI components verified via Playwright. Tax calculation correct (STCG @15%, Cess @4%). Excel and PDF exports working.",
+  "backend_issues": {
+    "critical": [],
+    "minor": []
+  },
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": [
+      {
+        "screen": "Tax Reports FY selector",
+        "issues": ["Minor React warning: <span> cannot be child of <option> - hydration warning in console, but UI works correctly"]
+      }
+    ]
+  },
+  "test_report_links": [
+    "/app/test_reports/pytest/tax_reports_results.xml",
+    "/app/backend/tests/test_tax_reports.py"
+  ],
+  "action_items": [],
+  "critical_code_review_comments": [],
+  "updated_files": [
+    "/app/backend/tests/test_tax_reports.py"
+  ],
+  "success_rate": {
+    "backend": "100% (15/15 tests passed)",
+    "frontend": "100% (all Tax Report features verified)"
+  },
+  "test_credentials": "None required - uses public preview URL",
+  "seed_data_creation": "Using existing 5 closed trades from March 2026 in FY 2025-26 with +₹12,853 P&L",
+  "retest_needed": false,
+  "main_agent_can_self_test": false,
+  "context_for_next_testing_agent": "Tax Reports feature fully working. Tax calculation: Net P&L ₹12,853 → STCG @15% = ₹1,928, Cess @4% = ₹77, Total Tax = ₹2,005. Monthly breakdown shows March 2026 with 5 trades. Excel (7.7KB) and PDF (3.1KB) exports verified with correct file signatures.",
+  "tested_features": {
+    "1_tax_tab_exists": "PASS - Tax Reports tab visible in tabs bar with data-testid='tax-tab'",
+    "2_fy_selector": "PASS - FY year dropdown visible with data-testid='fy-selector', options from 2027-28 to 2023-24",
+    "3_view_toggle_buttons": "PASS - Summary/Monthly buttons work with data-testid='view-summary-btn' and 'view-monthly-btn'",
+    "4_summary_cards": "PASS - 4 cards visible: Total Trades (5), Net P&L (+₹12,853), Tax Liability (₹2,005), F&O Turnover (₹12,853)",
+    "5_tax_calculation_card": "PASS - Shows Net Taxable Profit, STCG Tax @15%, Cess @4%, Total Tax Liability",
+    "6_trading_summary_card": "PASS - Shows Buy Value (₹99,750), Sell Value (₹1,12,603), Profit, Loss, Turnover, Audit Threshold",
+    "7_monthly_table": "PASS - Table with Month, Trades, Profit, Loss, Net P&L, Turnover, STCG Tax, Cess, Total Tax columns",
+    "8_excel_export_button": "PASS - Button visible with data-testid='export-excel-btn', API returns valid xlsx (PK signature)",
+    "9_pdf_export_button": "PASS - Button visible with data-testid='export-pdf-btn', API returns valid PDF (%PDF- signature)",
+    "10_api_tax_report": "PASS - GET /api/tax/report?fy_year=2025-26 returns complete tax calculation with total_tax_liability",
+    "11_api_export_excel": "PASS - GET /api/tax/export-excel returns valid xlsx file (7746 bytes)",
+    "12_api_export_pdf": "PASS - GET /api/tax/export-pdf returns valid PDF file (3181 bytes)",
+    "13_disclaimer_text": "PASS - Visible at bottom: 'This report is auto-generated. Consult a CA for actual tax filing. ITR-3 applicable.'",
+    "14_other_tabs_regression": "PASS - Dashboard, News, Signals, Trades, History, Analytics tabs all working"
+  },
+  "api_verification": {
+    "GET /api/tax/report?fy_year=2025-26": "200 OK - {total_trades:5, net_pnl:12852.66, stcg_tax:1927.9, cess:77.12, total_tax_liability:2005.01}",
+    "GET /api/tax/export-excel?fy_year=2025-26": "200 OK - Returns xlsx file (7746 bytes, PK signature)",
+    "GET /api/tax/export-pdf?fy_year=2025-26": "200 OK - Returns PDF file (3181 bytes, %PDF- signature)",
+    "GET /api/tax/report?fy_year=2024-25": "200 OK - Returns empty report for FY with no trades",
+    "GET /api/tax/report?fy_year=2027-28": "200 OK - Returns zero values for future FY",
+    "GET /api/health": "200 OK - healthy (no regression)",
+    "GET /api/portfolio": "200 OK - current_value, total_pnl present (no regression)",
+    "GET /api/trades/history": "200 OK - with filters and summary (no regression)"
+  },
+  "tax_calculation_verification": {
+    "net_pnl": 12852.66,
+    "stcg_rate": "15%",
+    "stcg_tax": 1927.90,
+    "cess_rate": "4% of STCG",
+    "cess": 77.12,
+    "total_tax_liability": 2005.01,
+    "effective_tax_rate": "15.6%",
+    "audit_threshold": 100000000,
+    "audit_required": false,
+    "calculation_correct": true
+  }
+}

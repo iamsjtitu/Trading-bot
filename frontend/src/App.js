@@ -16,6 +16,7 @@ import AutoTradingSettings from '@/components/AutoTradingSettings';
 import PositionCalculator from '@/components/PositionCalculator';
 import TradeHistory from '@/components/TradeHistory';
 import TradeAnalytics from '@/components/TradeAnalytics';
+import TaxReports from '@/components/TaxReports';
 import UpdateBanner from '@/components/UpdateBanner';
 
 // Detect if running in desktop (localhost) or web mode
@@ -470,6 +471,7 @@ function App() {
             <TabsTrigger value="history" data-testid="history-tab" className="data-[state=active]:bg-blue-100 data-[state=active]:text-blue-900">Trade History</TabsTrigger>
             <TabsTrigger value="calculator" data-testid="calculator-tab" className="data-[state=active]:bg-blue-100 data-[state=active]:text-blue-900">Calculator</TabsTrigger>
             <TabsTrigger value="analytics" data-testid="analytics-tab" className="data-[state=active]:bg-blue-100 data-[state=active]:text-blue-900">Trade Analytics</TabsTrigger>
+            <TabsTrigger value="tax" data-testid="tax-tab" className="data-[state=active]:bg-blue-100 data-[state=active]:text-blue-900">Tax Reports</TabsTrigger>
           </TabsList>
 
           <TabsContent value="news"><NewsFeed news={news} formatTime={formatTime} /></TabsContent>
@@ -478,6 +480,7 @@ function App() {
           <TabsContent value="history"><TradeHistory formatCurrency={formatCurrency} tradingMode={tradingMode} upstoxConnected={upstoxConnected} upstoxOrders={upstoxOrders} /></TabsContent>
           <TabsContent value="calculator"><PositionCalculator riskMetrics={riskMetrics} formatCurrency={formatCurrency} /></TabsContent>
           <TabsContent value="analytics"><TradeAnalytics /></TabsContent>
+          <TabsContent value="tax"><TaxReports formatCurrency={formatCurrency} /></TabsContent>
         </Tabs>
 
         {/* Live Positions from Upstox */}

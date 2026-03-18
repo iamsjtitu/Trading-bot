@@ -679,5 +679,101 @@ _Sent by AI Trading Bot_`;
     });
   });
 
+  // ============ Tax Report Endpoints ============
+
+  function getFYRange(fyYear) {
+    const [startYear] = fyYear.split('-').map(Number);
+    return {
+      start: new Date(startYear, 3, 1).toISOString(), // April 1
+      end: new Date(startYear + 1, 2, 31, 23, 59, 59).toISOString(), // March 31
+    };
+  }
+
+  function calculateTaxReport(trades, fyYear) {
+    const { start, end } = getFYRange(fyYear);
+    const fyTrades = trades.filter(t => t.status === 'CLOSED' && (t.exit_time || t.entry_time || '') >= start && (t.exit_time || t.entry_time || '') <= end);
+
+    if (!fyTrades.length) return { fy_year: fyYear, total_trades: 0, net_pnl: 0, total_tax_liability: 0, monthly_breakdown: {}, trade_count: 0 };
+
+    const totalBuy = fyTrades.reduce((s, t) => s + (t.investment || 0), 0);
+    const totalSell = fyTrades.reduce((s, t) => s + ((t.exit_price || 0) * (t.quantity || 0)), 0);
+    const totalPnl = fyTrades.reduce((s, t) => s + (t.pnl || 0), 0);
+    const wins = fyTrades.filter(t => (t.pnl || 0) > 0);
+    const losses = fyTrades.filter(t => (t.pnl || 0) < 0);
+    const totalProfit = wins.reduce((s, t) => s + t.pnl, 0);
+    const totalLoss = Math.abs(losses.reduce((s, t) => s + t.pnl, 0));
+    const turnover = fyTrades.reduce((s, t) => s + Math.abs(t.pnl || 0), 0);
+    const sttPaid = totalSell * 0.000625;
+    const stcgTax = totalPnl > 0 ? totalPnl * 0.15 : 0;
+    const cess = stcgTax * 0.04;
+
+    const monthly = {};
+    for (const t of fyTrades) {
+      const mk = (t.exit_time || t.entry_time || '').slice(0, 7);
+      if (!monthly[mk]) monthly[mk] = { trades: 0, profit: 0, loss: 0, net_pnl: 0, turnover: 0, buy_value: 0, sell_value: 0 };
+      const m = monthly[mk];
+      m.trades++;
+      const p = t.pnl || 0;
+      m.net_pnl += p;
+      m.turnover += Math.abs(p);
+      m.buy_value += t.investment || 0;
+      m.sell_value += (t.exit_price || 0) * (t.quantity || 0);
+      if (p > 0) m.profit += p; else m.loss += Math.abs(p);
+    }
+    for (const m of Object.values(monthly)) {
+      m.stcg_tax = m.net_pnl > 0 ? Math.round(m.net_pnl * 0.15 * 100) / 100 : 0;
+      m.cess = Math.round(m.stcg_tax * 0.04 * 100) / 100;
+      m.total_tax = Math.round((m.stcg_tax + m.cess) * 100) / 100;
+    }
+    const monthlySorted = Object.fromEntries(Object.entries(monthly).sort());
+
+    return {
+      fy_year: fyYear, total_trades: fyTrades.length,
+      profitable_trades: wins.length, loss_trades: losses.length,
+      win_rate: Math.round((wins.length / fyTrades.length) * 1000) / 10,
+      total_buy_value: Math.round(totalBuy * 100) / 100,
+      total_sell_value: Math.round(totalSell * 100) / 100,
+      total_profit: Math.round(totalProfit * 100) / 100,
+      total_loss: Math.round(totalLoss * 100) / 100,
+      net_pnl: Math.round(totalPnl * 100) / 100,
+      turnover: Math.round(turnover * 100) / 100,
+      stt_paid: Math.round(sttPaid * 100) / 100,
+      stcg_tax: Math.round(stcgTax * 100) / 100,
+      cess: Math.round(cess * 100) / 100,
+      total_tax_liability: Math.round((stcgTax + cess) * 100) / 100,
+      effective_tax_rate: totalPnl > 0 ? Math.round(((stcgTax + cess) / totalPnl) * 1000) / 10 : 0,
+      audit_required: turnover > 100000000,
+      audit_limit: 100000000,
+      monthly_breakdown: monthlySorted,
+      trade_count: fyTrades.length,
+    };
+  }
+
+  router.get('/api/tax/report', (req, res) => {
+    const fyYear = req.query.fy_year || '2025-26';
+    const report = calculateTaxReport(db.data.trades || [], fyYear);
+    res.json({ status: 'success', report });
+  });
+
+  router.get('/api/tax/export-excel', (req, res) => {
+    // Desktop app: redirect to backend service or return JSON for now
+    const fyYear = req.query.fy_year || '2025-26';
+    const report = calculateTaxReport(db.data.trades || [], fyYear);
+    // For desktop, we generate CSV as a fallback (Excel requires extra deps)
+    const headers = 'Month,Trades,Profit,Loss,Net P&L,Turnover,STCG Tax,Cess,Total Tax\n';
+    const rows = Object.entries(report.monthly_breakdown).map(([m, d]) => `${m},${d.trades},${d.profit},${d.loss},${d.net_pnl},${d.turnover},${d.stcg_tax},${d.cess},${d.total_tax}`).join('\n');
+    const totals = `\nTOTAL,${report.total_trades},${report.total_profit},${report.total_loss},${report.net_pnl},${report.turnover},${report.stcg_tax},${report.cess},${report.total_tax_liability}`;
+    res.setHeader('Content-Type', 'text/csv');
+    res.setHeader('Content-Disposition', `attachment; filename=Tax_Report_FY_${fyYear}.csv`);
+    res.send(headers + rows + totals);
+  });
+
+  router.get('/api/tax/export-pdf', (req, res) => {
+    // Desktop app: return JSON summary (PDF generation needs Python backend)
+    const fyYear = req.query.fy_year || '2025-26';
+    const report = calculateTaxReport(db.data.trades || [], fyYear);
+    res.json({ status: 'success', message: 'PDF export available via web app. Download CSV for desktop.', report });
+  });
+
   return router;
 };

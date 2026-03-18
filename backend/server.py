@@ -1,5 +1,6 @@
 from fastapi import FastAPI, APIRouter, BackgroundTasks
 from fastapi.staticfiles import StaticFiles
+from fastapi.responses import Response
 from dotenv import load_dotenv
 from starlette.middleware.cors import CORSMiddleware
 import os
@@ -13,6 +14,7 @@ import httpx
 
 # Import our services
 from news_service import NewsService
+from tax_service import calculate_tax_report, generate_excel_report, generate_pdf_report
 from sentiment_service import SentimentService
 from trading_engine import TradingEngine
 from settings_manager import SettingsManager
@@ -745,6 +747,56 @@ async def get_trading_status():
         logger.error(f"Trading status error: {e}")
         return {"status": "error", "message": str(e)}
 
+# ============ Tax Report Endpoints ============
+
+@api_router.get("/tax/report")
+async def get_tax_report(fy_year: str = "2025-26"):
+    """Get capital gains tax report for a financial year"""
+    try:
+        trades = await db.paper_trades.find({"status": "CLOSED"}, {"_id": 0}).to_list(5000)
+        report = calculate_tax_report(trades, fy_year)
+        # Remove full trades from response (too large for JSON)
+        report_summary = {k: v for k, v in report.items() if k != 'trades'}
+        report_summary['trade_count'] = len(report.get('trades', []))
+        return {"status": "success", "report": report_summary}
+    except Exception as e:
+        logger.error(f"Tax report error: {e}")
+        return {"status": "error", "message": str(e)}
+
+@api_router.get("/tax/export-excel")
+async def export_tax_excel(fy_year: str = "2025-26"):
+    """Export tax report as Excel file"""
+    try:
+        trades = await db.paper_trades.find({"status": "CLOSED"}, {"_id": 0}).to_list(5000)
+        report = calculate_tax_report(trades, fy_year)
+        excel_bytes = generate_excel_report(report)
+        filename = f"Tax_Report_FY_{fy_year}.xlsx"
+        return Response(
+            content=excel_bytes,
+            media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+            headers={"Content-Disposition": f"attachment; filename={filename}"}
+        )
+    except Exception as e:
+        logger.error(f"Tax Excel export error: {e}")
+        return {"status": "error", "message": str(e)}
+
+@api_router.get("/tax/export-pdf")
+async def export_tax_pdf(fy_year: str = "2025-26"):
+    """Export tax report as PDF file"""
+    try:
+        trades = await db.paper_trades.find({"status": "CLOSED"}, {"_id": 0}).to_list(5000)
+        report = calculate_tax_report(trades, fy_year)
+        pdf_bytes = generate_pdf_report(report)
+        filename = f"Tax_Report_FY_{fy_year}.pdf"
+        return Response(
+            content=pdf_bytes,
+            media_type="application/pdf",
+            headers={"Content-Disposition": f"attachment; filename={filename}"}
+        )
+    except Exception as e:
+        logger.error(f"Tax PDF export error: {e}")
+        return {"status": "error", "message": str(e)}
+
 @api_router.post("/test/generate-trade")
 async def test_generate_trade():
     """Test endpoint to manually trigger trade generation"""
@@ -937,7 +989,7 @@ async def shutdown_db_client():
 
 # Serve frontend build if available (for desktop/local mode)
 frontend_build = ROOT_DIR.parent / 'frontend' / 'build'
-if frontend_build.exists():
+if frontend_build.exists() and (frontend_build / 'static').exists():
     from starlette.responses import FileResponse
 
     app.mount("/static", StaticFiles(directory=str(frontend_build / "static")), name="static")
