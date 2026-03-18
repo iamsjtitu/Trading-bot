@@ -127,7 +127,7 @@ async def root():
         "message": "AI-Powered Options Trading Bot API",
         "version": "1.0.0",
         "status": "active",
-        "app_version": "2.9.0"
+        "app_version": "3.0.0"
     }
 
 @api_router.get("/health")
