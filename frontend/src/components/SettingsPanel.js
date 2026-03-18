@@ -456,6 +456,8 @@ export default function SettingsPanel({ onClose, onSave }) {
                         { value: 'ndtv_profit', label: 'NDTV Profit (Free)', desc: 'Business & market news from NDTV Profit' },
                         { value: 'cnbc_tv18', label: 'CNBC TV18 (Free)', desc: 'Market & economy news from CNBC TV18' },
                         { value: 'livemint', label: 'Livemint (Free)', desc: 'Markets news from Livemint' },
+                        { value: 'businesstoday', label: 'Business Today (Free)', desc: 'Market & economy news from BusinessToday.in' },
+                        { value: 'hindubusinessline', label: 'Hindu Business Line (Free)', desc: 'Markets & stocks from TheHinduBusinessLine.com' },
                         { value: 'newsapi', label: 'NewsAPI.org (API Key)', desc: 'Global news API - requires key' },
                         { value: 'alphavantage', label: 'Alpha Vantage (API Key)', desc: 'Financial news with sentiment - requires key' },
                       ].map(src => {

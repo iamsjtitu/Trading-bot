@@ -115,6 +115,24 @@ class NewsService:
             except Exception as e:
                 logger.error(f"Livemint fetch error: {e}")
 
+        # Try Business Today
+        if 'businesstoday' in sources:
+            try:
+                articles = self._fetch_from_businesstoday(max_articles)
+                all_news.extend(articles)
+                logger.info(f"Fetched {len(articles)} articles from Business Today")
+            except Exception as e:
+                logger.error(f"Business Today fetch error: {e}")
+
+        # Try Hindu Business Line
+        if 'hindubusinessline' in sources:
+            try:
+                articles = self._fetch_from_hindubusinessline(max_articles)
+                all_news.extend(articles)
+                logger.info(f"Fetched {len(articles)} articles from Hindu Business Line")
+            except Exception as e:
+                logger.error(f"Hindu Business Line fetch error: {e}")
+
         # Fallback to demo news
         if len(all_news) == 0:
             all_news = self._get_demo_news()
@@ -354,6 +372,68 @@ class NewsService:
                     })
             except Exception as e:
                 logger.error(f"Livemint RSS error for {url}: {e}")
+        return articles[:max_articles]
+
+    def _fetch_from_businesstoday(self, max_articles: int) -> List[Dict]:
+        """Fetch from Business Today RSS feeds"""
+        import xml.etree.ElementTree as ET
+        feeds = [
+            'https://www.businesstoday.in/rss',
+        ]
+        articles = []
+        market_keywords = ['market', 'nifty', 'sensex', 'stock', 'share', 'trade', 'rbi', 'bank',
+                          'invest', 'rupee', 'gdp', 'inflation', 'earnings', 'ipo', 'fund', 'economy',
+                          'fiscal', 'budget', 'profit', 'revenue', 'sector', 'fii', 'dii', 'fpi',
+                          'mutual fund', 'bond', 'yield', 'interest rate', 'crude', 'gold', 'silver']
+        for url in feeds:
+            try:
+                resp = requests.get(url, timeout=10, headers={'User-Agent': 'Mozilla/5.0'})
+                resp.raise_for_status()
+                root = ET.fromstring(resp.text)
+                for item in root.findall('.//item')[:max_articles * 2]:
+                    title = strip_html(item.findtext('title', ''))
+                    desc = strip_html(item.findtext('description', ''))
+                    link = item.findtext('link', '').strip()
+                    pub = item.findtext('pubDate', '')
+                    if not title or title == 'undefined':
+                        continue
+                    text_lower = (title + ' ' + desc).lower()
+                    if any(kw in text_lower for kw in market_keywords):
+                        articles.append({
+                            'title': title, 'description': desc, 'content': desc,
+                            'source': 'Business Today', 'url': link,
+                            'published_at': pub, 'fetched_at': datetime.now(timezone.utc).isoformat(),
+                        })
+            except Exception as e:
+                logger.error(f"Business Today RSS error for {url}: {e}")
+        return articles[:max_articles]
+
+    def _fetch_from_hindubusinessline(self, max_articles: int) -> List[Dict]:
+        """Fetch from The Hindu Business Line RSS feeds"""
+        import xml.etree.ElementTree as ET
+        feeds = [
+            'https://www.thehindubusinessline.com/markets/feeder/default.rss',
+            'https://www.thehindubusinessline.com/markets/stock-markets/feeder/default.rss',
+            'https://www.thehindubusinessline.com/economy/feeder/default.rss',
+        ]
+        articles = []
+        for url in feeds:
+            try:
+                resp = requests.get(url, timeout=10, headers={'User-Agent': 'Mozilla/5.0'})
+                resp.raise_for_status()
+                root = ET.fromstring(resp.text)
+                for item in root.findall('.//item')[:max_articles // len(feeds)]:
+                    title = strip_html(item.findtext('title', ''))
+                    desc = strip_html(item.findtext('description', ''))
+                    link = item.findtext('link', '').strip()
+                    pub = item.findtext('pubDate', '')
+                    articles.append({
+                        'title': title, 'description': desc, 'content': desc,
+                        'source': 'Hindu Business Line', 'url': link,
+                        'published_at': pub, 'fetched_at': datetime.now(timezone.utc).isoformat(),
+                    })
+            except Exception as e:
+                logger.error(f"Hindu BL RSS error for {url}: {e}")
         return articles[:max_articles]
 
     def _get_demo_news(self) -> List[Dict]:

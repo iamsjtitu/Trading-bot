@@ -365,6 +365,76 @@ module.exports = function (db) {
     return articles.slice(0, max);
   }
 
+  // --- Business Today ---
+  async function fetchFromBusinessToday(max) {
+    const articles = [];
+    const marketKeywords = ['market', 'nifty', 'sensex', 'stock', 'share', 'trade', 'rbi', 'bank',
+      'invest', 'rupee', 'gdp', 'inflation', 'earnings', 'ipo', 'fund', 'economy',
+      'fiscal', 'budget', 'profit', 'revenue', 'sector', 'fii', 'dii', 'fpi',
+      'mutual fund', 'bond', 'yield', 'interest rate', 'crude', 'gold', 'silver'];
+    try {
+      const resp = await axios.get('https://www.businesstoday.in/rss', {
+        timeout: 10000, headers: { 'User-Agent': 'Mozilla/5.0' },
+      });
+      const xml = resp.data;
+      const items = xml.match(/<item>[\s\S]*?<\/item>/g) || [];
+      for (const item of items.slice(0, max * 2)) {
+        const title = (item.match(/<title><!\[CDATA\[(.*?)\]\]>/)?.[1] || item.match(/<title>(.*?)<\/title>/)?.[1] || '').trim();
+        const desc = (item.match(/<description><!\[CDATA\[(.*?)\]\]>/)?.[1] || item.match(/<description>(.*?)<\/description>/)?.[1] || '').replace(/<[^>]+>/g, '').trim();
+        const link = (item.match(/<link>(.*?)<\/link>/)?.[1] || '').trim();
+        const pub = item.match(/<pubDate>(.*?)<\/pubDate>/)?.[1] || '';
+        if (!title) continue;
+        const textLower = (title + ' ' + desc).toLowerCase();
+        if (marketKeywords.some(kw => textLower.includes(kw))) {
+          articles.push({
+            title, description: desc, content: desc,
+            source: 'Business Today', url: link,
+            published_at: pub ? new Date(pub).toISOString() : new Date().toISOString(),
+            fetched_at: new Date().toISOString(),
+          });
+        }
+      }
+    } catch (e) {
+      console.error('[News] Business Today error:', e.message);
+    }
+    return articles.slice(0, max);
+  }
+
+  // --- Hindu Business Line ---
+  async function fetchFromHinduBusinessLine(max) {
+    const articles = [];
+    const feeds = [
+      'https://www.thehindubusinessline.com/markets/feeder/default.rss',
+      'https://www.thehindubusinessline.com/markets/stock-markets/feeder/default.rss',
+      'https://www.thehindubusinessline.com/economy/feeder/default.rss',
+    ];
+    for (const feedUrl of feeds) {
+      try {
+        const resp = await axios.get(feedUrl, {
+          timeout: 10000, headers: { 'User-Agent': 'Mozilla/5.0' },
+        });
+        const xml = resp.data;
+        const items = xml.match(/<item>[\s\S]*?<\/item>/g) || [];
+        for (const item of items.slice(0, Math.ceil(max / feeds.length))) {
+          const title = (item.match(/<title><!\[CDATA\[(.*?)\]\]>/)?.[1] || item.match(/<title>(.*?)<\/title>/)?.[1] || '').trim();
+          const desc = (item.match(/<description><!\[CDATA\[(.*?)\]\]>/)?.[1] || item.match(/<description>(.*?)<\/description>/)?.[1] || '').replace(/<[^>]+>/g, '').trim();
+          const link = (item.match(/<link>(.*?)<\/link>/)?.[1] || '').trim();
+          const pub = item.match(/<pubDate>(.*?)<\/pubDate>/)?.[1] || '';
+          if (!title) continue;
+          articles.push({
+            title, description: desc, content: desc,
+            source: 'Hindu Business Line', url: link,
+            published_at: pub ? new Date(pub).toISOString() : new Date().toISOString(),
+            fetched_at: new Date().toISOString(),
+          });
+        }
+      } catch (e) {
+        console.error(`[News] Hindu BL error (${feedUrl}):`, e.message);
+      }
+    }
+    return articles.slice(0, max);
+  }
+
   // --- NewsAPI ---
   function fetchFromNewsAPI(apiKey, max) {
     return axios.get('https://newsapi.org/v2/everything', {
@@ -433,6 +503,10 @@ module.exports = function (db) {
           } else if (src === 'alphavantage') {
             const key = newsCfg.alphavantage_key || '';
             if (key && key !== 'get_from_alphavantage_co') allNews = allNews.concat(await fetchFromAlphaVantage(key, 10));
+          } else if (src === 'businesstoday') {
+            allNews = allNews.concat(await fetchFromBusinessToday(10));
+          } else if (src === 'hindubusinessline') {
+            allNews = allNews.concat(await fetchFromHinduBusinessLine(10));
           }
         } catch (e) {
           console.error(`[News] ${src} error:`, e.message);
