@@ -22,13 +22,14 @@ jobs:
 
       - name: Install frontend dependencies
         working-directory: frontend
-        run: yarn install
+        run: npm install --legacy-peer-deps
 
       - name: Build frontend
         working-directory: frontend
-        run: yarn build
+        run: npm run build
         env:
           REACT_APP_BACKEND_URL: ''
+          CI: false
 
       - name: Copy frontend build to desktop
         run: |
@@ -36,14 +37,14 @@ jobs:
 
       - name: Install desktop dependencies
         working-directory: desktop
-        run: yarn install
+        run: npm install
 
       - name: Install NSIS
         run: choco install nsis -y
 
       - name: Build Windows .exe
         working-directory: desktop
-        run: yarn build:win
+        run: npx electron-builder --win
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
@@ -69,24 +70,25 @@ jobs:
 
       - name: Install frontend dependencies
         working-directory: frontend
-        run: yarn install
+        run: npm install --legacy-peer-deps
 
       - name: Build frontend
         working-directory: frontend
-        run: yarn build
+        run: npm run build
         env:
           REACT_APP_BACKEND_URL: ''
+          CI: false
 
       - name: Copy frontend build to desktop
         run: cp -r frontend/build desktop/frontend-build
 
       - name: Install desktop dependencies
         working-directory: desktop
-        run: yarn install
+        run: npm install
 
       - name: Build Mac .dmg
         working-directory: desktop
-        run: yarn build:mac
+        run: npx electron-builder --mac
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
