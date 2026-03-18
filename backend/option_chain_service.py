@@ -20,10 +20,7 @@ OPTION_INSTRUMENTS = {
     'MIDCPNIFTY': {'name': 'MIDCAP NIFTY', 'label': 'Midcap Nifty (NSE)', 'exchange': 'NSE', 'lot_size': 50, 'strike_step': 25, 'base_price': 12000, 'type': 'index'},
     'SENSEX': {'name': 'SENSEX', 'label': 'Sensex (BSE)', 'exchange': 'BSE', 'lot_size': 10, 'strike_step': 100, 'base_price': 79800, 'type': 'index'},
     'BANKEX': {'name': 'BANKEX', 'label': 'Bankex (BSE)', 'exchange': 'BSE', 'lot_size': 15, 'strike_step': 100, 'base_price': 55000, 'type': 'index'},
-    # MCX Commodities
-    'CRUDEOIL': {'name': 'Crude Oil', 'label': 'Crude Oil (MCX)', 'exchange': 'MCX', 'lot_size': 100, 'strike_step': 50, 'base_price': 5800, 'type': 'commodity'},
-    'GOLD': {'name': 'Gold', 'label': 'Gold (MCX)', 'exchange': 'MCX', 'lot_size': 100, 'strike_step': 100, 'base_price': 72000, 'type': 'commodity'},
-    'SILVER': {'name': 'Silver', 'label': 'Silver (MCX)', 'exchange': 'MCX', 'lot_size': 30, 'strike_step': 500, 'base_price': 88000, 'type': 'commodity'},
+    # MCX Commodities removed - Upstox API does not support MCX option chain
 }
 
 # Risk-free rate (approximate India 10Y gov bond yield)

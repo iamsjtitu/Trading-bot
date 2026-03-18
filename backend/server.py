@@ -23,8 +23,7 @@ from upstox_service import UpstoxService
 from ws_market_data import market_data_manager
 from broker_manager import BrokerManager, BROKER_INFO
 from option_chain_service import option_chain_service
-from market_hours_service import get_market_status, get_upcoming_holidays, get_mcx_status
-from mcx_resolver import get_mcx_instrument_keys
+from market_hours_service import get_market_status, get_upcoming_holidays
 
 ROOT_DIR = Path(__file__).parent
 load_dotenv(ROOT_DIR / '.env')
@@ -1311,8 +1310,7 @@ async def stop_ws_streaming():
 async def get_market_status_endpoint():
     """Get Indian stock market open/close status with next opening time"""
     nse_status = get_market_status()
-    mcx_status = get_mcx_status()
-    return {"status": "success", "nse": nse_status, "mcx": mcx_status, **nse_status}
+    return {"status": "success", "nse": nse_status, **nse_status}
 
 @api_router.get("/market-holidays")
 async def get_market_holidays(count: int = 5):
@@ -1444,12 +1442,6 @@ async def startup_event():
         option_chain_service.broker_service = broker_manager.active_broker
         logger.info(f"Active broker: {broker_manager.active_broker_id}")
 
-        # Pre-resolve MCX instrument keys for live data
-        try:
-            mcx_keys = await get_mcx_instrument_keys()
-            logger.info(f"MCX instruments resolved: {list(mcx_keys.keys())}")
-        except Exception as e:
-            logger.warning(f"MCX resolution deferred: {e}")
         # Load instrument from settings
         settings = await settings_manager.get_settings()
         inst = settings.get('trading_instrument', 'NIFTY50')

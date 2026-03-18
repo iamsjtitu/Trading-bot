@@ -73,30 +73,6 @@ class TradingEngine:
                 'option_premium': 200,
                 'exchange': 'BSE',
             },
-            'CRUDEOIL': {
-                'label': 'Crude Oil',
-                'lot_size': 100,
-                'base_price': 5800,
-                'strike_step': 50,
-                'option_premium': 40,
-                'exchange': 'MCX',
-            },
-            'GOLD': {
-                'label': 'Gold',
-                'lot_size': 100,
-                'base_price': 72000,
-                'strike_step': 100,
-                'option_premium': 200,
-                'exchange': 'MCX',
-            },
-            'SILVER': {
-                'label': 'Silver',
-                'lot_size': 30,
-                'base_price': 88000,
-                'strike_step': 500,
-                'option_premium': 300,
-                'exchange': 'MCX',
-            },
         }
         self.active_instrument = 'NIFTY50'
         
@@ -303,7 +279,7 @@ class TradingEngine:
             inst = self.instruments.get(self.active_instrument, self.instruments['NIFTY50'])
             exchange = inst.get('exchange', 'NSE')
             # Map exchange to broker exchange segment
-            exchange_map = {'NSE': 'NFO', 'BSE': 'BFO', 'MCX': 'MCX'}
+            exchange_map = {'NSE': 'NFO', 'BSE': 'BFO'}
             broker_exchange = exchange_map.get(exchange, 'NFO')
             
             # Build order params for broker

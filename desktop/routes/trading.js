@@ -14,7 +14,6 @@ module.exports = function (db) {
     NIFTY50: { exchange: 'NSE' }, BANKNIFTY: { exchange: 'NSE' },
     FINNIFTY: { exchange: 'NSE' }, MIDCPNIFTY: { exchange: 'NSE' },
     SENSEX: { exchange: 'BSE' }, BANKEX: { exchange: 'BSE' },
-    CRUDEOIL: { exchange: 'MCX' }, GOLD: { exchange: 'MCX' }, SILVER: { exchange: 'MCX' },
   };
 
   // Internal state for auto-trading settings - LOAD from saved settings

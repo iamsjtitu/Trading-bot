@@ -114,28 +114,7 @@ module.exports = function (db) {
       nse = { is_open: true, reason: 'trading_hours', message: 'Market Open', closes_at: closeToday.toISOString(), time_remaining: `${Math.floor(remaining/60)}h ${remaining%60}m`, next_open: null, next_open_label: null, holiday_name: null };
     }
 
-    // --- MCX Status (9:00 AM - 11:30 PM IST = 540 - 1410 min) ---
-    let mcx;
-    if (weekday === 0 || weekday === 6) {
-      // Next weekday 9:00 AM
-      const d = new Date(ist); d.setUTCDate(d.getUTCDate() + (weekday === 6 ? 2 : 1));
-      const nextOpen = new Date(Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate(), 3, 30, 0));
-      mcx = { is_open: false, reason: 'weekend', message: `MCX Closed - ${weekday === 6 ? 'Saturday' : 'Sunday'}`, next_open: nextOpen.toISOString(), next_open_label: formatLabel(nextOpen) };
-    } else if (totalMin < 540) {
-      const openToday = new Date(Date.UTC(ist.getUTCFullYear(), ist.getUTCMonth(), ist.getUTCDate(), 3, 30, 0));
-      mcx = { is_open: false, reason: 'before_hours', message: 'MCX Closed - Before Trading Hours', next_open: openToday.toISOString(), next_open_label: '09:00 AM IST today' };
-    } else if (totalMin >= 1410) {
-      const d = new Date(ist); d.setUTCDate(d.getUTCDate() + 1);
-      while (d.getUTCDay() === 0 || d.getUTCDay() === 6) d.setUTCDate(d.getUTCDate() + 1);
-      const nextOpen = new Date(Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate(), 3, 30, 0));
-      mcx = { is_open: false, reason: 'after_hours', message: 'MCX Closed - After Trading Hours', next_open: nextOpen.toISOString(), next_open_label: formatLabel(nextOpen) };
-    } else {
-      const remaining = 1410 - totalMin;
-      const closeToday = new Date(Date.UTC(ist.getUTCFullYear(), ist.getUTCMonth(), ist.getUTCDate(), 18, 0, 0)); // 23:30 IST = 18:00 UTC
-      mcx = { is_open: true, reason: 'trading_hours', message: 'MCX Open', closes_at: closeToday.toISOString(), time_remaining: `${Math.floor(remaining/60)}h ${remaining%60}m`, next_open: null, next_open_label: null };
-    }
-
-    res.json({ status: 'success', nse, mcx, ...nse });
+    res.json({ status: 'success', nse, ...nse });
   });
 
   // GET /api/market-holidays

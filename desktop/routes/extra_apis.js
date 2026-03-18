@@ -7,8 +7,6 @@ const { Router } = require('express');
 const axios = require('axios');
 const crypto = require('crypto');
 
-const { getMCXKeys } = require('./mcx_resolver');
-
 const INDEX_KEYS = {
   nifty50: 'NSE_INDEX|Nifty 50',
   sensex: 'BSE_INDEX|SENSEX',
@@ -23,9 +21,6 @@ const INSTRUMENTS = {
   MIDCPNIFTY: { label: 'Midcap Nifty (NSE)', exchange: 'NSE', symbol: 'MIDCPNIFTY', lot_size: 50, tick_size: 0.05, strike_step: 25, option_premium: '~100' },
   SENSEX: { label: 'Sensex (BSE)', exchange: 'BSE', symbol: 'SENSEX', lot_size: 10, tick_size: 0.05, strike_step: 100, option_premium: '~250' },
   BANKEX: { label: 'Bankex (BSE)', exchange: 'BSE', symbol: 'BANKEX', lot_size: 15, tick_size: 0.05, strike_step: 100, option_premium: '~200' },
-  CRUDEOIL: { label: 'Crude Oil (MCX)', exchange: 'MCX', symbol: 'CRUDEOIL', lot_size: 100, tick_size: 1, strike_step: 50, option_premium: '~50' },
-  GOLD: { label: 'Gold (MCX)', exchange: 'MCX', symbol: 'GOLD', lot_size: 100, tick_size: 1, strike_step: 100, option_premium: '~500' },
-  SILVER: { label: 'Silver (MCX)', exchange: 'MCX', symbol: 'SILVER', lot_size: 30, tick_size: 1, strike_step: 500, option_premium: '~300' },
 };
 
 const BROKER_INFO = {
@@ -56,10 +51,7 @@ module.exports = function (db) {
       return res.json({ status: 'success', data: null, source: 'none' });
     }
     try {
-      // Resolve MCX keys dynamically
-      const mcxKeys = await getMCXKeys();
-      console.log('[QuickData] MCX keys resolved:', JSON.stringify(mcxKeys));
-      const allKeys = { ...INDEX_KEYS, ...mcxKeys };
+      const allKeys = { ...INDEX_KEYS };
       const keysStr = Object.values(allKeys).join(',');
       const resp = await axios.get(`https://api.upstox.com/v2/market-quote/quotes?instrument_key=${encodeURIComponent(keysStr)}`, {
         headers: apiHeaders(token), timeout: 10000,
@@ -175,7 +167,7 @@ module.exports = function (db) {
     for (const [key, val] of Object.entries(INSTRUMENTS)) {
       instruments[key] = {
         label: val.label, name: val.label.split(' (')[0], exchange: val.exchange,
-        symbol: val.symbol, lot_size: val.lot_size, type: val.exchange === 'MCX' ? 'commodity' : 'index',
+        symbol: val.symbol, lot_size: val.lot_size, type: 'index',
       };
     }
     res.json({ status: 'success', instruments });
@@ -195,17 +187,10 @@ module.exports = function (db) {
 
     let marketOpen = false;
     let marketMsg = 'Market Closed';
+    // NSE/BSE: 9:15 AM - 3:30 PM IST (555 - 930 min), Mon-Fri
+    const marketOpen = weekday >= 1 && weekday <= 5 && totalMin >= 555 && totalMin < 930;
+    const marketMsg = marketOpen ? 'Market Open' : 'Market Closed';
     let nextOpenLabel = '';
-
-    if (exchange === 'MCX') {
-      // MCX: 9:00 AM - 11:30 PM IST (540 - 1410 min), Mon-Fri
-      marketOpen = weekday >= 1 && weekday <= 5 && totalMin >= 540 && totalMin < 1410;
-      marketMsg = marketOpen ? 'MCX Open' : 'MCX Closed';
-    } else {
-      // NSE/BSE: 9:15 AM - 3:30 PM IST (555 - 930 min), Mon-Fri, no holidays
-      marketOpen = weekday >= 1 && weekday <= 5 && totalMin >= 555 && totalMin < 930;
-      marketMsg = marketOpen ? 'Market Open' : 'Market Closed';
-    }
 
     if (!marketOpen) {
       return res.json({
@@ -234,20 +219,6 @@ module.exports = function (db) {
         instrument,
         config: instConfig,
         market_message: 'No broker connected. Go to Settings and connect your broker.',
-        chain: [],
-        summary: null,
-        timestamp: new Date().toISOString(),
-      });
-    }
-
-    // MCX option chain is NOT supported by Upstox API
-    if (exchange === 'MCX') {
-      return res.json({
-        status: 'success',
-        source: 'not_supported',
-        instrument,
-        config: instConfig,
-        market_message: 'MCX Option Chain is not supported by Upstox API. Use NSE/BSE instruments for Option Chain.',
         chain: [],
         summary: null,
         timestamp: new Date().toISOString(),
@@ -292,12 +263,7 @@ module.exports = function (db) {
     const instConfig = INSTRUMENTS[instrument] || INSTRUMENTS.NIFTY50;
     const exchange = instConfig.exchange || 'NSE';
 
-    let marketOpen = false;
-    if (exchange === 'MCX') {
-      marketOpen = weekday >= 1 && weekday <= 5 && totalMin >= 540 && totalMin < 1410;
-    } else {
-      marketOpen = weekday >= 1 && weekday <= 5 && totalMin >= 555 && totalMin < 930;
-    }
+    let marketOpen = weekday >= 1 && weekday <= 5 && totalMin >= 555 && totalMin < 930;
 
     if (!marketOpen) {
       return res.json({ status: 'success', instrument, alerts: [], message: 'Market Closed', source: 'market_closed', timestamp: new Date().toISOString() });
@@ -318,12 +284,11 @@ module.exports = function (db) {
 
   // ==================== Helpers ====================
   function getDefaultSpot(instrument) {
-    const defaults = { NIFTY50: 24000, BANKNIFTY: 52000, FINNIFTY: 23800, MIDCPNIFTY: 12500, SENSEX: 79500, BANKEX: 57000, CRUDEOIL: 5800, GOLD: 72000, SILVER: 85000 };
+    const defaults = { NIFTY50: 24000, BANKNIFTY: 52000, FINNIFTY: 23800, MIDCPNIFTY: 12500, SENSEX: 79500, BANKEX: 57000 };
     return defaults[instrument] || 24000;
   }
 
   function getStrikeStep(instrument, spot) {
-    if (['CRUDEOIL', 'GOLD', 'SILVER'].includes(instrument)) return spot > 10000 ? 500 : 50;
     if (spot > 50000) return 100;
     if (spot > 20000) return 50;
     return 25;

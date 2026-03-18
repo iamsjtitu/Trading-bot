@@ -109,19 +109,12 @@ class UpstoxService(BrokerBase):
     # ==================== Market Data ====================
 
     async def get_live_market_data(self) -> Dict:
-        """Fetch live index + MCX commodity prices from Upstox"""
+        """Fetch live NSE/BSE index prices from Upstox"""
         token = await self._get_access_token()
         if not token:
             return {'status': 'error', 'message': 'Not logged in to Upstox', 'data': None}
 
-        # Resolve MCX instrument keys dynamically
-        from mcx_resolver import get_mcx_instrument_keys
-        mcx_keys = await get_mcx_instrument_keys()
-
-        # Merge NSE index keys + MCX futures keys
         all_keys = dict(INDEX_KEYS)
-        all_keys.update(mcx_keys)  # adds crudeoil, gold, silver with real instrument keys
-
         keys_str = ','.join(all_keys.values())
         url = f"{UPSTOX_API_BASE}/market-quote/quotes?instrument_key={urllib.parse.quote(keys_str)}"
 

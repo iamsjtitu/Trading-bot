@@ -53,7 +53,6 @@ export default function MarketStatusBanner() {
   if (!data) return null;
 
   const nse = data.nse || data;
-  const mcx = data.mcx;
 
   return (
     <div className="mb-4 flex gap-3 flex-wrap" data-testid="market-status-banner">
@@ -81,27 +80,6 @@ export default function MarketStatusBanner() {
           )}
         </div>
       </div>
-
-      {/* MCX Status */}
-      {mcx && (
-        <div className={`flex-1 min-w-[240px] px-4 py-2.5 rounded-lg border flex items-center justify-between ${
-          mcx.is_open ? 'border-amber-200 bg-amber-50/80' : 'border-slate-200 bg-slate-50/80'
-        }`}>
-          <div className="flex items-center gap-2.5">
-            <StatusDot open={mcx.is_open} />
-            <span className={`font-semibold text-sm ${mcx.is_open ? 'text-amber-800' : 'text-slate-700'}`} data-testid="mcx-status-text">
-              MCX: {mcx.message}
-            </span>
-          </div>
-          <div className="flex items-center gap-2">
-            {mcx.is_open ? (
-              <Countdown targetISO={mcx.closes_at} label="Closes" onExpire={fetchStatus} />
-            ) : (
-              <Countdown targetISO={mcx.next_open} label="Opens" onExpire={fetchStatus} />
-            )}
-          </div>
-        </div>
-      )}
     </div>
   );
 }
