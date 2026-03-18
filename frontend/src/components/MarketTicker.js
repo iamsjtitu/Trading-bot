@@ -16,7 +16,7 @@ function isMarketOpen() {
   return timeInMin >= 555 && timeInMin <= 930; // 9:15=555, 15:30=930
 }
 
-export default function MarketTicker({ marketIndices }) {
+export default function MarketTicker({ marketIndices, tradingMode, upstoxConnected }) {
   const indices = [
     { key: 'nifty50', label: 'NIFTY 50' },
     { key: 'sensex', label: 'SENSEX' },
@@ -24,7 +24,9 @@ export default function MarketTicker({ marketIndices }) {
     { key: 'finnifty', label: 'FIN NIFTY' },
   ];
 
-  const marketOpen = isMarketOpen();
+  const timeBasedOpen = isMarketOpen();
+  // In LIVE mode with Upstox connected, treat market as live
+  const marketOpen = (tradingMode === 'LIVE' && upstoxConnected) || timeBasedOpen;
 
   return (
     <div className={`border rounded-lg shadow-md p-3 mb-4 overflow-hidden ${marketOpen ? 'bg-white border-gray-200' : 'bg-gray-50 border-gray-300'}`} data-testid="market-ticker">
@@ -53,7 +55,9 @@ export default function MarketTicker({ marketIndices }) {
         })}
         <div className="flex items-center gap-2 border-l border-gray-300 pl-4 flex-shrink-0">
           <span className="text-xs text-gray-500 italic">
-            {marketOpen ? 'Updating every 1 sec' : 'Market hours: 9:15 AM - 3:30 PM IST'}
+            {tradingMode === 'LIVE' && upstoxConnected
+              ? 'Live data from Upstox'
+              : marketOpen ? 'Updating every 1 sec' : 'Market hours: 9:15 AM - 3:30 PM IST'}
           </span>
         </div>
       </div>

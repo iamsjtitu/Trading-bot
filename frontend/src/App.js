@@ -318,6 +318,28 @@ function App() {
     isLive: true,
   } : portfolio;
 
+  // Determine active trades based on mode
+  const displayTrades = (tradingMode === 'LIVE' && upstoxConnected && livePortfolio?.positions?.length > 0)
+    ? livePortfolio.positions.map(pos => ({
+        trade_type: pos.quantity > 0 ? 'BUY' : 'SELL',
+        symbol: pos.symbol || pos.trading_symbol || 'N/A',
+        quantity: Math.abs(pos.quantity),
+        status: 'OPEN',
+        entry_price: pos.avg_price || pos.average_price || 0,
+        current_price: pos.ltp || pos.last_price || 0,
+        current_value: (pos.ltp || pos.last_price || 0) * Math.abs(pos.quantity),
+        investment: (pos.avg_price || pos.average_price || 0) * Math.abs(pos.quantity),
+        live_pnl: pos.pnl || 0,
+        pnl_percentage: (pos.avg_price || pos.average_price) > 0
+          ? (((pos.ltp || pos.last_price || 0) - (pos.avg_price || pos.average_price || 0)) / (pos.avg_price || pos.average_price || 1)) * 100
+          : 0,
+        stop_loss: 0,
+        target: 0,
+        entry_time: new Date().toISOString(),
+        isLive: true,
+      }))
+    : trades;
+
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-purple-50 text-gray-900">
       {/* Update Banner */}
@@ -390,7 +412,7 @@ function App() {
           </div>
         )}
 
-        <MarketTicker marketIndices={marketIndices} />
+        <MarketTicker marketIndices={marketIndices} tradingMode={tradingMode} upstoxConnected={upstoxConnected} />
 
         {/* Notifications */}
         {notifications.length > 0 && (
@@ -475,8 +497,8 @@ function App() {
           </TabsList>
 
           <TabsContent value="news"><NewsFeed news={news} formatTime={formatTime} /></TabsContent>
-          <TabsContent value="signals"><SignalsList signals={signals} formatCurrency={formatCurrency} formatTime={formatTime} /></TabsContent>
-          <TabsContent value="trades"><TradesList trades={trades} formatCurrency={formatCurrency} formatTime={formatTime} /></TabsContent>
+          <TabsContent value="signals"><SignalsList signals={signals} formatCurrency={formatCurrency} formatTime={formatTime} tradingMode={tradingMode} upstoxConnected={upstoxConnected} /></TabsContent>
+          <TabsContent value="trades"><TradesList trades={displayTrades} formatCurrency={formatCurrency} formatTime={formatTime} tradingMode={tradingMode} upstoxConnected={upstoxConnected} /></TabsContent>
           <TabsContent value="history"><TradeHistory formatCurrency={formatCurrency} tradingMode={tradingMode} upstoxConnected={upstoxConnected} upstoxOrders={upstoxOrders} /></TabsContent>
           <TabsContent value="calculator"><PositionCalculator riskMetrics={riskMetrics} formatCurrency={formatCurrency} /></TabsContent>
           <TabsContent value="analytics"><TradeAnalytics /></TabsContent>

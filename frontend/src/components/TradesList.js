@@ -2,18 +2,31 @@ import { Card } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { FaChartLine } from 'react-icons/fa';
 
-export default function TradesList({ trades, formatCurrency, formatTime }) {
+export default function TradesList({ trades, formatCurrency, formatTime, tradingMode, upstoxConnected }) {
+  const isLiveMode = tradingMode === 'LIVE';
+
   if (trades.length === 0) {
     return (
       <Card className="bg-white border-gray-200 p-8 text-center shadow-md" data-testid="no-trades-message">
         <FaChartLine className="text-5xl text-gray-400 mx-auto mb-4" />
-        <p className="text-gray-600 font-medium">No active trades</p>
+        <p className="text-gray-600 font-medium">
+          {isLiveMode && !upstoxConnected
+            ? 'Upstox not connected. Go to Settings > Broker to connect.'
+            : isLiveMode
+            ? 'No active positions on Upstox'
+            : 'No active trades'}
+        </p>
       </Card>
     );
   }
 
   return (
     <div className="space-y-4">
+      {isLiveMode && upstoxConnected && trades[0]?.isLive && (
+        <div className="bg-green-50 border border-green-300 rounded-lg p-3 text-sm text-green-800 font-medium" data-testid="live-trades-banner">
+          Showing live positions from Upstox
+        </div>
+      )}
       {trades.map((trade, idx) => (
         <Card key={idx} className="bg-white border-gray-200 p-4 shadow-md hover:shadow-lg transition-shadow" data-testid={`trade-${idx}`}>
           <div className="flex items-center justify-between mb-3">

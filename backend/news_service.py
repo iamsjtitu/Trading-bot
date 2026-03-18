@@ -195,9 +195,9 @@ class NewsService:
         articles = []
         for article in data.get('articles', []):
             articles.append({
-                'title': article.get('title', ''),
-                'description': article.get('description', '') or '',
-                'content': article.get('content', '') or '',
+                'title': strip_html(article.get('title', '') or ''),
+                'description': strip_html(article.get('description', '') or ''),
+                'content': strip_html(article.get('content', '') or ''),
                 'source': article.get('source', {}).get('name', 'NewsAPI'),
                 'url': article.get('url', ''),
                 'published_at': article.get('publishedAt', ''),
@@ -235,9 +235,9 @@ class NewsService:
                     pass
 
             articles.append({
-                'title': item.get('title', ''),
-                'description': item.get('summary', '') or '',
-                'content': item.get('summary', '') or '',
+                'title': strip_html(item.get('title', '') or ''),
+                'description': strip_html(item.get('summary', '') or ''),
+                'content': strip_html(item.get('summary', '') or ''),
                 'source': item.get('source', 'Alpha Vantage'),
                 'url': item.get('url', ''),
                 'published_at': pub_time,

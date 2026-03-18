@@ -6,7 +6,7 @@ import pytest
 import requests
 import os
 
-BASE_URL = os.environ.get('REACT_APP_BACKEND_URL', 'https://options-ai-trader-1.preview.emergentagent.com').rstrip('/')
+BASE_URL = os.environ.get('REACT_APP_BACKEND_URL', 'https://news-driven-options.preview.emergentagent.com').rstrip('/')
 
 class TestTaxReportAPI:
     """Test /api/tax/report endpoint"""

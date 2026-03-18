@@ -2,6 +2,16 @@ import { Card } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { FaNewspaper } from 'react-icons/fa';
 
+function cleanText(text) {
+  if (!text) return '';
+  return text
+    .replace(/<!\[CDATA\[|\]\]>/g, '')
+    .replace(/<[^>]*>/g, '')
+    .replace(/&amp;/g, '&').replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&quot;/g, '"').replace(/&#39;/g, "'")
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
 export default function NewsFeed({ news, formatTime }) {
   const getSentimentColor = (sentiment) => {
     if (!sentiment) return 'bg-gray-500';
@@ -41,12 +51,12 @@ export default function NewsFeed({ news, formatTime }) {
             </div>
             <div className="flex-grow">
               <div className="flex items-start justify-between mb-2">
-                <h3 className="font-semibold text-lg text-gray-800">{article.title}</h3>
+                <h3 className="font-semibold text-lg text-gray-800">{cleanText(article.title)}</h3>
                 <Badge className={getSentimentColor(article.sentiment_analysis?.sentiment)}>
                   {article.sentiment_analysis?.sentiment || 'N/A'}
                 </Badge>
               </div>
-              <p className="text-sm text-gray-600 mb-2">{article.description}</p>
+              <p className="text-sm text-gray-600 mb-2">{cleanText(article.description)}</p>
               <div className="flex items-center gap-4 text-xs text-gray-500">
                 <span>{article.source}</span>
                 <span>{formatTime(article.published_at)}</span>
@@ -61,7 +71,7 @@ export default function NewsFeed({ news, formatTime }) {
                 )}
               </div>
               {article.sentiment_analysis?.reason && (
-                <p className="text-sm text-blue-600 mt-2 italic bg-blue-50 p-2 rounded">{article.sentiment_analysis.reason}</p>
+                <p className="text-sm text-blue-600 mt-2 italic bg-blue-50 p-2 rounded">{cleanText(article.sentiment_analysis.reason)}</p>
               )}
             </div>
           </div>
