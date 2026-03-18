@@ -132,7 +132,7 @@ export default function SettingsPanel({ onClose, onSave }) {
     // Save settings first
     await saveSettings();
     try {
-      const res = await axios.get(`${API}/upstox/auth-url`);
+      const res = await axios.get(`${API}/brokers/auth-url`);
       if (res.data.status === 'success') {
         window.open(res.data.auth_url, '_blank');
       } else {
@@ -147,9 +147,9 @@ export default function SettingsPanel({ onClose, onSave }) {
     if (!authCode.trim()) { alert('Please enter the authorization code'); return; }
     setConnectingUpstox(true);
     try {
-      const res = await axios.post(`${API}/upstox/callback`, { code: authCode.trim() });
+      const res = await axios.post(`${API}/brokers/callback`, { code: authCode.trim() });
       if (res.data.status === 'success') {
-        alert('Upstox connected successfully!');
+        alert('Broker connected successfully!');
         setAuthCode('');
         await checkUpstoxConnection();
       } else {
@@ -247,18 +247,24 @@ export default function SettingsPanel({ onClose, onSave }) {
                 </div>
               </div>
 
-              {/* Upstox Credentials */}
+              {/* Broker Credentials */}
               <div className="bg-white p-4 rounded-lg border border-gray-200">
-                <h3 className="font-bold text-gray-800 mb-3">Upstox API Credentials</h3>
+                <h3 className="font-bold text-gray-800 mb-3">{brokers.find(b => b.id === activeBroker)?.name || 'Broker'} API Credentials</h3>
                 <div className="space-y-3">
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-1">API Key</label>
-                    <input type="text" value={settings.broker.api_key} onChange={(e) => updateField('broker', 'api_key', e.target.value)} className="w-full px-3 py-2 border border-gray-300 rounded-lg" placeholder="Enter Upstox API Key" data-testid="broker-api-key" />
+                    <input type="text" value={settings.broker.api_key} onChange={(e) => updateField('broker', 'api_key', e.target.value)} className="w-full px-3 py-2 border border-gray-300 rounded-lg" placeholder={`Enter ${brokers.find(b => b.id === activeBroker)?.name || 'Broker'} API Key`} data-testid="broker-api-key" />
                   </div>
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-1">API Secret</label>
-                    <input type="password" value={settings.broker.api_secret} onChange={(e) => updateField('broker', 'api_secret', e.target.value)} className="w-full px-3 py-2 border border-gray-300 rounded-lg" placeholder="Enter Upstox API Secret" data-testid="broker-api-secret" />
+                    <input type="password" value={settings.broker.api_secret} onChange={(e) => updateField('broker', 'api_secret', e.target.value)} className="w-full px-3 py-2 border border-gray-300 rounded-lg" placeholder={`Enter ${brokers.find(b => b.id === activeBroker)?.name || 'Broker'} API Secret`} data-testid="broker-api-secret" />
                   </div>
+                  {(activeBroker === 'angelone' || activeBroker === '5paisa' || activeBroker === 'iifl') && (
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">Client ID</label>
+                      <input type="text" value={settings.broker[`${activeBroker}_client_id`] || ''} onChange={(e) => updateField('broker', `${activeBroker}_client_id`, e.target.value)} className="w-full px-3 py-2 border border-gray-300 rounded-lg" placeholder="Enter Client ID" data-testid="broker-client-id" />
+                    </div>
+                  )}
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-1">Redirect URI</label>
                     <input type="text" value={settings.broker.redirect_uri} onChange={(e) => updateField('broker', 'redirect_uri', e.target.value)} className="w-full px-3 py-2 border border-gray-300 rounded-lg" placeholder="https://yourapp.com/callback" data-testid="broker-redirect-uri" />
@@ -269,12 +275,12 @@ export default function SettingsPanel({ onClose, onSave }) {
 
               {/* OAuth Login Flow */}
               <div className="bg-gradient-to-r from-green-50 to-blue-50 p-4 rounded-lg border border-green-300">
-                <h3 className="font-bold text-gray-800 mb-3">Connect to Upstox</h3>
-                <p className="text-sm text-gray-600 mb-3">Step 1: Save settings, then click Login. Step 2: Login on Upstox. Step 3: Copy the code from URL and paste below.</p>
+                <h3 className="font-bold text-gray-800 mb-3">Connect to {brokers.find(b => b.id === activeBroker)?.name || 'Broker'}</h3>
+                <p className="text-sm text-gray-600 mb-3">Step 1: Save settings, then click Login. Step 2: Login on broker. Step 3: Copy the code from URL and paste below.</p>
 
                 <div className="space-y-3">
-                  <Button onClick={handleUpstoxLogin} className="bg-gradient-to-r from-green-600 to-blue-600 text-white w-full" data-testid="upstox-login-btn">
-                    Login to Upstox (Opens New Tab)
+                  <Button onClick={handleUpstoxLogin} className="bg-gradient-to-r from-green-600 to-blue-600 text-white w-full" data-testid="broker-login-btn">
+                    Login to {brokers.find(b => b.id === activeBroker)?.name || 'Broker'} (Opens New Tab)
                   </Button>
 
                   <div className="flex gap-2">
@@ -287,8 +293,8 @@ export default function SettingsPanel({ onClose, onSave }) {
                   <div className="bg-yellow-50 p-3 rounded border border-yellow-200 text-xs text-gray-700">
                     <p className="font-semibold mb-1">How to get the code:</p>
                     <ol className="list-decimal ml-4 space-y-1">
-                      <li>Click "Login to Upstox" button above</li>
-                      <li>Login with your Upstox credentials</li>
+                      <li>Click "Login to Broker" button above</li>
+                      <li>Login with your broker credentials</li>
                       <li>After login, you'll be redirected to your Redirect URI</li>
                       <li>Copy the <strong>code</strong> parameter from the URL</li>
                       <li>Example: yoursite.com/callback?<strong>code=aBC123xyz</strong></li>
@@ -300,7 +306,7 @@ export default function SettingsPanel({ onClose, onSave }) {
               </div>
 
               <div className="bg-blue-50 p-4 rounded-lg border border-blue-200 text-xs">
-                <h4 className="font-semibold text-gray-800 mb-2">Where to get Upstox API credentials?</h4>
+                <h4 className="font-semibold text-gray-800 mb-2">Where to get API credentials?</h4>
                 <ol className="list-decimal ml-4 space-y-1 text-gray-700">
                   <li>Go to <a href="https://api.upstox.com" target="_blank" rel="noreferrer" className="text-blue-600 underline">Upstox Developer Portal</a></li>
                   <li>Create a new app</li>

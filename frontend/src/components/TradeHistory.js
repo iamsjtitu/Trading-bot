@@ -12,11 +12,11 @@ const BACKEND_URL = (() => {
 })();
 const API = `${BACKEND_URL}/api`;
 
-export default function TradeHistory({ formatCurrency, tradingMode, upstoxConnected, upstoxOrders }) {
+export default function TradeHistory({ formatCurrency, tradingMode, brokerConnected, brokerOrders }) {
   const [trades, setTrades] = useState([]);
   const [summary, setSummary] = useState(null);
   const [loading, setLoading] = useState(true);
-  const isLive = tradingMode === 'LIVE' && upstoxConnected;
+  const isLive = tradingMode === 'LIVE' && brokerConnected;
 
   // Filters
   const [tradeType, setTradeType] = useState('all');
@@ -75,7 +75,7 @@ export default function TradeHistory({ formatCurrency, tradingMode, upstoxConnec
   };
 
   const exportCSVLive = () => {
-    const orders = upstoxOrders || [];
+    const orders = brokerOrders || [];
     if (!orders.length) return;
     const headers = ['Order ID', 'Symbol', 'Type', 'Qty', 'Price', 'Avg Price', 'Status', 'Product', 'Time'];
     const rows = orders.map(o => [
@@ -98,7 +98,7 @@ export default function TradeHistory({ formatCurrency, tradingMode, upstoxConnec
 
   // In LIVE mode, show Upstox orders
   if (isLive) {
-    const liveOrders = upstoxOrders || [];
+    const liveOrders = brokerOrders || [];
     const completed = liveOrders.filter(o => o.status === 'complete' || o.status === 'traded');
     return (
       <div className="space-y-4" data-testid="trade-history-page">

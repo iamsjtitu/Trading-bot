@@ -371,10 +371,14 @@ class TradingEngine:
                         exit_reason = 'TARGET_HIT'
 
                     if exit_reason:
+                        # Get correct exchange for the instrument
+                        inst = self.instruments.get(self.active_instrument, self.instruments['NIFTY50'])
+                        exit_exchange_map = {'NSE': 'NFO', 'BSE': 'BFO', 'MCX': 'MCX'}
+                        exit_exchange = exit_exchange_map.get(inst.get('exchange', 'NSE'), 'NFO')
                         # Place exit order
                         exit_params = {
                             'instrument_token': pos.get('instrument_token', ''),
-                            'exchange': 'NFO',
+                            'exchange': exit_exchange,
                             'transaction_type': 'SELL',
                             'order_type': 'MARKET',
                             'quantity': abs(pos.get('quantity', order['quantity'])),

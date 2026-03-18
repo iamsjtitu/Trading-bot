@@ -2,7 +2,7 @@ import { Card } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { FaBullseye } from 'react-icons/fa';
 
-export default function SignalsList({ signals, formatCurrency, formatTime, tradingMode, upstoxConnected }) {
+export default function SignalsList({ signals, formatCurrency, formatTime, tradingMode, brokerConnected }) {
   const isLiveMode = tradingMode === 'LIVE';
 
   const getSentimentColor = (sentiment) => {
@@ -25,8 +25,8 @@ export default function SignalsList({ signals, formatCurrency, formatTime, tradi
   return (
     <div className="space-y-4">
       {isLiveMode && (
-        <div className={`border rounded-lg p-3 text-sm font-medium ${upstoxConnected ? 'bg-green-50 border-green-300 text-green-800' : 'bg-yellow-50 border-yellow-300 text-yellow-800'}`} data-testid="signals-mode-banner">
-          {upstoxConnected
+        <div className={`border rounded-lg p-3 text-sm font-medium ${brokerConnected ? 'bg-green-50 border-green-300 text-green-800' : 'bg-yellow-50 border-yellow-300 text-yellow-800'}`} data-testid="signals-mode-banner">
+          {brokerConnected
             ? 'LIVE MODE: AI signals will execute real trades on Upstox'
             : 'LIVE MODE: Connect Upstox in Settings to execute trades'}
         </div>

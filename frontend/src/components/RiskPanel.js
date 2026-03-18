@@ -2,9 +2,9 @@ import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 
-export default function RiskPanel({ riskMetrics, emergencyStop, onEmergencyStop, formatCurrency, tradingMode, upstoxConnected }) {
+export default function RiskPanel({ riskMetrics, emergencyStop, onEmergencyStop, formatCurrency, tradingMode, brokerConnected }) {
   const isLive = riskMetrics?.isLive || false;
-  const isLiveDisconnected = tradingMode === 'LIVE' && !upstoxConnected;
+  const isLiveDisconnected = tradingMode === 'LIVE' && !brokerConnected;
 
   return (
     <Card className="bg-gradient-to-r from-orange-50 to-red-50 border-orange-200 p-4 mb-4 shadow-lg" data-testid="risk-management-panel">
@@ -14,14 +14,14 @@ export default function RiskPanel({ riskMetrics, emergencyStop, onEmergencyStop,
             Risk Management
             {emergencyStop && <Badge className="bg-red-600">STOPPED</Badge>}
             {isLive && <Badge className="bg-green-600 text-xs" data-testid="risk-live-badge">LIVE</Badge>}
-            {isLiveDisconnected && <Badge className="bg-yellow-600 text-xs" data-testid="risk-disconnected-badge">UPSTOX NOT CONNECTED</Badge>}
+            {isLiveDisconnected && <Badge className="bg-yellow-600 text-xs" data-testid="risk-disconnected-badge">BROKER NOT CONNECTED</Badge>}
           </h2>
           <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
             <div>
               <p className="text-xs text-gray-600 font-medium">{isLive ? 'Margin Used' : 'Daily Used'}</p>
               <p className="text-lg font-bold text-gray-900">{formatCurrency(riskMetrics.dailyUsed)}</p>
               {!isLive && <p className="text-xs text-gray-500">of {formatCurrency(riskMetrics.dailyLimit)}</p>}
-              {isLive && <p className="text-xs text-green-600">Live from Upstox</p>}
+              {isLive && <p className="text-xs text-green-600">Live from Broker</p>}
               {!isLive && (
                 <div className="mt-1 h-2 bg-gray-200 rounded-full overflow-hidden">
                   <div
@@ -38,14 +38,14 @@ export default function RiskPanel({ riskMetrics, emergencyStop, onEmergencyStop,
             <div>
               <p className="text-xs text-gray-600 font-medium">{isLive ? 'Orders Today' : "Today's Trades"}</p>
               <p className="text-lg font-bold text-gray-900">{riskMetrics.todayTrades}</p>
-              {isLive && <p className="text-xs text-green-600">Live from Upstox</p>}
+              {isLive && <p className="text-xs text-green-600">Live from Broker</p>}
             </div>
             <div>
               <p className="text-xs text-gray-600 font-medium">Today's P&L</p>
               <p className={`text-lg font-bold ${riskMetrics.todayPnL >= 0 ? 'text-green-600' : 'text-red-600'}`}>
                 {formatCurrency(riskMetrics.todayPnL)}
               </p>
-              {isLive && <p className="text-xs text-green-600">Live from Upstox</p>}
+              {isLive && <p className="text-xs text-green-600">Live from Broker</p>}
             </div>
             <div>
               <p className="text-xs text-gray-600 font-medium">Stop Loss</p>

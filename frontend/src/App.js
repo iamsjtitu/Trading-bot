@@ -70,10 +70,10 @@ function App() {
   });
   const [showSettings, setShowSettings] = useState(false);
   const [tradingMode, setTradingMode] = useState('PAPER');
-  const [upstoxConnected, setUpstoxConnected] = useState(false);
-  const [upstoxProfile, setUpstoxProfile] = useState(null);
+  const [brokerConnected, setBrokerConnected] = useState(false);
+  const [brokerProfile, setBrokerProfile] = useState(null);
   const [livePortfolio, setLivePortfolio] = useState(null);
-  const [upstoxOrders, setUpstoxOrders] = useState([]);
+  const [brokerOrders, setBrokerOrders] = useState([]);
   const [wsConnected, setWsConnected] = useState(false);
   const wsRef = useRef(null);
 
@@ -107,13 +107,13 @@ function App() {
       const res = await axios.get(`${API}/combined-status`);
       const data = res.data;
 
-      setUpstoxConnected(data.upstox_connected || false);
+      setBrokerConnected(data.upstox_connected || false);
 
       if (data.upstox_connected) {
         if (data.market_data) setMarketIndices(data.market_data);
         if (data.portfolio) setLivePortfolio(data.portfolio);
-        if (data.orders) setUpstoxOrders(data.orders);
-        if (data.profile) setUpstoxProfile(data.profile);
+        if (data.orders) setBrokerOrders(data.orders);
+        if (data.profile) setBrokerProfile(data.profile);
 
         // Update risk metrics from Upstox live data
         if (data.portfolio) {
@@ -322,7 +322,7 @@ function App() {
   // This MUST be isolated so other state changes don't kill the interval
   useEffect(() => {
     let marketInterval;
-    if (tradingMode === 'LIVE' && upstoxConnected) {
+    if (tradingMode === 'LIVE' && brokerConnected) {
       // Immediate first load
       loadMarketDataQuick();
       // Then poll every 500ms for near real-time
@@ -339,11 +339,11 @@ function App() {
       }, 1000);
     }
     return () => { if (marketInterval) clearInterval(marketInterval); };
-  }, [tradingMode, upstoxConnected, loadMarketDataQuick]);
+  }, [tradingMode, brokerConnected, loadMarketDataQuick]);
 
   // WebSocket connection for real-time market data
   useEffect(() => {
-    if (tradingMode !== 'LIVE' || !upstoxConnected) {
+    if (tradingMode !== 'LIVE' || !brokerConnected) {
       // Disconnect WS when not in LIVE or Upstox not connected
       if (wsRef.current) {
         wsRef.current.close();
@@ -417,7 +417,7 @@ function App() {
       wsRef.current = null;
       setWsConnected(false);
     };
-  }, [tradingMode, upstoxConnected, addNotification]);
+  }, [tradingMode, brokerConnected, addNotification]);
 
   const formatCurrency = (amount) => new Intl.NumberFormat('en-IN', { style: 'currency', currency: 'INR', maximumFractionDigits: 0 }).format(amount);
   const formatTime = (isoString) => {
@@ -439,13 +439,13 @@ function App() {
   // Determine portfolio data based on mode
   const displayPortfolio = (() => {
     if (tradingMode === 'LIVE') {
-      if (upstoxConnected && livePortfolio) {
+      if (brokerConnected && livePortfolio) {
         return {
           current_value: (livePortfolio.funds?.total || 0),
           total_pnl: livePortfolio.total_pnl || 0,
           active_positions: livePortfolio.active_positions || 0,
-          total_trades: upstoxOrders.length,
-          winning_trades: upstoxOrders.filter(o => (o.status === 'complete' || o.status === 'traded')).length,
+          total_trades: brokerOrders.length,
+          winning_trades: brokerOrders.filter(o => (o.status === 'complete' || o.status === 'traded')).length,
           isLive: true,
         };
       }
@@ -466,7 +466,7 @@ function App() {
   // Determine active trades based on mode
   const displayTrades = (() => {
     if (tradingMode === 'LIVE') {
-      if (upstoxConnected && livePortfolio?.positions?.length > 0) {
+      if (brokerConnected && livePortfolio?.positions?.length > 0) {
         return livePortfolio.positions.map(pos => ({
           trade_type: pos.quantity > 0 ? 'BUY' : 'SELL',
           symbol: pos.symbol || pos.trading_symbol || 'N/A',
@@ -512,11 +512,11 @@ function App() {
                     {tradingMode === 'LIVE' ? 'LIVE TRADING' : 'PAPER MODE'}
                   </Badge>
                   {tradingMode === 'LIVE' && (
-                    <Badge data-testid="upstox-status-badge" className={upstoxConnected ? 'bg-green-600' : 'bg-yellow-600'}>
-                      {upstoxConnected ? `Upstox: ${upstoxProfile?.name || 'Connected'}` : 'Upstox: Disconnected'}
+                    <Badge data-testid="broker-status-badge" className={brokerConnected ? 'bg-green-600' : 'bg-yellow-600'}>
+                      {brokerConnected ? `${brokerProfile?.broker || 'Broker'}: ${brokerProfile?.name || 'Connected'}` : 'Broker: Disconnected'}
                     </Badge>
                   )}
-                  {tradingMode === 'LIVE' && upstoxConnected && (
+                  {tradingMode === 'LIVE' && brokerConnected && (
                     <Badge data-testid="ws-status-badge" className={wsConnected ? 'bg-emerald-600' : 'bg-orange-500'}>
                       {wsConnected ? 'WS: Live' : 'WS: Polling'}
                     </Badge>
@@ -548,19 +548,19 @@ function App() {
       <div className="container mx-auto px-4 py-6">
         {/* LIVE Trading Warning */}
         {tradingMode === 'LIVE' && (
-          <div className={`p-4 rounded-lg mb-4 shadow-lg border-2 ${upstoxConnected ? 'bg-gradient-to-r from-red-600 to-orange-600 border-red-700' : 'bg-gradient-to-r from-yellow-500 to-orange-500 border-yellow-600'} text-white`} data-testid="live-trading-warning">
+          <div className={`p-4 rounded-lg mb-4 shadow-lg border-2 ${brokerConnected ? 'bg-gradient-to-r from-red-600 to-orange-600 border-red-700' : 'bg-gradient-to-r from-yellow-500 to-orange-500 border-yellow-600'} text-white`} data-testid="live-trading-warning">
             <div className="flex items-center gap-3">
               <div className="text-3xl">!</div>
               <div className="flex-1">
-                {upstoxConnected ? (
+                {brokerConnected ? (
                   <>
                     <h3 className="font-bold text-lg">LIVE TRADING MODE - CONNECTED</h3>
-                    <p className="text-sm">Real money trades active via Upstox. Market data is LIVE.</p>
+                    <p className="text-sm">Real money trades active. Market data is LIVE.</p>
                   </>
                 ) : (
                   <>
                     <h3 className="font-bold text-lg">LIVE MODE - NOT CONNECTED</h3>
-                    <p className="text-sm">Go to Settings &gt; Broker to login to Upstox and start live trading.</p>
+                    <p className="text-sm">Go to Settings &gt; Broker to login to your Broker and start live trading.</p>
                   </>
                 )}
               </div>
@@ -570,7 +570,7 @@ function App() {
         )}
 
         <MarketStatusBanner />
-        <MarketTicker marketIndices={marketIndices} tradingMode={tradingMode} upstoxConnected={upstoxConnected} />
+        <MarketTicker marketIndices={marketIndices} tradingMode={tradingMode} brokerConnected={brokerConnected} />
 
         {/* Notifications */}
         {notifications.length > 0 && (
@@ -591,7 +591,7 @@ function App() {
           </div>
         )}
 
-        <RiskPanel riskMetrics={riskMetrics} emergencyStop={emergencyStop} onEmergencyStop={handleEmergencyStop} formatCurrency={formatCurrency} tradingMode={tradingMode} upstoxConnected={upstoxConnected} />
+        <RiskPanel riskMetrics={riskMetrics} emergencyStop={emergencyStop} onEmergencyStop={handleEmergencyStop} formatCurrency={formatCurrency} tradingMode={tradingMode} brokerConnected={brokerConnected} />
         <AutoTradingSettings autoSettings={autoSettings} showAutoSettings={showAutoSettings} setShowAutoSettings={setShowAutoSettings} updateAutoSettings={updateAutoSettings} />
 
         {/* Portfolio Summary Cards */}
@@ -601,8 +601,8 @@ function App() {
               <div>
                 <p className="text-sm text-gray-600 font-medium">Portfolio Value</p>
                 <p className="text-2xl font-bold text-gray-900">{formatCurrency(displayPortfolio?.current_value || 0)}</p>
-                {displayPortfolio?.isLive && <p className="text-xs text-green-600 mt-1">Live from Upstox</p>}
-                {displayPortfolio?.isDisconnected && <p className="text-xs text-yellow-600 mt-1">Connect Upstox for live data</p>}
+                {displayPortfolio?.isLive && <p className="text-xs text-green-600 mt-1">Live from Broker</p>}
+                {displayPortfolio?.isDisconnected && <p className="text-xs text-yellow-600 mt-1">Connect Broker for live data</p>}
               </div>
               <FaWallet className="text-3xl text-blue-500" />
             </div>
@@ -614,8 +614,8 @@ function App() {
                 <p className={`text-2xl font-bold ${(displayPortfolio?.total_pnl || 0) >= 0 ? 'text-green-600' : 'text-red-600'}`}>
                   {formatCurrency(displayPortfolio?.total_pnl || 0)}
                 </p>
-                {displayPortfolio?.isLive && <p className="text-xs text-green-600 mt-1">Live from Upstox</p>}
-                {displayPortfolio?.isDisconnected && <p className="text-xs text-yellow-600 mt-1">Connect Upstox for live data</p>}
+                {displayPortfolio?.isLive && <p className="text-xs text-green-600 mt-1">Live from Broker</p>}
+                {displayPortfolio?.isDisconnected && <p className="text-xs text-yellow-600 mt-1">Connect Broker for live data</p>}
               </div>
               <FaChartLine className="text-3xl text-green-500" />
             </div>
@@ -625,8 +625,8 @@ function App() {
               <div>
                 <p className="text-sm text-gray-600 font-medium">Active Positions</p>
                 <p className="text-2xl font-bold text-gray-900">{displayPortfolio?.active_positions || 0}</p>
-                {displayPortfolio?.isLive && <p className="text-xs text-green-600 mt-1">Live from Upstox</p>}
-                {displayPortfolio?.isDisconnected && <p className="text-xs text-yellow-600 mt-1">Connect Upstox for live data</p>}
+                {displayPortfolio?.isLive && <p className="text-xs text-green-600 mt-1">Live from Broker</p>}
+                {displayPortfolio?.isDisconnected && <p className="text-xs text-yellow-600 mt-1">Connect Broker for live data</p>}
               </div>
               <FaBullseye className="text-3xl text-purple-500" />
             </div>
@@ -638,8 +638,8 @@ function App() {
                 <p className="text-2xl font-bold text-gray-900">
                   {displayPortfolio?.isLive ? (displayPortfolio?.total_trades || 0) : displayPortfolio?.isDisconnected ? '--' : `${stats?.win_rate?.toFixed(1) || 0}%`}
                 </p>
-                {displayPortfolio?.isLive && <p className="text-xs text-green-600 mt-1">Live from Upstox</p>}
-                {displayPortfolio?.isDisconnected && <p className="text-xs text-yellow-600 mt-1">Connect Upstox for live data</p>}
+                {displayPortfolio?.isLive && <p className="text-xs text-green-600 mt-1">Live from Broker</p>}
+                {displayPortfolio?.isDisconnected && <p className="text-xs text-yellow-600 mt-1">Connect Broker for live data</p>}
               </div>
               <FaBullseye className="text-3xl text-yellow-500" />
             </div>
@@ -661,9 +661,9 @@ function App() {
           </TabsList>
 
           <TabsContent value="news"><NewsFeed news={news} formatTime={formatTime} /></TabsContent>
-          <TabsContent value="signals"><SignalsList signals={signals} formatCurrency={formatCurrency} formatTime={formatTime} tradingMode={tradingMode} upstoxConnected={upstoxConnected} /></TabsContent>
-          <TabsContent value="trades"><TradesList trades={displayTrades} formatCurrency={formatCurrency} formatTime={formatTime} tradingMode={tradingMode} upstoxConnected={upstoxConnected} /></TabsContent>
-          <TabsContent value="history"><TradeHistory formatCurrency={formatCurrency} tradingMode={tradingMode} upstoxConnected={upstoxConnected} upstoxOrders={upstoxOrders} /></TabsContent>
+          <TabsContent value="signals"><SignalsList signals={signals} formatCurrency={formatCurrency} formatTime={formatTime} tradingMode={tradingMode} brokerConnected={brokerConnected} /></TabsContent>
+          <TabsContent value="trades"><TradesList trades={displayTrades} formatCurrency={formatCurrency} formatTime={formatTime} tradingMode={tradingMode} brokerConnected={brokerConnected} /></TabsContent>
+          <TabsContent value="history"><TradeHistory formatCurrency={formatCurrency} tradingMode={tradingMode} brokerConnected={brokerConnected} brokerOrders={brokerOrders} /></TabsContent>
           <TabsContent value="calculator"><PositionCalculator riskMetrics={riskMetrics} formatCurrency={formatCurrency} /></TabsContent>
           <TabsContent value="analytics"><TradeAnalytics /></TabsContent>
           <TabsContent value="tax"><TaxReports formatCurrency={formatCurrency} /></TabsContent>
@@ -672,9 +672,9 @@ function App() {
         </Tabs>
 
         {/* Live Positions from Upstox */}
-        {tradingMode === 'LIVE' && upstoxConnected && livePortfolio?.positions?.length > 0 && (
+        {tradingMode === 'LIVE' && brokerConnected && livePortfolio?.positions?.length > 0 && (
           <div className="mt-6">
-            <h2 className="text-lg font-bold text-gray-800 mb-3" data-testid="live-positions-title">Upstox Live Positions</h2>
+            <h2 className="text-lg font-bold text-gray-800 mb-3" data-testid="live-positions-title">Live Positions</h2>
             <div className="bg-white border border-gray-200 rounded-lg overflow-hidden shadow-md">
               <table className="w-full text-sm">
                 <thead className="bg-gray-50 border-b border-gray-200">

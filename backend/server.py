@@ -127,7 +127,7 @@ async def root():
         "message": "AI-Powered Options Trading Bot API",
         "version": "1.0.0",
         "status": "active",
-        "app_version": "2.1.0"
+        "app_version": "2.2.0"
     }
 
 @api_router.get("/health")
@@ -1070,6 +1070,11 @@ async def set_active_broker(request: dict):
     """Set the active broker"""
     broker_id = request.get('broker_id', '')
     result = await broker_manager.set_active_broker(broker_id)
+    if result.get('status') == 'success':
+        # Update trading engine and option chain to use new active broker
+        trading_engine.broker_service = broker_manager.active_broker
+        option_chain_service.broker_service = broker_manager.active_broker
+        logger.info(f"Broker switched to: {broker_id}")
     return result
 
 @api_router.get("/brokers/active")
@@ -1088,12 +1093,51 @@ async def broker_callback(request: dict):
     code = request.get('code', '')
     if not code:
         return {"status": "error", "message": "Authorization code/credentials required"}
-    return await broker_manager.active_broker.exchange_code_for_token(code)
+    result = await broker_manager.active_broker.exchange_code_for_token(code)
+    if result.get('status') == 'success':
+        trading_engine.broker_service = broker_manager.active_broker
+        option_chain_service.broker_service = broker_manager.active_broker
+    return result
 
 @api_router.get("/brokers/connection")
 async def check_broker_connection():
     """Check active broker connection"""
     return await broker_manager.active_broker.check_connection()
+
+@api_router.get("/broker/profile")
+async def get_broker_profile():
+    """Get active broker's user profile"""
+    return await broker_manager.active_broker.get_profile()
+
+@api_router.get("/broker/portfolio")
+async def get_broker_portfolio():
+    """Get active broker's portfolio (funds + positions)"""
+    return await broker_manager.active_broker.get_portfolio()
+
+@api_router.post("/broker/order")
+async def place_broker_order(request: dict):
+    """Place order via active broker"""
+    return await broker_manager.active_broker.place_order(request)
+
+@api_router.delete("/broker/order/{order_id}")
+async def cancel_broker_order(order_id: str):
+    """Cancel order via active broker"""
+    return await broker_manager.active_broker.cancel_order(order_id)
+
+@api_router.get("/broker/orders")
+async def get_broker_orders():
+    """Get active broker's order book"""
+    return await broker_manager.active_broker.get_order_book()
+
+@api_router.get("/broker/market-data")
+async def get_broker_market_data():
+    """Get live market data via active broker"""
+    return await broker_manager.active_broker.get_live_market_data()
+
+@api_router.get("/broker/pnl")
+async def get_broker_pnl(segment: str = 'EQ', year: str = ''):
+    """Get P&L via active broker"""
+    return await broker_manager.active_broker.get_trade_pnl(segment, year)
 
 # ==================== Option Chain ====================
 
@@ -1137,6 +1181,7 @@ async def get_oi_buildup_alerts(instrument: str, spot_price: float = 0, expiry_d
 
 # ==================== Upstox Routes ====================
 
+# ==================== Legacy Upstox endpoints (kept for backward compat) ====================
 @api_router.get("/upstox/auth-url")
 async def get_upstox_auth_url():
     """Get Upstox OAuth login URL"""
@@ -1274,12 +1319,12 @@ async def get_market_data_quick():
 
 @api_router.get("/combined-status")
 async def get_combined_status():
-    """Get dashboard status - uses Upstox data when in LIVE mode"""
+    """Get dashboard status - uses active broker data when in LIVE mode"""
     try:
         settings = await settings_manager.get_settings()
         mode = settings.get('trading_mode', 'PAPER')
-        upstox_connected = False
-        upstox_profile = None
+        broker_connected = False
+        active_broker = broker_manager.active_broker
 
         result = {
             'mode': mode,
@@ -1290,14 +1335,14 @@ async def get_combined_status():
         }
 
         if mode == 'LIVE':
-            conn = await upstox_service.check_connection()
-            upstox_connected = conn.get('connected', False)
-            result['upstox_connected'] = upstox_connected
+            conn = await active_broker.check_connection()
+            broker_connected = conn.get('connected', False)
+            result['upstox_connected'] = broker_connected  # kept for frontend compat
 
-            if upstox_connected:
-                # Auto-start WebSocket if not already running
-                if not market_data_manager.is_connected:
-                    token = await upstox_service._get_access_token()
+            if broker_connected:
+                # Auto-start WebSocket if not already running (Upstox only for now)
+                if broker_manager.active_broker_id == 'upstox' and not market_data_manager.is_connected:
+                    token = await active_broker._get_access_token()
                     if token:
                         await market_data_manager.start(token)
 
@@ -1306,22 +1351,22 @@ async def get_combined_status():
                     result['market_data'] = market_data_manager.latest_data
                     result['market_data_source'] = 'websocket'
                 else:
-                    market = await upstox_service.get_live_market_data()
+                    market = await active_broker.get_live_market_data()
                     if market.get('status') == 'success':
                         result['market_data'] = market['data']
                     result['market_data_source'] = 'rest'
 
-                portfolio = await upstox_service.get_portfolio()
+                portfolio = await active_broker.get_portfolio()
                 if portfolio.get('status') == 'success':
                     result['portfolio'] = portfolio
 
-                orders = await upstox_service.get_order_book()
+                orders = await active_broker.get_order_book()
                 if orders.get('status') == 'success':
                     result['orders'] = orders['orders']
 
-                profile = await upstox_service.get_profile()
+                profile = await active_broker.get_profile()
                 if profile.get('status') == 'success':
-                    result['profile'] = profile['profile']
+                    result['profile'] = {**profile.get('profile', {}), 'broker': broker_manager.active_broker_id.title()}
 
         result['ws_status'] = market_data_manager.get_status()
         return {"status": "success", **result}
@@ -1371,9 +1416,10 @@ async def startup_event():
         logger.info("Portfolio initialized")
         # Load active broker
         await broker_manager.load_active_broker()
-        # Wire up broker to trading engine and option chain
-        trading_engine.broker_service = upstox_service
-        option_chain_service.broker_service = upstox_service
+        # Wire up ACTIVE broker (not hardcoded Upstox) to trading engine and option chain
+        trading_engine.broker_service = broker_manager.active_broker
+        option_chain_service.broker_service = broker_manager.active_broker
+        logger.info(f"Active broker: {broker_manager.active_broker_id}")
         # Load instrument from settings
         settings = await settings_manager.get_settings()
         inst = settings.get('trading_instrument', 'NIFTY50')

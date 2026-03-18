@@ -16,7 +16,7 @@ function isMarketOpen() {
   return timeInMin >= 555 && timeInMin <= 930; // 9:15=555, 15:30=930
 }
 
-export default function MarketTicker({ marketIndices, tradingMode, upstoxConnected }) {
+export default function MarketTicker({ marketIndices, tradingMode, brokerConnected }) {
   const indices = [
     { key: 'nifty50', label: 'NIFTY 50' },
     { key: 'sensex', label: 'SENSEX' },
@@ -29,15 +29,15 @@ export default function MarketTicker({ marketIndices, tradingMode, upstoxConnect
 
   const timeBasedOpen = isMarketOpen();
   // In LIVE mode with Upstox connected, treat market as live
-  const marketOpen = (tradingMode === 'LIVE' && upstoxConnected) || timeBasedOpen;
-  const isLiveDisconnected = tradingMode === 'LIVE' && !upstoxConnected;
+  const marketOpen = (tradingMode === 'LIVE' && brokerConnected) || timeBasedOpen;
+  const isLiveDisconnected = tradingMode === 'LIVE' && !brokerConnected;
 
   return (
     <div className={`border rounded-lg shadow-md p-3 mb-4 overflow-hidden ${isLiveDisconnected ? 'bg-yellow-50 border-yellow-300' : marketOpen ? 'bg-white border-gray-200' : 'bg-gray-50 border-gray-300'}`} data-testid="market-ticker">
       <div className="flex items-center gap-6 overflow-x-auto">
         <div className="flex items-center gap-2 flex-shrink-0">
           {isLiveDisconnected ? (
-            <Badge className="bg-yellow-600 text-white text-xs" data-testid="market-status-badge">UPSTOX NOT CONNECTED</Badge>
+            <Badge className="bg-yellow-600 text-white text-xs" data-testid="market-status-badge">BROKER NOT CONNECTED</Badge>
           ) : marketOpen ? (
             <Badge className="bg-green-600 text-white text-xs" data-testid="market-status-badge">LIVE MARKET</Badge>
           ) : (
@@ -61,10 +61,10 @@ export default function MarketTicker({ marketIndices, tradingMode, upstoxConnect
         })}
         <div className="flex items-center gap-2 border-l border-gray-300 pl-4 flex-shrink-0">
           <span className="text-xs text-gray-500 italic">
-            {tradingMode === 'LIVE' && upstoxConnected
-              ? 'Live data from Upstox'
-              : tradingMode === 'LIVE' && !upstoxConnected
-              ? 'Connect Upstox in Settings for live data'
+            {tradingMode === 'LIVE' && brokerConnected
+              ? 'Live data from Broker'
+              : tradingMode === 'LIVE' && !brokerConnected
+              ? 'Connect Broker in Settings for live data'
               : marketOpen ? 'Simulated data (Paper mode)' : 'Market hours: 9:15 AM - 3:30 PM IST'}
           </span>
         </div>

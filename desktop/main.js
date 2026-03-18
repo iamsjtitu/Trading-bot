@@ -140,6 +140,7 @@ function createApiServer(db) {
     { name: 'tax', load: () => require('./routes/tax')(db) },
     { name: 'market_status', load: () => require('./routes/market_status')(db) },
     { name: 'extra_apis', load: () => require('./routes/extra_apis')(db) },
+    { name: 'broker_router', load: () => require('./routes/broker_router')(db) },
   ];
 
   let loaded = 0;
