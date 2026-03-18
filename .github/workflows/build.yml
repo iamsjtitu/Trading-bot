@@ -40,7 +40,29 @@ jobs:
         run: npm install
 
       - name: Install NSIS
-        run: choco install nsis -y
+        run: |
+          $retries = 3
+          $success = $false
+          for ($i = 1; $i -le $retries; $i++) {
+            Write-Host "Attempt $i of $retries..."
+            choco install nsis -y --no-progress 2>$null
+            if ($LASTEXITCODE -eq 0) {
+              $success = $true
+              break
+            }
+            Write-Host "Attempt $i failed, waiting 30s..."
+            Start-Sleep -Seconds 30
+          }
+          if (-not $success) {
+            Write-Host "Chocolatey failed. Installing NSIS directly..."
+            $url = "https://sourceforge.net/projects/nsis/files/NSIS%203/3.10/nsis-3.10-setup.exe/download"
+            Invoke-WebRequest -Uri $url -OutFile "$env:TEMP\nsis-setup.exe" -MaximumRedirection 5
+            Start-Process -FilePath "$env:TEMP\nsis-setup.exe" -Args "/S" -Wait
+            $env:PATH = "C:\Program Files (x86)\NSIS;$env:PATH"
+            [System.Environment]::SetEnvironmentVariable("PATH", $env:PATH, "Process")
+          }
+          makensis /VERSION
+        shell: pwsh
 
       - name: Build Windows .exe
         working-directory: desktop
