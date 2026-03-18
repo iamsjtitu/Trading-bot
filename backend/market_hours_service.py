@@ -10,6 +10,10 @@ MARKET_OPEN = time(9, 15)
 MARKET_CLOSE = time(15, 30)
 PRE_OPEN_START = time(9, 0)
 
+# MCX Commodity market hours
+MCX_OPEN = time(9, 0)
+MCX_CLOSE = time(23, 30)
+
 # NSE/BSE Holidays 2025-2026 (confirmed + expected)
 NSE_HOLIDAYS = {
     # 2025
@@ -152,6 +156,71 @@ def get_market_status() -> dict:
         "next_open": None,
         "next_open_label": None,
         "holiday_name": None,
+    }
+
+
+def _next_mcx_trading_day(from_dt: datetime) -> datetime:
+    """Find next MCX trading day."""
+    d = from_dt.date() + timedelta(days=1)
+    for _ in range(30):
+        if d.weekday() < 5:
+            return datetime.combine(d, MCX_OPEN, tzinfo=IST)
+        d += timedelta(days=1)
+    return datetime.combine(d, MCX_OPEN, tzinfo=IST)
+
+
+def get_mcx_status() -> dict:
+    """Returns MCX commodity market status (9:00 AM - 11:30 PM IST, Mon-Fri)."""
+    now_ist = datetime.now(IST)
+    today = now_ist.date()
+    current_time = now_ist.time()
+    weekday = now_ist.weekday()
+
+    if weekday >= 5:
+        next_open = _next_mcx_trading_day(now_ist)
+        day_label = "Saturday" if weekday == 5 else "Sunday"
+        return {
+            "is_open": False,
+            "reason": "weekend",
+            "message": f"MCX Closed - {day_label}",
+            "next_open": next_open.isoformat(),
+            "next_open_label": next_open.strftime("%A, %d %b %Y at %I:%M %p IST"),
+        }
+
+    if current_time < MCX_OPEN:
+        open_today = datetime.combine(today, MCX_OPEN, tzinfo=IST)
+        return {
+            "is_open": False,
+            "reason": "before_hours",
+            "message": "MCX Closed - Before Trading Hours",
+            "next_open": open_today.isoformat(),
+            "next_open_label": "09:00 AM IST today",
+        }
+
+    if current_time >= MCX_CLOSE:
+        next_open = _next_mcx_trading_day(now_ist)
+        return {
+            "is_open": False,
+            "reason": "after_hours",
+            "message": "MCX Closed - After Trading Hours",
+            "next_open": next_open.isoformat(),
+            "next_open_label": next_open.strftime("%A, %d %b %Y at %I:%M %p IST"),
+        }
+
+    # MCX is OPEN
+    close_today = datetime.combine(today, MCX_CLOSE, tzinfo=IST)
+    remaining = close_today - now_ist
+    hours_left = int(remaining.total_seconds() // 3600)
+    mins_left = int((remaining.total_seconds() % 3600) // 60)
+
+    return {
+        "is_open": True,
+        "reason": "trading_hours",
+        "message": "MCX Open",
+        "closes_at": close_today.isoformat(),
+        "time_remaining": f"{hours_left}h {mins_left}m",
+        "next_open": None,
+        "next_open_label": None,
     }
 
 

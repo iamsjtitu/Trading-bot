@@ -91,80 +91,51 @@ module.exports = function (db) {
     const dateKey = formatDateKey(ist);
     const holidayName = NSE_HOLIDAYS[dateKey] || null;
 
-    // Weekend
+    // --- NSE Status ---
+    let nse;
     if (weekday === 0 || weekday === 6) {
       const nextOpen = nextTradingDay(ist);
-      return res.json({
-        status: 'success', is_open: false, reason: 'weekend',
-        message: `Market Closed - ${weekday === 6 ? 'Saturday' : 'Sunday'}`,
-        next_open: nextOpen.toISOString(),
-        next_open_label: formatLabel(nextOpen),
-        holiday_name: null,
-      });
-    }
-
-    // Holiday
-    if (holidayName) {
+      nse = { is_open: false, reason: 'weekend', message: `Market Closed - ${weekday === 6 ? 'Saturday' : 'Sunday'}`, next_open: nextOpen.toISOString(), next_open_label: formatLabel(nextOpen), holiday_name: null };
+    } else if (holidayName) {
       const nextOpen = nextTradingDay(ist);
-      return res.json({
-        status: 'success', is_open: false, reason: 'holiday',
-        message: `Market Closed - ${holidayName}`,
-        next_open: nextOpen.toISOString(),
-        next_open_label: formatLabel(nextOpen),
-        holiday_name: holidayName,
-      });
-    }
-
-    // Pre-open (9:00-9:15 IST = 540-555 min)
-    if (totalMin >= 540 && totalMin < 555) {
+      nse = { is_open: false, reason: 'holiday', message: `Market Closed - ${holidayName}`, next_open: nextOpen.toISOString(), next_open_label: formatLabel(nextOpen), holiday_name: holidayName };
+    } else if (totalMin >= 540 && totalMin < 555) {
       const openToday = new Date(Date.UTC(ist.getUTCFullYear(), ist.getUTCMonth(), ist.getUTCDate(), 3, 45, 0));
-      return res.json({
-        status: 'success', is_open: false, reason: 'pre_open',
-        message: 'Pre-Open Session',
-        next_open: openToday.toISOString(),
-        next_open_label: '09:15 AM IST today',
-        holiday_name: null,
-      });
-    }
-
-    // Before market (before 9:15 IST = 555 min)
-    if (totalMin < 555) {
+      nse = { is_open: false, reason: 'pre_open', message: 'Pre-Open Session', next_open: openToday.toISOString(), next_open_label: '09:15 AM IST today', holiday_name: null };
+    } else if (totalMin < 555) {
       const openToday = new Date(Date.UTC(ist.getUTCFullYear(), ist.getUTCMonth(), ist.getUTCDate(), 3, 45, 0));
-      return res.json({
-        status: 'success', is_open: false, reason: 'before_hours',
-        message: 'Market Closed - Before Trading Hours',
-        next_open: openToday.toISOString(),
-        next_open_label: '09:15 AM IST today',
-        holiday_name: null,
-      });
-    }
-
-    // After market (after 15:30 IST = 930 min)
-    if (totalMin >= 930) {
+      nse = { is_open: false, reason: 'before_hours', message: 'Market Closed - Before Trading Hours', next_open: openToday.toISOString(), next_open_label: '09:15 AM IST today', holiday_name: null };
+    } else if (totalMin >= 930) {
       const nextOpen = nextTradingDay(ist);
-      return res.json({
-        status: 'success', is_open: false, reason: 'after_hours',
-        message: 'Market Closed - After Trading Hours',
-        next_open: nextOpen.toISOString(),
-        next_open_label: formatLabel(nextOpen),
-        holiday_name: null,
-      });
+      nse = { is_open: false, reason: 'after_hours', message: 'Market Closed - After Trading Hours', next_open: nextOpen.toISOString(), next_open_label: formatLabel(nextOpen), holiday_name: null };
+    } else {
+      const remaining = 930 - totalMin;
+      const closeToday = new Date(Date.UTC(ist.getUTCFullYear(), ist.getUTCMonth(), ist.getUTCDate(), 10, 0, 0));
+      nse = { is_open: true, reason: 'trading_hours', message: 'Market Open', closes_at: closeToday.toISOString(), time_remaining: `${Math.floor(remaining/60)}h ${remaining%60}m`, next_open: null, next_open_label: null, holiday_name: null };
     }
 
-    // Market OPEN (9:15-15:30 IST)
-    const closeMin = 930;
-    const remaining = closeMin - totalMin;
-    const hLeft = Math.floor(remaining / 60);
-    const mLeft = remaining % 60;
-    const closeToday = new Date(Date.UTC(ist.getUTCFullYear(), ist.getUTCMonth(), ist.getUTCDate(), 10, 0, 0)); // 15:30 IST = 10:00 UTC
+    // --- MCX Status (9:00 AM - 11:30 PM IST = 540 - 1410 min) ---
+    let mcx;
+    if (weekday === 0 || weekday === 6) {
+      // Next weekday 9:00 AM
+      const d = new Date(ist); d.setUTCDate(d.getUTCDate() + (weekday === 6 ? 2 : 1));
+      const nextOpen = new Date(Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate(), 3, 30, 0));
+      mcx = { is_open: false, reason: 'weekend', message: `MCX Closed - ${weekday === 6 ? 'Saturday' : 'Sunday'}`, next_open: nextOpen.toISOString(), next_open_label: formatLabel(nextOpen) };
+    } else if (totalMin < 540) {
+      const openToday = new Date(Date.UTC(ist.getUTCFullYear(), ist.getUTCMonth(), ist.getUTCDate(), 3, 30, 0));
+      mcx = { is_open: false, reason: 'before_hours', message: 'MCX Closed - Before Trading Hours', next_open: openToday.toISOString(), next_open_label: '09:00 AM IST today' };
+    } else if (totalMin >= 1410) {
+      const d = new Date(ist); d.setUTCDate(d.getUTCDate() + 1);
+      while (d.getUTCDay() === 0 || d.getUTCDay() === 6) d.setUTCDate(d.getUTCDate() + 1);
+      const nextOpen = new Date(Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate(), 3, 30, 0));
+      mcx = { is_open: false, reason: 'after_hours', message: 'MCX Closed - After Trading Hours', next_open: nextOpen.toISOString(), next_open_label: formatLabel(nextOpen) };
+    } else {
+      const remaining = 1410 - totalMin;
+      const closeToday = new Date(Date.UTC(ist.getUTCFullYear(), ist.getUTCMonth(), ist.getUTCDate(), 18, 0, 0)); // 23:30 IST = 18:00 UTC
+      mcx = { is_open: true, reason: 'trading_hours', message: 'MCX Open', closes_at: closeToday.toISOString(), time_remaining: `${Math.floor(remaining/60)}h ${remaining%60}m`, next_open: null, next_open_label: null };
+    }
 
-    res.json({
-      status: 'success', is_open: true, reason: 'trading_hours',
-      message: 'Market Open',
-      closes_at: closeToday.toISOString(),
-      time_remaining: `${hLeft}h ${mLeft}m`,
-      next_open: null, next_open_label: null, holiday_name: null,
-    });
+    res.json({ status: 'success', nse, mcx, ...nse });
   });
 
   // GET /api/market-holidays

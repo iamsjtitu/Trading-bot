@@ -68,3 +68,8 @@ Build an AI-powered automated options trading bot that connects to world news, u
 - P3: App.js refactoring
 
 ## Version: 2.0.0
+
+### MCX Market Hours Indicator
+- Separate MCX status (9:00 AM - 11:30 PM IST) alongside NSE/BSE (9:15 AM - 3:30 PM IST)
+- Both shown in dashboard banner with independent countdown timers
+- Desktop Node.js backend also has MCX status support
