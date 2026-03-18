@@ -76,4 +76,4 @@ desktop/routes/
 - P3: Telegram notifications integration
 - P3: App.js refactoring
 
-## Version: 1.8.0
+## Version: 2.0.0
