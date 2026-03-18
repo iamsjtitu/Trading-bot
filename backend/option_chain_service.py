@@ -474,7 +474,7 @@ class OptionChainService:
         return {'iv': iv, 'option_type': option_type}
 
     def detect_oi_buildup(self, instrument: str, spot_price: float = 0, expiry_days: int = 7) -> Dict:
-        """Detect OI buildup patterns and generate alerts - only when market is open"""
+        """Detect OI buildup patterns and generate alerts - only with live data"""
         market_status = self._get_market_status_for_instrument(instrument)
         if not market_status.get('is_open'):
             return {
@@ -486,7 +486,15 @@ class OptionChainService:
                 'timestamp': datetime.now(timezone.utc).isoformat(),
             }
 
-        chain_data = self.generate_option_chain(instrument, spot_price, 10, expiry_days)
+        # OI alerts need live data - return empty when no broker
+        return {
+            'status': 'success',
+            'instrument': instrument,
+            'alerts': [],
+            'message': 'OI alerts require live broker data',
+            'source': 'needs_live_data',
+            'timestamp': datetime.now(timezone.utc).isoformat(),
+        }
         if chain_data.get('status') != 'success':
             return {'status': 'error', 'alerts': []}
 
