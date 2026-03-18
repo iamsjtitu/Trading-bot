@@ -138,6 +138,8 @@ function createApiServer(db) {
     { name: 'trading', load: () => require('./routes/trading')(db) },
     { name: 'upstox', load: () => require('./routes/upstox')(db) },
     { name: 'tax', load: () => require('./routes/tax')(db) },
+    { name: 'market_status', load: () => require('./routes/market_status')(db) },
+    { name: 'extra_apis', load: () => require('./routes/extra_apis')(db) },
   ];
 
   let loaded = 0;

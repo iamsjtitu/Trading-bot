@@ -9,11 +9,13 @@ function uuid() { return crypto.randomUUID(); }
 module.exports = function (db) {
   const router = Router();
 
-  // Internal state for auto-trading settings
-  let autoExitEnabled = true;
-  let autoEntryEnabled = false;
-  let customTargetPct = null;
-  let customStoplossPct = null;
+  // Internal state for auto-trading settings - LOAD from saved settings
+  const savedAutoTrading = db.data.settings?.auto_trading || {};
+  let autoExitEnabled = savedAutoTrading.auto_exit !== false;
+  let autoEntryEnabled = savedAutoTrading.auto_entry || false;
+  let customTargetPct = savedAutoTrading.target_pct || null;
+  let customStoplossPct = savedAutoTrading.stoploss_pct || null;
+  console.log(`[Trading] Loaded auto settings: exit=${autoExitEnabled}, entry=${autoEntryEnabled}`);
 
   const riskParams = {
     low: { stop_loss_pct: 15, target_pct: 30, max_position_size: 0.03 },
@@ -472,6 +474,15 @@ _Sent automatically by AI Trading Bot_`;
     if ('auto_entry' in body) autoEntryEnabled = body.auto_entry;
     if ('target_pct' in body) customTargetPct = body.target_pct;
     if ('stoploss_pct' in body) customStoplossPct = body.stoploss_pct;
+
+    // Persist to settings
+    if (!db.data.settings) db.data.settings = {};
+    if (!db.data.settings.auto_trading) db.data.settings.auto_trading = {};
+    db.data.settings.auto_trading.auto_exit = autoExitEnabled;
+    db.data.settings.auto_trading.auto_entry = autoEntryEnabled;
+    if (customTargetPct != null) db.data.settings.auto_trading.target_pct = customTargetPct;
+    if (customStoplossPct != null) db.data.settings.auto_trading.stoploss_pct = customStoplossPct;
+    db.save();
 
     res.json({
       status: 'success',
