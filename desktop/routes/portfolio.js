@@ -33,7 +33,63 @@ module.exports = function (db) {
   });
 
   // GET /api/portfolio
-  router.get('/api/portfolio', (req, res) => {
+  router.get('/api/portfolio', async (req, res) => {
+    const mode = db.data.settings?.trading_mode || 'PAPER';
+
+    if (mode === 'LIVE') {
+      // In LIVE mode, fetch real portfolio from Upstox
+      const token = db.data.settings?.broker?.access_token;
+      if (!token) {
+        return res.json({
+          initial_capital: 0, current_value: 0, available_capital: 0,
+          invested_amount: 0, total_pnl: 0, unrealized_pnl: 0,
+          total_trades: 0, active_positions: 0, winning_trades: 0, losing_trades: 0,
+          isLive: false, isDisconnected: true,
+        });
+      }
+
+      try {
+        const axios = require('axios');
+        const headers = { Accept: 'application/json', Authorization: `Bearer ${token}`, 'Api-Version': '2.0' };
+        const [fundsRes, posRes] = await Promise.all([
+          axios.get('https://api.upstox.com/v2/user/get-funds-and-margin', { headers, timeout: 10000 }),
+          axios.get('https://api.upstox.com/v2/portfolio/short-term-positions', { headers, timeout: 10000 }),
+        ]);
+
+        const equity = fundsRes.data?.data?.equity || {};
+        const available = equity.available_margin || 0;
+        const used = equity.used_margin || 0;
+        let totalPnl = 0;
+        let activeCount = 0;
+        for (const pos of (posRes.data?.data || [])) {
+          totalPnl += pos.pnl || pos.realised || 0;
+          if (pos.quantity !== 0) activeCount++;
+        }
+
+        return res.json({
+          initial_capital: available + used,
+          current_value: available + used,
+          available_capital: available,
+          invested_amount: used,
+          total_pnl: Math.round(totalPnl * 100) / 100,
+          unrealized_pnl: Math.round(totalPnl * 100) / 100,
+          total_trades: 0,
+          active_positions: activeCount,
+          winning_trades: 0, losing_trades: 0,
+          isLive: true,
+        });
+      } catch (err) {
+        console.error('[Portfolio] Live fetch error:', err.message);
+        return res.json({
+          initial_capital: 0, current_value: 0, available_capital: 0,
+          invested_amount: 0, total_pnl: 0, unrealized_pnl: 0,
+          total_trades: 0, active_positions: 0, winning_trades: 0, losing_trades: 0,
+          isLive: true, error: err.message,
+        });
+      }
+    }
+
+    // PAPER mode
     const p = ensurePortfolio();
     const openTrades = (db.data.trades || []).filter(t => t.status === 'OPEN');
     let currentValue = p.available_capital;
@@ -127,21 +183,31 @@ module.exports = function (db) {
               finnifty: 'NSE_INDEX|Nifty Fin Service',
             };
             const keysStr = Object.values(INDEX_KEYS).join(',');
-            const mktRes = await axios.get(`https://api.upstox.com/v2/market-quote/ltp?instrument_key=${encodeURIComponent(keysStr)}`, { headers, timeout: 10000 });
+            // Use full market quote for richer data (OHLC + close price)
+            const mktRes = await axios.get(`https://api.upstox.com/v2/market-quote/quotes?instrument_key=${encodeURIComponent(keysStr)}`, { headers, timeout: 10000 });
             if (mktRes.data?.status === 'success') {
               const raw = mktRes.data.data || {};
               const indices = {};
               for (const [key, instrument] of Object.entries(INDEX_KEYS)) {
-                const quote = raw[instrument] || {};
+                // Robust key matching - try direct match, then search in response keys
+                let quote = raw[instrument];
+                if (!quote) {
+                  // Try finding by partial match (handles colon vs pipe format differences)
+                  const matchKey = Object.keys(raw).find(k => k.includes(instrument.split('|')[1] || ''));
+                  if (matchKey) quote = raw[matchKey];
+                }
+                if (!quote) { indices[key] = { value: 0, change: 0, changePct: 0 }; continue; }
+
                 const ltp = quote.last_price || 0;
-                const cp = quote.close_price || 0;
+                // Try multiple field names for close/previous close price
+                const cp = quote.ohlc?.close || quote.close_price || quote.cp || quote.prev_close || 0;
                 const change = cp ? ltp - cp : 0;
                 const changePct = cp ? (change / cp) * 100 : 0;
                 indices[key] = { value: ltp, change: Math.round(change * 100) / 100, changePct: Math.round(changePct * 100) / 100 };
               }
               result.market_data = indices;
             }
-          } catch (_) {}
+          } catch (e) { console.error('[CombinedStatus] Market data error:', e.message); }
 
           try {
             const [fundsRes, posRes, ordersRes] = await Promise.all([

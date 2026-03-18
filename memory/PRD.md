@@ -13,9 +13,9 @@ Build an AI-powered automated options trading bot that connects to world news, u
 
 ## Architecture
 - **Frontend:** React + Tailwind + Shadcn/UI + Chart.js
-- **Backend (Primary):** Python FastAPI + MongoDB
+- **Backend (Web):** Python FastAPI + MongoDB
+- **Backend (Desktop):** Node.js Express + JSON file DB
 - **Desktop:** Electron + electron-builder + electron-updater
-- **Database:** MongoDB (web) / JSON file (desktop)
 - **CI/CD:** GitHub Actions (Node.js 18 pinned)
 
 ## What's Implemented
@@ -35,13 +35,34 @@ Build an AI-powered automated options trading bot that connects to world news, u
 - Auto-updater for desktop app
 
 ## Bug Fixes Completed (March 18, 2026)
-1. **P0 - Market Status Indicator:** Fixed MarketTicker to show "LIVE MARKET" when Upstox connected OR during market hours
-2. **P0 - LIVE Mode Data Mismatch:** Active Trades tab now shows Upstox live positions when connected. Signals tab shows LIVE mode banner
-3. **P1 - HTML Tags in News:** Applied strip_html to all news sources (NewsAPI, Alpha Vantage) + frontend safety net
+1. **P0 - Market Status Indicator:** Fixed MarketTicker to show correct status based on Upstox connection + market hours
+2. **P0 - LIVE Mode Data Mismatch:** Fixed both desktop (Node.js) and web (Python) backends - Active Trades now fetches real Upstox positions in LIVE mode, portfolio shows live funds, no paper data leakage
+3. **P0 - Market Data 0.00:** Upgraded from `/market-quote/ltp` to `/market-quote/quotes` endpoint for full OHLC data. Fixed close price field parsing (was `close_price`, now `ohlc.close`/`cp` with fallback chain). Added robust key matching.
+4. **P1 - HTML Tags in News:** Applied strip_html to all news sources (NewsAPI, Alpha Vantage) + frontend safety net
+
+## Key Files
+### Frontend
+- `/app/frontend/src/App.js` - Main app with mode logic, displayTrades/displayPortfolio
+- `/app/frontend/src/components/MarketTicker.js` - Market status with Upstox-aware logic
+- `/app/frontend/src/components/NewsFeed.js` - News with cleanText() HTML stripping
+- `/app/frontend/src/components/SignalsList.js` - Trading signals with LIVE mode banner
+- `/app/frontend/src/components/TradesList.js` - Active trades with live/paper isolation
+- `/app/frontend/src/components/RiskPanel.js` - Risk panel with disconnected badge
+
+### Desktop Backend (Node.js)
+- `/app/desktop/routes/portfolio.js` - Portfolio + combined-status (fixed market data + live portfolio)
+- `/app/desktop/routes/upstox.js` - Upstox API routes (fixed market quote endpoint)
+- `/app/desktop/routes/trading.js` - Trades (fixed to fetch Upstox positions in LIVE mode)
+- `/app/desktop/main.js` - Electron shell + Express server
+
+### Web Backend (Python)
+- `/app/backend/server.py` - FastAPI backend
+- `/app/backend/upstox_service.py` - Upstox API integration (fixed market data parsing)
+- `/app/backend/news_service.py` - News fetching + HTML stripping
 
 ## Pending/Upcoming Tasks
 ### P0
-- MCX & Commodities Trading (user requested, pending after bug fixes)
+- MCX & Commodities Trading (user requested)
 
 ### P1
 - End-to-end Telegram notification testing (needs user credentials)
@@ -52,21 +73,6 @@ Build an AI-powered automated options trading bot that connects to world news, u
 - Advanced analytics & filtering on Trade History
 - CI/CD pipeline robustness improvements
 
-## 3rd Party Integrations
-- OpenAI GPT-4o-mini (Emergent LLM Key)
-- Upstox API (User credentials)
-- NewsAPI.org / Alpha Vantage (User API keys)
-- Web scraping: Moneycontrol, Economic Times
-- Electron / electron-builder / electron-updater
-- Chart.js, jspdf, exceljs
-- Telegram Bot API (User credentials)
-
-## Key Files
-- `/app/frontend/src/App.js` - Main app with mode logic
-- `/app/frontend/src/components/MarketTicker.js` - Market status
-- `/app/frontend/src/components/NewsFeed.js` - News with HTML cleaning
-- `/app/frontend/src/components/SignalsList.js` - Trading signals
-- `/app/frontend/src/components/TradesList.js` - Active trades
-- `/app/backend/server.py` - FastAPI backend
-- `/app/backend/news_service.py` - News fetching + HTML stripping
-- `/app/backend/upstox_service.py` - Upstox API integration
+## Version
+- Desktop: v1.3.3
+- Frontend: v0.1.0

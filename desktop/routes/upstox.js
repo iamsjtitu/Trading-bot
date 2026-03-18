@@ -111,14 +111,22 @@ module.exports = function (db) {
 
     const keysStr = Object.values(INDEX_KEYS).join(',');
     try {
-      const resp = await axios.get(`${UPSTOX_API_BASE}/market-quote/ltp?instrument_key=${encodeURIComponent(keysStr)}`, { headers: apiHeaders(token), timeout: 10000 });
+      // Use full market quote for richer data (OHLC + close price)
+      const resp = await axios.get(`${UPSTOX_API_BASE}/market-quote/quotes?instrument_key=${encodeURIComponent(keysStr)}`, { headers: apiHeaders(token), timeout: 10000 });
       if (resp.data?.status === 'success') {
         const raw = resp.data.data || {};
         const indices = {};
         for (const [key, instrument] of Object.entries(INDEX_KEYS)) {
-          const quote = raw[instrument] || {};
+          // Robust key matching
+          let quote = raw[instrument];
+          if (!quote) {
+            const matchKey = Object.keys(raw).find(k => k.includes(instrument.split('|')[1] || ''));
+            if (matchKey) quote = raw[matchKey];
+          }
+          if (!quote) { indices[key] = { value: 0, change: 0, changePct: 0 }; continue; }
+
           const ltp = quote.last_price || 0;
-          const cp = quote.close_price || 0;
+          const cp = quote.ohlc?.close || quote.close_price || quote.cp || quote.prev_close || 0;
           const change = cp ? ltp - cp : 0;
           const changePct = cp ? (change / cp) * 100 : 0;
           indices[key] = { value: ltp, change: Math.round(change * 100) / 100, changePct: Math.round(changePct * 100) / 100 };
@@ -127,6 +135,7 @@ module.exports = function (db) {
       }
       res.json({ status: 'error', message: resp.data?.message || 'Failed to fetch market data', data: null });
     } catch (err) {
+      console.error('[MarketData] Error:', err.message);
       res.json({ status: 'error', message: err.message, data: null });
     }
   });

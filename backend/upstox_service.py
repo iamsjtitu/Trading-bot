@@ -114,7 +114,8 @@ class UpstoxService:
             return {'status': 'error', 'message': 'Not logged in to Upstox', 'data': None}
 
         keys_str = ','.join(INDEX_KEYS.values())
-        url = f"{UPSTOX_API_BASE}/market-quote/ltp?instrument_key={urllib.parse.quote(keys_str)}"
+        # Use full market quote for richer data (OHLC + close price)
+        url = f"{UPSTOX_API_BASE}/market-quote/quotes?instrument_key={urllib.parse.quote(keys_str)}"
 
         try:
             resp = requests.get(url, headers=self._api_headers(token), timeout=10)
@@ -124,9 +125,23 @@ class UpstoxService:
                 raw = result.get('data', {})
                 indices = {}
                 for key, instrument in INDEX_KEYS.items():
-                    quote = raw.get(instrument, {})
+                    # Robust key matching
+                    quote = raw.get(instrument)
+                    if not quote:
+                        # Try partial match for format differences
+                        name_part = instrument.split('|')[1] if '|' in instrument else instrument
+                        for rk, rv in raw.items():
+                            if name_part in rk:
+                                quote = rv
+                                break
+                    if not quote:
+                        indices[key] = {'value': 0, 'change': 0, 'changePct': 0}
+                        continue
+
                     ltp = quote.get('last_price', 0)
-                    cp = quote.get('close_price', 0) or quote.get('instrument_token', {}).get('close_price', 0)
+                    # Try multiple field names for close/previous close price
+                    ohlc = quote.get('ohlc', {})
+                    cp = ohlc.get('close', 0) or quote.get('close_price', 0) or quote.get('cp', 0) or quote.get('prev_close', 0)
                     change = ltp - cp if cp else 0
                     change_pct = (change / cp * 100) if cp else 0
                     indices[key] = {

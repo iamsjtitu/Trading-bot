@@ -40,7 +40,52 @@ module.exports = function (db) {
   });
 
   // GET /api/trades/active
-  router.get('/api/trades/active', (req, res) => {
+  router.get('/api/trades/active', async (req, res) => {
+    const mode = db.data.settings?.trading_mode || 'PAPER';
+
+    if (mode === 'LIVE') {
+      // In LIVE mode, fetch real positions from Upstox instead of paper trades
+      const token = db.data.settings?.broker?.access_token;
+      if (!token) {
+        return res.json({ status: 'success', count: 0, trades: [], message: 'Upstox not connected' });
+      }
+
+      try {
+        const headers = { Accept: 'application/json', Authorization: `Bearer ${token}`, 'Api-Version': '2.0' };
+        const posResp = await axios.get('https://api.upstox.com/v2/portfolio/short-term-positions', { headers, timeout: 10000 });
+
+        if (posResp.data?.status === 'success') {
+          const positions = (posResp.data.data || []).filter(p => p.quantity !== 0);
+          const tradesFromPositions = positions.map(pos => ({
+            trade_type: pos.quantity > 0 ? 'BUY' : 'SELL',
+            symbol: pos.trading_symbol || 'N/A',
+            quantity: Math.abs(pos.quantity),
+            status: 'OPEN',
+            entry_price: pos.average_price || 0,
+            current_price: pos.last_price || 0,
+            current_value: (pos.last_price || 0) * Math.abs(pos.quantity),
+            investment: (pos.average_price || 0) * Math.abs(pos.quantity),
+            live_pnl: Math.round((pos.pnl || 0) * 100) / 100,
+            pnl_percentage: pos.average_price > 0
+              ? Math.round(((pos.last_price - pos.average_price) / pos.average_price) * 10000) / 100
+              : 0,
+            stop_loss: 0,
+            target: 0,
+            entry_time: new Date().toISOString(),
+            isLive: true,
+            instrument_token: pos.instrument_token || '',
+            product: pos.product || '',
+          }));
+          return res.json({ status: 'success', count: tradesFromPositions.length, trades: tradesFromPositions, isLive: true });
+        }
+      } catch (err) {
+        console.error('[Trades] Live positions fetch error:', err.message);
+      }
+      // Fallback: return empty if Upstox call fails
+      return res.json({ status: 'success', count: 0, trades: [], isLive: true, message: 'Could not fetch live positions' });
+    }
+
+    // PAPER mode: return simulated trades
     const openTrades = (db.data.trades || []).filter(t => t.status === 'OPEN');
     const tradesWithPnl = openTrades.map(trade => {
       const change = (Math.random() - 0.5) * 0.3;
