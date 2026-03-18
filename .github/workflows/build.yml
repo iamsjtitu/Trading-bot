@@ -54,13 +54,27 @@ jobs:
             Start-Sleep -Seconds 30
           }
           if (-not $success) {
-            Write-Host "Chocolatey failed. Installing NSIS directly..."
+            Write-Host "Chocolatey failed. Installing NSIS directly from SourceForge..."
             $url = "https://sourceforge.net/projects/nsis/files/NSIS%203/3.10/nsis-3.10-setup.exe/download"
             Invoke-WebRequest -Uri $url -OutFile "$env:TEMP\nsis-setup.exe" -MaximumRedirection 5
             Start-Process -FilePath "$env:TEMP\nsis-setup.exe" -Args "/S" -Wait
-            $env:PATH = "C:\Program Files (x86)\NSIS;$env:PATH"
-            [System.Environment]::SetEnvironmentVariable("PATH", $env:PATH, "Process")
           }
+          # Always add NSIS paths - Chocolatey doesn't refresh PATH in current session
+          $nsisLocations = @(
+            "C:\Program Files (x86)\NSIS",
+            "C:\Program Files\NSIS",
+            "C:\ProgramData\chocolatey\lib\nsis\tools",
+            "C:\ProgramData\chocolatey\bin"
+          )
+          foreach ($loc in $nsisLocations) {
+            if (Test-Path "$loc\makensis.exe") {
+              Write-Host "Found makensis at: $loc"
+              $env:PATH = "$loc;$env:PATH"
+              echo "$loc" >> $env:GITHUB_PATH
+              break
+            }
+          }
+          # Verify
           makensis /VERSION
         shell: pwsh
 
