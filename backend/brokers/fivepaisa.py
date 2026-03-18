@@ -18,18 +18,18 @@ class FivePaisaBroker(BrokerBase):
     BROKER_NAME = '5paisa'
 
     async def get_auth_url(self) -> Dict:
-        broker = await self._get_broker_settings()
-        api_key = broker.get('api_key', '')
+        creds = await self._get_my_credentials()
+        api_key = creds.get('api_key', '')
         if not api_key:
             return {'status': 'error', 'message': '5paisa API Key required in Settings.'}
-        redirect_uri = broker.get('redirect_uri', '')
+        redirect_uri = creds.get('redirect_uri', '')
         auth_url = f"https://dev-openapi.5paisa.com/WebVendorLogin/VLogin/Index?VendorKey={api_key}&ResponseURL={redirect_uri}"
         return {'status': 'success', 'auth_url': auth_url}
 
     async def exchange_code_for_token(self, auth_code: str) -> Dict:
-        broker = await self._get_broker_settings()
-        api_key = broker.get('api_key', '')
-        encryption_key = broker.get('api_secret', '')
+        creds = await self._get_my_credentials()
+        api_key = creds.get('api_key', '')
+        encryption_key = creds.get('api_secret', '')
         if not all([api_key, encryption_key]):
             return {'status': 'error', 'message': 'API Key and Encryption Key required'}
         headers = {'Content-Type': 'application/json'}
@@ -49,8 +49,8 @@ class FivePaisaBroker(BrokerBase):
             return {'status': 'error', 'message': str(e)}
 
     async def _fivepaisa_headers(self) -> Dict:
-        broker = await self._get_broker_settings()
-        return {'Content-Type': 'application/json', 'Authorization': f"Bearer {broker.get('access_token', '')}"}
+        creds = await self._get_my_credentials()
+        return {'Content-Type': 'application/json', 'Authorization': f"Bearer {creds.get('token', '')}"}
 
     async def get_live_market_data(self) -> Dict:
         token = await self._get_access_token()
@@ -94,8 +94,8 @@ class FivePaisaBroker(BrokerBase):
         if not token:
             return {'status': 'error', 'message': 'Not logged in'}
         headers = await self._fivepaisa_headers()
-        broker = await self._get_broker_settings()
-        client_code = broker.get('client_code', '')
+        creds = await self._get_my_credentials()
+        client_code = creds.get('client_code', '')
         try:
             margin_body = {'head': {'requestCode': '5PMargin'}, 'body': {'ClientCode': client_code}}
             pos_body = {'head': {'requestCode': '5PNOP'}, 'body': {'ClientCode': client_code}}
@@ -128,11 +128,11 @@ class FivePaisaBroker(BrokerBase):
 
     async def place_order(self, params: Dict) -> Dict:
         headers = await self._fivepaisa_headers()
-        broker = await self._get_broker_settings()
+        creds = await self._get_my_credentials()
         body = {
             'head': {'requestCode': '5POrdReq'},
             'body': {
-                'ClientCode': broker.get('client_code', ''),
+                'ClientCode': creds.get('client_code', ''),
                 'OrderFor': 'P', 'Exchange': params.get('exchange', 'N'),
                 'ExchangeType': 'D', 'ScripCode': params.get('instrument_token', ''),
                 'Qty': params.get('quantity', 1), 'Price': params.get('price', 0),
@@ -155,9 +155,9 @@ class FivePaisaBroker(BrokerBase):
 
     async def get_order_book(self) -> Dict:
         headers = await self._fivepaisa_headers()
-        broker = await self._get_broker_settings()
+        creds = await self._get_my_credentials()
         try:
-            body = {'head': {'requestCode': '5POrdBkV2'}, 'body': {'ClientCode': broker.get('client_code', '')}}
+            body = {'head': {'requestCode': '5POrdBkV2'}, 'body': {'ClientCode': creds.get('client_code', '')}}
             resp = requests.post(f"{FIVEPAISA_LOGIN_URL}/V2/OrderBook", json=body, headers=headers, timeout=10)
             result = resp.json()
             orders = [{'order_id': o.get('ExchOrderID'), 'symbol': o.get('ScripName'),

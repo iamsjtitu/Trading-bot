@@ -24,21 +24,45 @@ class BrokerBase(ABC):
             return settings['broker']
         return {}
 
+    def _cred_key(self, field: str) -> str:
+        """Get broker-specific credential key, e.g. 'upstox_api_key'"""
+        return f'{self.BROKER_ID}_{field}'
+
+    async def _get_my_credentials(self) -> Dict:
+        """Get THIS broker's credentials (api_key, api_secret, token, etc.)"""
+        broker = await self._get_broker_settings()
+        prefix = f'{self.BROKER_ID}_'
+        creds = {}
+        for key, val in broker.items():
+            if key.startswith(prefix):
+                creds[key[len(prefix):]] = val
+        # Fallback: if no broker-specific keys found, check legacy shared keys
+        if not creds.get('api_key') and broker.get('api_key'):
+            # Only for the FIRST/original broker (upstox), use legacy keys
+            if self.BROKER_ID == 'upstox':
+                creds.setdefault('api_key', broker.get('api_key', ''))
+                creds.setdefault('api_secret', broker.get('api_secret', ''))
+                creds.setdefault('token', broker.get('access_token', ''))
+        creds['redirect_uri'] = broker.get('redirect_uri', '')
+        return creds
+
     async def _save_token(self, token: str, extra: Dict = None):
         update = {
-            'broker.access_token': token,
-            'broker.token_timestamp': __import__('datetime').datetime.now(
+            f'broker.{self._cred_key("token")}': token,
+            f'broker.{self._cred_key("token_timestamp")}': __import__('datetime').datetime.now(
                 __import__('datetime').timezone.utc
             ).isoformat(),
         }
+        # Also set legacy field for backward compat
+        update['broker.access_token'] = token
         if extra:
             for k, v in extra.items():
-                update[f'broker.{k}'] = v
+                update[f'broker.{self._cred_key(k)}'] = v
         await self.db.bot_settings.update_one({'type': 'main'}, {'$set': update})
 
     async def _get_access_token(self) -> Optional[str]:
-        broker = await self._get_broker_settings()
-        return broker.get('access_token', '') or None
+        creds = await self._get_my_credentials()
+        return creds.get('token', '') or None
 
     # ==================== Auth ====================
     @abstractmethod

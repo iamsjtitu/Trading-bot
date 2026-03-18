@@ -24,14 +24,14 @@ class AngelOneBroker(BrokerBase):
     async def exchange_code_for_token(self, auth_code: str) -> Dict:
         """For Angel One, auth_code contains JSON: {client_id, password, totp}"""
         import json
-        broker = await self._get_broker_settings()
-        api_key = broker.get('api_key', '')
+        creds = await self._get_my_credentials()
+        api_key = creds.get('api_key', '')
         try:
             creds = json.loads(auth_code) if isinstance(auth_code, str) else auth_code
         except json.JSONDecodeError:
             creds = {'client_id': auth_code}
-        client_id = creds.get('client_id', broker.get('client_id', ''))
-        password = creds.get('password', broker.get('password', ''))
+        client_id = creds.get('client_id', creds.get('client_id', ''))
+        password = creds.get('password', creds.get('password', ''))
         totp = creds.get('totp', '')
         if not all([api_key, client_id, password, totp]):
             return {'status': 'error', 'message': 'API Key, Client ID, Password and TOTP required'}
@@ -58,9 +58,9 @@ class AngelOneBroker(BrokerBase):
             return {'status': 'error', 'message': str(e)}
 
     async def _angel_headers(self) -> Dict:
-        broker = await self._get_broker_settings()
+        creds = await self._get_my_credentials()
         return {
-            'Authorization': f"Bearer {broker.get('access_token', '')}",
+            'Authorization': f"Bearer {creds.get('token', '')}",
             'Content-Type': 'application/json',
             'Accept': 'application/json',
             'X-UserType': 'USER',
@@ -68,7 +68,7 @@ class AngelOneBroker(BrokerBase):
             'X-ClientLocalIP': '127.0.0.1',
             'X-ClientPublicIP': '127.0.0.1',
             'X-MACAddress': '00:00:00:00:00:00',
-            'X-PrivateKey': broker.get('api_key', ''),
+            'X-PrivateKey': creds.get('api_key', ''),
         }
 
     async def get_live_market_data(self) -> Dict:

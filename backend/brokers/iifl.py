@@ -21,9 +21,9 @@ class IIFLBroker(BrokerBase):
         return {'status': 'info', 'message': 'IIFL uses API Key + Secret Key login. Configure in Settings.', 'auth_type': 'credentials'}
 
     async def exchange_code_for_token(self, auth_code: str) -> Dict:
-        broker = await self._get_broker_settings()
-        api_key = broker.get('api_key', '')
-        api_secret = broker.get('api_secret', '')
+        creds = await self._get_my_credentials()
+        api_key = creds.get('api_key', '')
+        api_secret = creds.get('api_secret', '')
         if not all([api_key, api_secret]):
             return {'status': 'error', 'message': 'API Key and Secret required'}
         headers = {'Content-Type': 'application/json'}

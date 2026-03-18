@@ -18,8 +18,8 @@ class PaytmMoneyBroker(BrokerBase):
     BROKER_NAME = 'Paytm Money'
 
     async def get_auth_url(self) -> Dict:
-        broker = await self._get_broker_settings()
-        api_key = broker.get('api_key', '')
+        creds = await self._get_my_credentials()
+        api_key = creds.get('api_key', '')
         if not api_key:
             return {'status': 'error', 'message': 'Paytm Money API Key required. Apply at developer.paytmmoney.com'}
         state = 'tradingbot'
@@ -27,9 +27,9 @@ class PaytmMoneyBroker(BrokerBase):
         return {'status': 'success', 'auth_url': auth_url}
 
     async def exchange_code_for_token(self, auth_code: str) -> Dict:
-        broker = await self._get_broker_settings()
-        api_key = broker.get('api_key', '')
-        api_secret = broker.get('api_secret', '')
+        creds = await self._get_my_credentials()
+        api_key = creds.get('api_key', '')
+        api_secret = creds.get('api_secret', '')
         if not all([api_key, api_secret]):
             return {'status': 'error', 'message': 'API Key and Secret required'}
         try:

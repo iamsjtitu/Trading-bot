@@ -253,11 +253,11 @@ export default function SettingsPanel({ onClose, onSave }) {
                 <div className="space-y-3">
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-1">API Key</label>
-                    <input type="text" value={settings.broker.api_key} onChange={(e) => updateField('broker', 'api_key', e.target.value)} className="w-full px-3 py-2 border border-gray-300 rounded-lg" placeholder={`Enter ${brokers.find(b => b.id === activeBroker)?.name || 'Broker'} API Key`} data-testid="broker-api-key" />
+                    <input type="text" value={settings.broker[`${activeBroker}_api_key`] || ''} onChange={(e) => updateField('broker', `${activeBroker}_api_key`, e.target.value)} className="w-full px-3 py-2 border border-gray-300 rounded-lg" placeholder={`Enter ${brokers.find(b => b.id === activeBroker)?.name || 'Broker'} API Key`} data-testid="broker-api-key" />
                   </div>
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-1">API Secret</label>
-                    <input type="password" value={settings.broker.api_secret} onChange={(e) => updateField('broker', 'api_secret', e.target.value)} className="w-full px-3 py-2 border border-gray-300 rounded-lg" placeholder={`Enter ${brokers.find(b => b.id === activeBroker)?.name || 'Broker'} API Secret`} data-testid="broker-api-secret" />
+                    <input type="password" value={settings.broker[`${activeBroker}_api_secret`] || ''} onChange={(e) => updateField('broker', `${activeBroker}_api_secret`, e.target.value)} className="w-full px-3 py-2 border border-gray-300 rounded-lg" placeholder={`Enter ${brokers.find(b => b.id === activeBroker)?.name || 'Broker'} API Secret`} data-testid="broker-api-secret" />
                   </div>
                   {(activeBroker === 'angelone' || activeBroker === '5paisa' || activeBroker === 'iifl') && (
                     <div>
@@ -267,7 +267,7 @@ export default function SettingsPanel({ onClose, onSave }) {
                   )}
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-1">Redirect URI</label>
-                    <input type="text" value={settings.broker.redirect_uri} onChange={(e) => updateField('broker', 'redirect_uri', e.target.value)} className="w-full px-3 py-2 border border-gray-300 rounded-lg" placeholder="https://yourapp.com/callback" data-testid="broker-redirect-uri" />
+                    <input type="text" value={settings.broker.redirect_uri || ''} onChange={(e) => updateField('broker', 'redirect_uri', e.target.value)} className="w-full px-3 py-2 border border-gray-300 rounded-lg" placeholder="https://yourapp.com/callback" data-testid="broker-redirect-uri" />
                     <button onClick={() => { updateField('broker', 'redirect_uri', `${window.location.origin}/callback`); }} className="mt-2 px-3 py-1 bg-blue-600 text-white rounded text-xs hover:bg-blue-700" data-testid="use-current-url-btn">Use Current URL</button>
                   </div>
                 </div>

@@ -42,7 +42,8 @@ module.exports = function (db) {
   const router = Router();
 
   function getToken() {
-    return db.data.settings?.broker?.access_token || null;
+    const activeBroker = db.data.settings?.broker?.name || 'upstox';
+    return db.data.settings?.broker?.[`${activeBroker}_token`] || null;
   }
 
   function apiHeaders(token) {

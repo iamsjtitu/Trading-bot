@@ -58,15 +58,14 @@ function getActiveBroker(db) {
 
 function getToken(db, brokerId) {
   const broker = db.data.settings?.broker || {};
-  if (brokerId === 'upstox') return broker.access_token || null;
-  return broker[`${brokerId}_token`] || broker.access_token || null;
+  return broker[`${brokerId}_token`] || null;
 }
 
 function getBrokerCreds(db, brokerId) {
   const broker = db.data.settings?.broker || {};
   return {
-    api_key: broker[`${brokerId}_api_key`] || broker.api_key || '',
-    api_secret: broker[`${brokerId}_api_secret`] || broker.api_secret || '',
+    api_key: broker[`${brokerId}_api_key`] || '',
+    api_secret: broker[`${brokerId}_api_secret`] || '',
     client_id: broker[`${brokerId}_client_id`] || '',
     redirect_uri: broker.redirect_uri || 'http://localhost:3000/callback',
   };
@@ -162,8 +161,8 @@ module.exports = function (db) {
       if (token) {
         if (!db.data.settings) db.data.settings = {};
         if (!db.data.settings.broker) db.data.settings.broker = {};
-        db.data.settings.broker.access_token = token;
         db.data.settings.broker[`${brokerId}_token`] = token;
+        db.data.settings.broker.access_token = token; // legacy compat
         db.save();
         res.json({ status: 'success', message: `${config.name} connected successfully`, broker: brokerId });
       } else {

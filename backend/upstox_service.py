@@ -39,8 +39,8 @@ class UpstoxService(BrokerBase):
         return {}
 
     async def _get_access_token(self) -> Optional[str]:
-        broker = await self._get_broker_settings()
-        return broker.get('access_token', '') or None
+        creds = await self._get_my_credentials()
+        return creds.get('token', '') or None
 
     def _api_headers(self, token: str) -> Dict:
         return {
@@ -53,9 +53,9 @@ class UpstoxService(BrokerBase):
 
     async def get_auth_url(self) -> Dict:
         """Generate Upstox OAuth login URL"""
-        broker = await self._get_broker_settings()
-        api_key = broker.get('api_key', '')
-        redirect_uri = broker.get('redirect_uri', '')
+        creds = await self._get_my_credentials()
+        api_key = creds.get('api_key', '')
+        redirect_uri = creds.get('redirect_uri', '')
 
         if not api_key or not redirect_uri:
             return {'status': 'error', 'message': 'API Key and Redirect URI required. Go to Settings > Broker.'}
@@ -70,10 +70,10 @@ class UpstoxService(BrokerBase):
 
     async def exchange_code_for_token(self, auth_code: str) -> Dict:
         """Exchange authorization code for access token"""
-        broker = await self._get_broker_settings()
-        api_key = broker.get('api_key', '')
-        api_secret = broker.get('api_secret', '')
-        redirect_uri = broker.get('redirect_uri', '')
+        creds = await self._get_my_credentials()
+        api_key = creds.get('api_key', '')
+        api_secret = creds.get('api_secret', '')
+        redirect_uri = creds.get('redirect_uri', '')
 
         if not all([api_key, api_secret, redirect_uri]):
             return {'status': 'error', 'message': 'Broker credentials incomplete'}
@@ -97,13 +97,7 @@ class UpstoxService(BrokerBase):
 
             if resp.status_code == 200 and 'access_token' in result:
                 token = result['access_token']
-                await self.db.bot_settings.update_one(
-                    {'type': 'main'},
-                    {'$set': {
-                        'broker.access_token': token,
-                        'broker.token_timestamp': datetime.now(timezone.utc).isoformat()
-                    }}
-                )
+                await self._save_token(token)
                 return {'status': 'success', 'message': 'Login successful! Access token saved.'}
             else:
                 msg = result.get('message', result.get('error', 'Unknown error'))
