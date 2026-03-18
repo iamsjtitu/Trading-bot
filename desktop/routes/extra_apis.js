@@ -185,12 +185,10 @@ module.exports = function (db) {
     const m = ist.getUTCMinutes();
     const totalMin = h * 60 + m;
 
-    let marketOpen = false;
-    let marketMsg = 'Market Closed';
     // NSE/BSE: 9:15 AM - 3:30 PM IST (555 - 930 min), Mon-Fri
     const marketOpen = weekday >= 1 && weekday <= 5 && totalMin >= 555 && totalMin < 930;
     const marketMsg = marketOpen ? 'Market Open' : 'Market Closed';
-    let nextOpenLabel = '';
+    const nextOpenLabel = '';
 
     if (!marketOpen) {
       return res.json({
