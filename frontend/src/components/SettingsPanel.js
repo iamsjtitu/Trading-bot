@@ -50,6 +50,8 @@ export default function SettingsPanel({ onClose, onSave }) {
       const res = await axios.post(`${API}/brokers/set-active`, { broker_id: brokerId });
       if (res.data.status === 'success') {
         setActiveBroker(brokerId);
+        // Re-check connection for newly selected broker
+        checkUpstoxConnection();
       }
     } catch (e) {
       console.error('Set broker error:', e);

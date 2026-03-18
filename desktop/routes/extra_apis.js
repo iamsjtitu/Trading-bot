@@ -12,27 +12,30 @@ const INDEX_KEYS = {
   sensex: 'BSE_INDEX|SENSEX',
   banknifty: 'NSE_INDEX|Nifty Bank',
   finnifty: 'NSE_INDEX|Nifty Fin Service',
+  crudeoil: 'MCX_FO|CRUDEOIL',
+  gold: 'MCX_FO|GOLD',
+  silver: 'MCX_FO|SILVER',
 };
 
 const INSTRUMENTS = {
-  NIFTY50: { label: 'Nifty 50 (NSE)', exchange: 'NSE', symbol: 'NIFTY', lot_size: 25, tick_size: 0.05 },
-  BANKNIFTY: { label: 'Bank Nifty (NSE)', exchange: 'NSE', symbol: 'BANKNIFTY', lot_size: 15, tick_size: 0.05 },
-  FINNIFTY: { label: 'Fin Nifty (NSE)', exchange: 'NSE', symbol: 'FINNIFTY', lot_size: 25, tick_size: 0.05 },
-  MIDCPNIFTY: { label: 'Midcap Nifty (NSE)', exchange: 'NSE', symbol: 'MIDCPNIFTY', lot_size: 50, tick_size: 0.05 },
-  SENSEX: { label: 'Sensex (BSE)', exchange: 'BSE', symbol: 'SENSEX', lot_size: 10, tick_size: 0.05 },
-  BANKEX: { label: 'Bankex (BSE)', exchange: 'BSE', symbol: 'BANKEX', lot_size: 15, tick_size: 0.05 },
-  CRUDEOIL: { label: 'Crude Oil (MCX)', exchange: 'MCX', symbol: 'CRUDEOIL', lot_size: 100, tick_size: 1 },
-  GOLD: { label: 'Gold (MCX)', exchange: 'MCX', symbol: 'GOLD', lot_size: 100, tick_size: 1 },
-  SILVER: { label: 'Silver (MCX)', exchange: 'MCX', symbol: 'SILVER', lot_size: 30, tick_size: 1 },
+  NIFTY50: { label: 'Nifty 50 (NSE)', exchange: 'NSE', symbol: 'NIFTY', lot_size: 25, tick_size: 0.05, strike_step: 50, option_premium: '~200' },
+  BANKNIFTY: { label: 'Bank Nifty (NSE)', exchange: 'NSE', symbol: 'BANKNIFTY', lot_size: 15, tick_size: 0.05, strike_step: 100, option_premium: '~300' },
+  FINNIFTY: { label: 'Fin Nifty (NSE)', exchange: 'NSE', symbol: 'FINNIFTY', lot_size: 25, tick_size: 0.05, strike_step: 50, option_premium: '~150' },
+  MIDCPNIFTY: { label: 'Midcap Nifty (NSE)', exchange: 'NSE', symbol: 'MIDCPNIFTY', lot_size: 50, tick_size: 0.05, strike_step: 25, option_premium: '~100' },
+  SENSEX: { label: 'Sensex (BSE)', exchange: 'BSE', symbol: 'SENSEX', lot_size: 10, tick_size: 0.05, strike_step: 100, option_premium: '~250' },
+  BANKEX: { label: 'Bankex (BSE)', exchange: 'BSE', symbol: 'BANKEX', lot_size: 15, tick_size: 0.05, strike_step: 100, option_premium: '~200' },
+  CRUDEOIL: { label: 'Crude Oil (MCX)', exchange: 'MCX', symbol: 'CRUDEOIL', lot_size: 100, tick_size: 1, strike_step: 50, option_premium: '~50' },
+  GOLD: { label: 'Gold (MCX)', exchange: 'MCX', symbol: 'GOLD', lot_size: 100, tick_size: 1, strike_step: 100, option_premium: '~500' },
+  SILVER: { label: 'Silver (MCX)', exchange: 'MCX', symbol: 'SILVER', lot_size: 30, tick_size: 1, strike_step: 500, option_premium: '~300' },
 };
 
 const BROKER_INFO = {
-  upstox: { id: 'upstox', name: 'Upstox', status: 'active', features: ['options', 'futures', 'websocket'] },
-  zerodha: { id: 'zerodha', name: 'Zerodha', status: 'coming_soon', features: ['options', 'futures'] },
-  angelone: { id: 'angelone', name: 'Angel One', status: 'coming_soon', features: ['options', 'futures'] },
-  '5paisa': { id: '5paisa', name: '5paisa', status: 'coming_soon', features: ['options', 'futures'] },
-  paytmmoney: { id: 'paytmmoney', name: 'Paytm Money', status: 'coming_soon', features: ['options'] },
-  iifl: { id: 'iifl', name: 'IIFL Securities', status: 'coming_soon', features: ['options', 'futures'] },
+  upstox: { id: 'upstox', name: 'Upstox', description: 'Full API support with WebSocket', status: 'active', features: ['options', 'futures', 'websocket'] },
+  zerodha: { id: 'zerodha', name: 'Zerodha', description: 'Coming soon - Kite Connect API', status: 'coming_soon', features: ['options', 'futures'] },
+  angelone: { id: 'angelone', name: 'Angel One', description: 'Coming soon - SmartAPI', status: 'coming_soon', features: ['options', 'futures'] },
+  '5paisa': { id: '5paisa', name: '5paisa', description: 'Coming soon - 5paisa API', status: 'coming_soon', features: ['options', 'futures'] },
+  paytmmoney: { id: 'paytmmoney', name: 'Paytm Money', description: 'Coming soon - Paytm Money API', status: 'coming_soon', features: ['options'] },
+  iifl: { id: 'iifl', name: 'IIFL Securities', description: 'Coming soon - IIFL Markets API', status: 'coming_soon', features: ['options', 'futures'] },
 };
 
 module.exports = function (db) {
@@ -162,9 +165,13 @@ module.exports = function (db) {
 
   // ==================== Option Chain ====================
   router.get('/api/option-chain/instruments', (req, res) => {
-    const instruments = Object.entries(INSTRUMENTS).map(([key, val]) => ({
-      key, label: val.label, exchange: val.exchange, symbol: val.symbol,
-    }));
+    const instruments = {};
+    for (const [key, val] of Object.entries(INSTRUMENTS)) {
+      instruments[key] = {
+        label: val.label, name: val.label.split(' (')[0], exchange: val.exchange,
+        symbol: val.symbol, lot_size: val.lot_size, type: val.exchange === 'MCX' ? 'commodity' : 'index',
+      };
+    }
     res.json({ status: 'success', instruments });
   });
 

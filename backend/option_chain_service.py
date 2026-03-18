@@ -13,16 +13,16 @@ logger = logging.getLogger(__name__)
 # Instrument configs for option chain
 OPTION_INSTRUMENTS = {
     # Index Options (NSE)
-    'NIFTY': {'name': 'NIFTY 50', 'exchange': 'NSE', 'lot_size': 25, 'strike_step': 50, 'base_price': 24000, 'type': 'index'},
-    'BANKNIFTY': {'name': 'BANK NIFTY', 'exchange': 'NSE', 'lot_size': 15, 'strike_step': 100, 'base_price': 52000, 'type': 'index'},
-    'FINNIFTY': {'name': 'FIN NIFTY', 'exchange': 'NSE', 'lot_size': 25, 'strike_step': 50, 'base_price': 23800, 'type': 'index'},
-    'MIDCPNIFTY': {'name': 'MIDCAP NIFTY', 'exchange': 'NSE', 'lot_size': 50, 'strike_step': 25, 'base_price': 12000, 'type': 'index'},
-    'SENSEX': {'name': 'SENSEX', 'exchange': 'BSE', 'lot_size': 10, 'strike_step': 100, 'base_price': 79800, 'type': 'index'},
-    'BANKEX': {'name': 'BANKEX', 'exchange': 'BSE', 'lot_size': 15, 'strike_step': 100, 'base_price': 55000, 'type': 'index'},
+    'NIFTY50': {'name': 'NIFTY 50', 'label': 'Nifty 50 (NSE)', 'exchange': 'NSE', 'lot_size': 25, 'strike_step': 50, 'base_price': 24000, 'type': 'index'},
+    'BANKNIFTY': {'name': 'BANK NIFTY', 'label': 'Bank Nifty (NSE)', 'exchange': 'NSE', 'lot_size': 15, 'strike_step': 100, 'base_price': 52000, 'type': 'index'},
+    'FINNIFTY': {'name': 'FIN NIFTY', 'label': 'Fin Nifty (NSE)', 'exchange': 'NSE', 'lot_size': 25, 'strike_step': 50, 'base_price': 23800, 'type': 'index'},
+    'MIDCPNIFTY': {'name': 'MIDCAP NIFTY', 'label': 'Midcap Nifty (NSE)', 'exchange': 'NSE', 'lot_size': 50, 'strike_step': 25, 'base_price': 12000, 'type': 'index'},
+    'SENSEX': {'name': 'SENSEX', 'label': 'Sensex (BSE)', 'exchange': 'BSE', 'lot_size': 10, 'strike_step': 100, 'base_price': 79800, 'type': 'index'},
+    'BANKEX': {'name': 'BANKEX', 'label': 'Bankex (BSE)', 'exchange': 'BSE', 'lot_size': 15, 'strike_step': 100, 'base_price': 55000, 'type': 'index'},
     # MCX Commodities
-    'CRUDEOIL': {'name': 'Crude Oil', 'exchange': 'MCX', 'lot_size': 100, 'strike_step': 50, 'base_price': 5800, 'type': 'commodity'},
-    'GOLD': {'name': 'Gold', 'exchange': 'MCX', 'lot_size': 100, 'strike_step': 100, 'base_price': 72000, 'type': 'commodity'},
-    'SILVER': {'name': 'Silver', 'exchange': 'MCX', 'lot_size': 30, 'strike_step': 500, 'base_price': 88000, 'type': 'commodity'},
+    'CRUDEOIL': {'name': 'Crude Oil', 'label': 'Crude Oil (MCX)', 'exchange': 'MCX', 'lot_size': 100, 'strike_step': 50, 'base_price': 5800, 'type': 'commodity'},
+    'GOLD': {'name': 'Gold', 'label': 'Gold (MCX)', 'exchange': 'MCX', 'lot_size': 100, 'strike_step': 100, 'base_price': 72000, 'type': 'commodity'},
+    'SILVER': {'name': 'Silver', 'label': 'Silver (MCX)', 'exchange': 'MCX', 'lot_size': 30, 'strike_step': 500, 'base_price': 88000, 'type': 'commodity'},
 }
 
 # Risk-free rate (approximate India 10Y gov bond yield)
@@ -131,7 +131,7 @@ class OptionChainService:
             try:
                 # Map instrument name to broker-compatible key
                 inst_map = {
-                    'NIFTY': 'Nifty 50', 'BANKNIFTY': 'Nifty Bank',
+                    'NIFTY50': 'Nifty 50', 'BANKNIFTY': 'Nifty Bank',
                     'FINNIFTY': 'Nifty Fin Service', 'MIDCPNIFTY': 'NIFTY MID SELECT',
                     'SENSEX': 'SENSEX', 'BANKEX': 'BANKEX',
                     'CRUDEOIL': 'CRUDEOIL', 'GOLD': 'GOLD', 'SILVER': 'SILVER',

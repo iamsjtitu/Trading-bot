@@ -63,7 +63,10 @@ function App() {
     nifty50: { value: 24125.50, change: 0, changePct: 0 },
     sensex: { value: 79850.25, change: 0, changePct: 0 },
     banknifty: { value: 52340.75, change: 0, changePct: 0 },
-    finnifty: { value: 23890.30, change: 0, changePct: 0 }
+    finnifty: { value: 23890.30, change: 0, changePct: 0 },
+    crudeoil: { value: 5800, change: 0, changePct: 0 },
+    gold: { value: 72000, change: 0, changePct: 0 },
+    silver: { value: 88000, change: 0, changePct: 0 }
   });
   const [showSettings, setShowSettings] = useState(false);
   const [tradingMode, setTradingMode] = useState('PAPER');

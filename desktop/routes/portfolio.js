@@ -181,6 +181,9 @@ module.exports = function (db) {
               sensex: 'BSE_INDEX|SENSEX',
               banknifty: 'NSE_INDEX|Nifty Bank',
               finnifty: 'NSE_INDEX|Nifty Fin Service',
+              crudeoil: 'MCX_FO|CRUDEOIL',
+              gold: 'MCX_FO|GOLD',
+              silver: 'MCX_FO|SILVER',
             };
             const keysStr = Object.values(INDEX_KEYS).join(',');
             // Use full market quote for richer data (OHLC + close price)

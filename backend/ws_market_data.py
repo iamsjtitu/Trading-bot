@@ -23,6 +23,9 @@ INDEX_INSTRUMENT_KEYS = [
     'BSE_INDEX|SENSEX',
     'NSE_INDEX|Nifty Bank',
     'NSE_INDEX|Nifty Fin Service',
+    'MCX_FO|CRUDEOIL',
+    'MCX_FO|GOLD',
+    'MCX_FO|SILVER',
 ]
 
 INDEX_KEY_MAP = {
@@ -30,6 +33,9 @@ INDEX_KEY_MAP = {
     'BSE_INDEX|SENSEX': 'sensex',
     'NSE_INDEX|Nifty Bank': 'banknifty',
     'NSE_INDEX|Nifty Fin Service': 'finnifty',
+    'MCX_FO|CRUDEOIL': 'crudeoil',
+    'MCX_FO|GOLD': 'gold',
+    'MCX_FO|SILVER': 'silver',
 }
 
 

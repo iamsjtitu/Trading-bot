@@ -22,6 +22,9 @@ export default function MarketTicker({ marketIndices, tradingMode, upstoxConnect
     { key: 'sensex', label: 'SENSEX' },
     { key: 'banknifty', label: 'BANK NIFTY' },
     { key: 'finnifty', label: 'FIN NIFTY' },
+    { key: 'crudeoil', label: 'CRUDE OIL' },
+    { key: 'gold', label: 'GOLD' },
+    { key: 'silver', label: 'SILVER' },
   ];
 
   const timeBasedOpen = isMarketOpen();

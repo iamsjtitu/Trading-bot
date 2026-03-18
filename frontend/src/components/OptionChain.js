@@ -10,7 +10,7 @@ const API = `${process.env.REACT_APP_BACKEND_URL}/api`;
 
 export default function OptionChain() {
   const [instruments, setInstruments] = useState({});
-  const [selected, setSelected] = useState('NIFTY');
+  const [selected, setSelected] = useState('NIFTY50');
   const [chain, setChain] = useState(null);
   const [loading, setLoading] = useState(false);
   const [expiryDays, setExpiryDays] = useState(7);
@@ -47,12 +47,12 @@ export default function OptionChain() {
 
   useEffect(() => { loadChain(); loadAlerts(); }, [loadChain, loadAlerts]);
 
-  // Auto-refresh every 2s when enabled
+  // Auto-refresh every 1s when enabled
   useEffect(() => {
     if (autoRefresh) {
       refreshRef.current = setInterval(() => {
         loadChain();
-      }, 2000);
+      }, 1000);
     }
     return () => {
       if (refreshRef.current) clearInterval(refreshRef.current);
@@ -77,8 +77,8 @@ export default function OptionChain() {
   };
 
   const instrumentGroups = {
-    'Index Options': Object.entries(instruments).filter(([, v]) => v.type === 'index'),
-    'MCX Commodities': Object.entries(instruments).filter(([, v]) => v.type === 'commodity'),
+    'Index Options': Object.entries(instruments).filter(([, v]) => v.exchange !== 'MCX'),
+    'MCX Commodities': Object.entries(instruments).filter(([, v]) => v.exchange === 'MCX'),
   };
 
   return (
@@ -98,7 +98,7 @@ export default function OptionChain() {
                     <div key={group}>
                       <div className="px-2 py-1 text-xs font-bold text-gray-400 uppercase">{group}</div>
                       {items.map(([k, v]) => (
-                        <SelectItem key={k} value={k}>{v.name} ({v.exchange})</SelectItem>
+                        <SelectItem key={k} value={k}>{v.label || `${v.name} (${v.exchange})`}</SelectItem>
                       ))}
                     </div>
                   )
