@@ -143,8 +143,9 @@ module.exports = function (db) {
     if (!db.data.settings) db.data.settings = {};
     if (!db.data.settings.broker) db.data.settings.broker = {};
     db.data.settings.broker.name = brokerId;
+    db.data.settings.active_broker = brokerId; // sync with Python backend field
     db.save();
-    res.json({ status: 'success', active: brokerId, broker: BROKER_INFO[brokerId] });
+    res.json({ status: 'success', active_broker: brokerId, broker: BROKER_INFO[brokerId] });
   });
 
   router.get('/api/brokers/active', (req, res) => {
@@ -152,19 +153,7 @@ module.exports = function (db) {
     res.json({ status: 'success', broker_id: activeBroker, broker: BROKER_INFO[activeBroker] || BROKER_INFO.upstox });
   });
 
-  router.get('/api/brokers/connection', async (req, res) => {
-    const token = getToken();
-    if (!token) return res.json({ connected: false, message: 'No access token. Please login.' });
-    try {
-      const resp = await axios.get('https://api.upstox.com/v2/user/profile', { headers: apiHeaders(token), timeout: 10000 });
-      if (resp.data?.status === 'success') {
-        return res.json({ connected: true, message: `Connected as ${resp.data.data?.user_name || 'User'}` });
-      }
-      res.json({ connected: false, message: 'Token expired' });
-    } catch (e) {
-      res.json({ connected: false, message: e.message });
-    }
-  });
+  // NOTE: /api/brokers/connection is handled by broker_router.js (per-broker checks)
 
   // ==================== Option Chain ====================
   router.get('/api/option-chain/instruments', (req, res) => {
@@ -219,9 +208,10 @@ module.exports = function (db) {
     }
 
     // Market is open - try broker data
-    // For desktop, the broker token would be in the store
-    const settings = await db.getSettings();
-    const brokerToken = (settings.broker || {})[`${settings.active_broker || 'upstox'}_token`] || settings.broker?.access_token || '';
+    // For desktop, the broker token is in db.data.settings
+    const settings = db.data?.settings || {};
+    const activeBroker = settings.active_broker || settings.broker?.name || 'upstox';
+    const brokerToken = (settings.broker || {})[`${activeBroker}_token`] || settings.broker?.access_token || '';
 
     if (!brokerToken) {
       return res.json({
@@ -258,6 +248,33 @@ module.exports = function (db) {
     } catch (err) {
       return res.json({ status: 'success', source: 'broker_error', instrument, config: instConfig, market_message: `Broker error: ${err.message}`, chain: [], summary: null, timestamp: new Date().toISOString() });
     }
+  });
+
+  router.get('/api/option-chain/oi-buildup/:instrument', (req, res) => {
+    const instrument = req.params.instrument;
+
+    // Check market status
+    const ist = new Date(new Date().getTime() + 5.5 * 60 * 60 * 1000);
+    const weekday = ist.getUTCDay();
+    const h = ist.getUTCHours();
+    const m = ist.getUTCMinutes();
+    const totalMin = h * 60 + m;
+    const instConfig = INSTRUMENTS[instrument] || INSTRUMENTS.NIFTY50;
+    const exchange = instConfig.exchange || 'NSE';
+
+    let marketOpen = false;
+    if (exchange === 'MCX') {
+      marketOpen = weekday >= 1 && weekday <= 5 && totalMin >= 540 && totalMin < 1410;
+    } else {
+      marketOpen = weekday >= 1 && weekday <= 5 && totalMin >= 555 && totalMin < 930;
+    }
+
+    if (!marketOpen) {
+      return res.json({ status: 'success', instrument, alerts: [], message: 'Market Closed', source: 'market_closed', timestamp: new Date().toISOString() });
+    }
+
+    // OI alerts need live broker data
+    res.json({ status: 'success', instrument, alerts: [], message: 'OI alerts require live broker data', source: 'needs_live_data', timestamp: new Date().toISOString() });
   });
 
   router.get('/api/oi-buildup-alerts', (req, res) => {
