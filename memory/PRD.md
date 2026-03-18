@@ -15,80 +15,53 @@ Build an AI-powered automated options trading bot that connects to world news, u
 ### Core Features
 - Full AI Decision Engine (multi-signal correlation, market regime, dynamic sizing, sector rotation, trade review)
 - AI Brain dashboard with Confidence Heatmap
-- Dashboard with real-time market ticker
+- Dashboard with real-time market ticker (WebSocket + polling fallback)
 - LIVE vs PAPER mode with proper data isolation
-- Auto-Entry: News fetch + signal generation + Upstox order placement
-- Auto-Exit: Real-time SL/target monitoring with Upstox sell orders
-- News feed with AI sentiment (multi-source, HTML stripped, freshness decay)
+- Auto-Entry/Exit with Upstox order placement
+- 9 News sources (Demo, Moneycontrol, ET, NSE, NDTV Profit, CNBC TV18, Livemint, NewsAPI, Alpha Vantage)
 - Trade analytics, tax reporting, desktop notifications
 - Desktop app auto-updater
 
+### v1.5.0 Features (March 18, 2026)
+- **Multi-Broker Support**: 6 brokers with abstraction layer
+  - Upstox, Zerodha (Kite Connect), Angel One (SmartAPI), 5paisa, Paytm Money, IIFL Securities
+  - Broker selector in Settings > Broker tab
+  - Each broker has full implementation: auth, market data, portfolio, orders
+  - Persistent active broker selection in MongoDB
+  - API: /api/brokers/list, /api/brokers/set-active, /api/brokers/active
+- **Option Chain with Greeks**: Full Black-Scholes model
+  - 9 instruments: NIFTY, BANKNIFTY, FINNIFTY, MIDCPNIFTY, SENSEX, BANKEX (index) + CRUDEOIL, GOLD, SILVER (MCX)
+  - Greeks: Delta, Gamma, Theta, Vega, Rho
+  - Summary: PCR, Max Pain, ATM IV
+  - IV calculator (Newton-Raphson method)
+  - New "Option Chain" tab in dashboard
+  - API: /api/option-chain/{instrument}, /api/option-chain/greeks, /api/option-chain/iv
+
 ### v1.4.0 Features
-- **Real-time Upstox WebSocket integration** for push-based market data streaming
-  - Backend WebSocket manager (`ws_market_data.py`) connects to Upstox WS
-  - FastAPI WebSocket endpoint (`/api/ws/market-data`) relays data to frontend
-  - Frontend auto-connects WebSocket in LIVE mode with auto-reconnect
-  - Falls back to REST polling if WebSocket unavailable
-  - WS status badge in header (WS: Live / WS: Polling)
-  - REST endpoints: `/api/ws/status`, `/api/ws/start`, `/api/ws/stop`
+- Real-time Upstox WebSocket integration for push-based market data
+- WebSocket manager, FastAPI relay endpoint, frontend auto-reconnect
 
 ### v1.3.6 Features
-- **3 New Free News Sources**: NDTV Profit, CNBC TV18, Livemint (9 sources total)
-- **Multi-Instrument Trading**: NIFTY50, BANKNIFTY, FINNIFTY, MIDCPNIFTY
-- Settings > Trading tab for instrument selection
-- Instrument-aware signal generation
+- 3 new free news sources (NDTV Profit, CNBC TV18, Livemint)
+- Multi-instrument trading (NIFTY50, BANKNIFTY, FINNIFTY, MIDCPNIFTY)
 
-## Key API Endpoints
-- `/api/health` - Health check
-- `/api/combined-status` - Dashboard data (now includes ws_status)
-- `/api/instruments` - List trading instruments
-- `/api/instruments/set` - Set active instrument
-- `/api/ws/status` - WebSocket streaming status
-- `/api/ws/start` - Start WebSocket (requires Upstox token)
-- `/api/ws/stop` - Stop WebSocket
-- `/api/ws/market-data` - WebSocket endpoint for frontend
-- `/api/news/fetch` - Fetch & analyze news
-- `/api/trades/execute-live` - Place live Upstox trade
-- `/api/ai/insights` - AI Brain dashboard data
-- `/api/ai/heatmap-data` - Sentiment heatmap data
+## Key Files
+- `/app/backend/broker_base.py` - Abstract broker interface
+- `/app/backend/broker_manager.py` - Broker management & routing
+- `/app/backend/brokers/*.py` - Individual broker implementations
+- `/app/backend/option_chain_service.py` - Option chain + Greeks calculator
+- `/app/backend/ws_market_data.py` - WebSocket market data manager
+- `/app/frontend/src/components/OptionChain.js` - Option chain UI
+- `/app/frontend/src/components/SettingsPanel.js` - Settings with broker/instrument selection
 
 ## Pending Tasks
 ### P1
-- Desktop rebuild & verification (package v1.4.0 into .exe/.dmg)
+- Desktop rebuild & verification (.exe/.dmg with v1.5.0)
 - Telegram notifications e2e testing
 
 ### P2
-- MCX & Commodities Trading
-- More broker integrations
+- MCX & Commodities Trading (actual trade execution)
+- More broker integrations testing with real credentials
 - Advanced Trade History analytics
 
-## Version: 1.4.0
-
-## Changelog
-### v1.4.0 (March 18, 2026)
-- Real-time Upstox WebSocket integration for push-based market data
-- WebSocket manager with auto-connect, auto-reconnect, protobuf decoding
-- FastAPI WebSocket relay endpoint for frontend
-- Frontend WebSocket client with keepalive ping and auto-reconnect
-- WS status badge (WS: Live / WS: Polling) in header
-- Falls back to REST polling when WS unavailable
-- Version bump to 1.4.0
-
-### v1.3.6 (March 18, 2026)
-- Added NDTV Profit, CNBC TV18, Livemint as free news sources
-- Multi-instrument trading: NIFTY50, BANKNIFTY, FINNIFTY, MIDCPNIFTY
-- New Settings > Trading tab for instrument selection
-- Fixed loadUpstoxData temporal dead zone in App.js
-- /api/instruments and /api/instruments/set endpoints
-
-### v1.3.5
-- Fixed market data auto-refresh (5s interval)
-- Auto-entry auto-fetches news when Entry is ON
-- News fetch interval reduced to 3 min
-
-### v1.3.4
-- Sector Confidence Heatmap in AI Brain tab
-
-### v1.3.3
-- Full AI Decision Engine (9 features)
-- AI Brain dashboard tab
+## Version: 1.5.0
