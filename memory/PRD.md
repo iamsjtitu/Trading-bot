@@ -67,7 +67,7 @@ Build an AI-powered automated options trading bot that connects to world news, u
 - P3: Telegram notifications integration
 - P3: App.js refactoring
 
-## Version: 2.0.0
+## Version: 2.1.0
 
 ### MCX Market Hours Indicator
 - Separate MCX status (9:00 AM - 11:30 PM IST) alongside NSE/BSE (9:15 AM - 3:30 PM IST)
