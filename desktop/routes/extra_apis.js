@@ -7,14 +7,13 @@ const { Router } = require('express');
 const axios = require('axios');
 const crypto = require('crypto');
 
+const { getMCXKeys } = require('./mcx_resolver');
+
 const INDEX_KEYS = {
   nifty50: 'NSE_INDEX|Nifty 50',
   sensex: 'BSE_INDEX|SENSEX',
   banknifty: 'NSE_INDEX|Nifty Bank',
   finnifty: 'NSE_INDEX|Nifty Fin Service',
-  crudeoil: 'MCX_FO|CRUDEOIL',
-  gold: 'MCX_FO|GOLD',
-  silver: 'MCX_FO|SILVER',
 };
 
 const INSTRUMENTS = {
@@ -57,14 +56,17 @@ module.exports = function (db) {
       return res.json({ status: 'success', data: null, source: 'none' });
     }
     try {
-      const keysStr = Object.values(INDEX_KEYS).join(',');
+      // Resolve MCX keys dynamically
+      const mcxKeys = await getMCXKeys();
+      const allKeys = { ...INDEX_KEYS, ...mcxKeys };
+      const keysStr = Object.values(allKeys).join(',');
       const resp = await axios.get(`https://api.upstox.com/v2/market-quote/quotes?instrument_key=${encodeURIComponent(keysStr)}`, {
         headers: apiHeaders(token), timeout: 5000,
       });
       if (resp.data?.status === 'success') {
         const raw = resp.data.data || {};
         const indices = {};
-        for (const [key, instrument] of Object.entries(INDEX_KEYS)) {
+        for (const [key, instrument] of Object.entries(allKeys)) {
           let quote = raw[instrument];
           if (!quote) {
             const matchKey = Object.keys(raw).find(k => k.includes(instrument.split('|')[1] || ''));

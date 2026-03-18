@@ -13,16 +13,16 @@ UPSTOX_AUTH_URL = "https://api.upstox.com/v2/login/authorization/dialog"
 UPSTOX_TOKEN_URL = "https://api.upstox.com/v2/login/authorization/token"
 UPSTOX_API_BASE = "https://api.upstox.com/v2"
 
-# Index instrument keys
+# Index instrument keys (MCX keys resolved dynamically)
 INDEX_KEYS = {
     'nifty50': 'NSE_INDEX|Nifty 50',
     'sensex': 'BSE_INDEX|SENSEX',
     'banknifty': 'NSE_INDEX|Nifty Bank',
     'finnifty': 'NSE_INDEX|Nifty Fin Service',
-    'crudeoil': 'MCX_FO|CRUDEOIL',
-    'gold': 'MCX_FO|GOLD',
-    'silver': 'MCX_FO|SILVER',
 }
+
+# MCX keys added dynamically via resolve_mcx_keys()
+_mcx_keys_resolved = False
 
 
 class UpstoxService(BrokerBase):
@@ -109,13 +109,20 @@ class UpstoxService(BrokerBase):
     # ==================== Market Data ====================
 
     async def get_live_market_data(self) -> Dict:
-        """Fetch live index prices from Upstox"""
+        """Fetch live index + MCX commodity prices from Upstox"""
         token = await self._get_access_token()
         if not token:
             return {'status': 'error', 'message': 'Not logged in to Upstox', 'data': None}
 
-        keys_str = ','.join(INDEX_KEYS.values())
-        # Use full market quote for richer data (OHLC + close price)
+        # Resolve MCX instrument keys dynamically
+        from mcx_resolver import get_mcx_instrument_keys
+        mcx_keys = await get_mcx_instrument_keys()
+
+        # Merge NSE index keys + MCX futures keys
+        all_keys = dict(INDEX_KEYS)
+        all_keys.update(mcx_keys)  # adds crudeoil, gold, silver with real instrument keys
+
+        keys_str = ','.join(all_keys.values())
         url = f"{UPSTOX_API_BASE}/market-quote/quotes?instrument_key={urllib.parse.quote(keys_str)}"
 
         try:
@@ -125,7 +132,7 @@ class UpstoxService(BrokerBase):
             if result.get('status') == 'success':
                 raw = result.get('data', {})
                 indices = {}
-                for key, instrument in INDEX_KEYS.items():
+                for key, instrument in all_keys.items():
                     # Robust key matching
                     quote = raw.get(instrument)
                     if not quote:

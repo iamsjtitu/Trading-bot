@@ -54,4 +54,4 @@ Build an AI-powered automated options trading bot with multi-broker support, AI 
 - P2: Trade analytics
 - P3: Telegram notifications
 
-## Version: 2.3.0
+## Version: 2.4.0

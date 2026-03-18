@@ -176,14 +176,14 @@ module.exports = function (db) {
 
         if (result.upstox_connected) {
           try {
+            const { getMCXKeys } = require('./mcx_resolver');
+            const mcxKeys = await getMCXKeys();
             const INDEX_KEYS = {
               nifty50: 'NSE_INDEX|Nifty 50',
               sensex: 'BSE_INDEX|SENSEX',
               banknifty: 'NSE_INDEX|Nifty Bank',
               finnifty: 'NSE_INDEX|Nifty Fin Service',
-              crudeoil: 'MCX_FO|CRUDEOIL',
-              gold: 'MCX_FO|GOLD',
-              silver: 'MCX_FO|SILVER',
+              ...mcxKeys,
             };
             const keysStr = Object.values(INDEX_KEYS).join(',');
             // Use full market quote for richer data (OHLC + close price)

@@ -24,6 +24,7 @@ from ws_market_data import market_data_manager
 from broker_manager import BrokerManager, BROKER_INFO
 from option_chain_service import option_chain_service
 from market_hours_service import get_market_status, get_upcoming_holidays, get_mcx_status
+from mcx_resolver import get_mcx_instrument_keys
 
 ROOT_DIR = Path(__file__).parent
 load_dotenv(ROOT_DIR / '.env')
@@ -127,7 +128,7 @@ async def root():
         "message": "AI-Powered Options Trading Bot API",
         "version": "1.0.0",
         "status": "active",
-        "app_version": "2.3.0"
+        "app_version": "2.4.0"
     }
 
 @api_router.get("/health")
@@ -1306,11 +1307,12 @@ async def get_market_data_quick():
     # First try WebSocket cache (instant)
     if market_data_manager.latest_data:
         return {"status": "success", "data": market_data_manager.latest_data, "source": "ws_cache", "ts": market_data_manager._last_update}
-    # Then try broker REST
+    # Then try active broker REST
     try:
-        token = await upstox_service._get_access_token()
+        active_broker = broker_manager.active_broker
+        token = await active_broker._get_access_token()
         if token:
-            market = await upstox_service.get_live_market_data()
+            market = await active_broker.get_live_market_data()
             if market.get('status') == 'success' and market.get('data'):
                 return {"status": "success", "data": market['data'], "source": "rest", "ts": datetime.now(timezone.utc).isoformat()}
     except Exception as e:
@@ -1420,6 +1422,13 @@ async def startup_event():
         trading_engine.broker_service = broker_manager.active_broker
         option_chain_service.broker_service = broker_manager.active_broker
         logger.info(f"Active broker: {broker_manager.active_broker_id}")
+
+        # Pre-resolve MCX instrument keys for live data
+        try:
+            mcx_keys = await get_mcx_instrument_keys()
+            logger.info(f"MCX instruments resolved: {list(mcx_keys.keys())}")
+        except Exception as e:
+            logger.warning(f"MCX resolution deferred: {e}")
         # Load instrument from settings
         settings = await settings_manager.get_settings()
         inst = settings.get('trading_instrument', 'NIFTY50')

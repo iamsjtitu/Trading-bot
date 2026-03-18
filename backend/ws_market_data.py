@@ -17,15 +17,12 @@ logger = logging.getLogger(__name__)
 # Upstox WebSocket authorize endpoint
 UPSTOX_WS_AUTH_URL = "https://api.upstox.com/v2/feed/market-data-feed/authorize"
 
-# Index instrument keys for subscription
+# Index instrument keys for subscription (MCX resolved dynamically on start)
 INDEX_INSTRUMENT_KEYS = [
     'NSE_INDEX|Nifty 50',
     'BSE_INDEX|SENSEX',
     'NSE_INDEX|Nifty Bank',
     'NSE_INDEX|Nifty Fin Service',
-    'MCX_FO|CRUDEOIL',
-    'MCX_FO|GOLD',
-    'MCX_FO|SILVER',
 ]
 
 INDEX_KEY_MAP = {
@@ -33,9 +30,6 @@ INDEX_KEY_MAP = {
     'BSE_INDEX|SENSEX': 'sensex',
     'NSE_INDEX|Nifty Bank': 'banknifty',
     'NSE_INDEX|Nifty Fin Service': 'finnifty',
-    'MCX_FO|CRUDEOIL': 'crudeoil',
-    'MCX_FO|GOLD': 'gold',
-    'MCX_FO|SILVER': 'silver',
 }
 
 
@@ -61,6 +55,19 @@ class MarketDataManager:
             return
         self._access_token = access_token
         self._running = True
+
+        # Resolve MCX instrument keys and add to subscription
+        try:
+            from mcx_resolver import get_mcx_instrument_keys
+            mcx_keys = await get_mcx_instrument_keys()
+            for commodity, inst_key in mcx_keys.items():
+                if inst_key not in INDEX_INSTRUMENT_KEYS:
+                    INDEX_INSTRUMENT_KEYS.append(inst_key)
+                    INDEX_KEY_MAP[inst_key] = commodity
+            logger.info(f"WebSocket instruments: {len(INDEX_INSTRUMENT_KEYS)} (MCX: {list(mcx_keys.keys())})")
+        except Exception as e:
+            logger.warning(f"MCX resolution for WS failed: {e}")
+
         if self._ws_task and not self._ws_task.done():
             self._ws_task.cancel()
         self._ws_task = asyncio.create_task(self._connect_loop())
