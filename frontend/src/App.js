@@ -20,6 +20,7 @@ import TaxReports from '@/components/TaxReports';
 import AIInsights from '@/components/AIInsights';
 import OptionChain from '@/components/OptionChain';
 import UpdateBanner from '@/components/UpdateBanner';
+import MarketStatusBanner from '@/components/MarketStatusBanner';
 
 // Detect if running in desktop (localhost) or web mode
 const BACKEND_URL = (() => {
@@ -565,6 +566,7 @@ function App() {
           </div>
         )}
 
+        <MarketStatusBanner />
         <MarketTicker marketIndices={marketIndices} tradingMode={tradingMode} upstoxConnected={upstoxConnected} />
 
         {/* Notifications */}

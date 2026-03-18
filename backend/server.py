@@ -23,6 +23,7 @@ from upstox_service import UpstoxService
 from ws_market_data import market_data_manager
 from broker_manager import BrokerManager, BROKER_INFO
 from option_chain_service import option_chain_service
+from market_hours_service import get_market_status, get_upcoming_holidays
 
 ROOT_DIR = Path(__file__).parent
 load_dotenv(ROOT_DIR / '.env')
@@ -125,7 +126,8 @@ async def root():
     return {
         "message": "AI-Powered Options Trading Bot API",
         "version": "1.0.0",
-        "status": "active"
+        "status": "active",
+        "app_version": "1.8.0"
     }
 
 @api_router.get("/health")
@@ -1235,6 +1237,20 @@ async def stop_ws_streaming():
     """Stop WebSocket streaming"""
     await market_data_manager.stop()
     return {"status": "success", "message": "WebSocket streaming stopped"}
+
+# ==================== Market Hours ====================
+
+@api_router.get("/market-status")
+async def get_market_status_endpoint():
+    """Get Indian stock market open/close status with next opening time"""
+    status = get_market_status()
+    return {"status": "success", **status}
+
+@api_router.get("/market-holidays")
+async def get_market_holidays(count: int = 5):
+    """Get upcoming NSE/BSE holidays"""
+    holidays = get_upcoming_holidays(count)
+    return {"status": "success", "holidays": holidays}
 
 # ==================== Combined Status (Paper + Live) ====================
 
