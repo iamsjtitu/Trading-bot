@@ -40,11 +40,52 @@ export default function SignalsList({ signals, formatCurrency, formatTime, tradi
               </Badge>
               <span className="font-semibold text-lg text-gray-800">{signal.symbol}</span>
               <Badge variant="outline" className="border-gray-400 text-gray-700">Strike: {signal.strike_price}</Badge>
+              {signal.market_regime && signal.market_regime !== 'UNKNOWN' && (
+                <Badge variant="outline" className="border-indigo-300 text-indigo-600 text-xs">{signal.market_regime.replace('_', ' ')}</Badge>
+              )}
             </div>
-            <Badge className={getSentimentColor(signal.sentiment)}>
-              {signal.confidence}% Confident
-            </Badge>
+            <div className="flex items-center gap-2">
+              {signal.composite_score && (
+                <Badge className="bg-blue-600 text-xs" data-testid={`signal-${idx}-composite`}>
+                  Score: {signal.composite_score}
+                </Badge>
+              )}
+              <Badge className={getSentimentColor(signal.sentiment)}>
+                {signal.confidence}% Confident
+              </Badge>
+            </div>
           </div>
+
+          {/* AI Scoring Breakdown */}
+          {(signal.correlation_score || signal.confluence_score || signal.freshness_score) && (
+            <div className="flex flex-wrap gap-2 mb-3">
+              {signal.correlation_score > 0 && (
+                <span className="text-xs bg-blue-50 text-blue-700 px-2 py-0.5 rounded-full">
+                  Correlation: {signal.correlation_score}%
+                </span>
+              )}
+              {signal.confluence_score > 0 && (
+                <span className="text-xs bg-indigo-50 text-indigo-700 px-2 py-0.5 rounded-full">
+                  Confluence: {signal.confluence_score}%
+                </span>
+              )}
+              {signal.freshness_score > 0 && (
+                <span className="text-xs bg-green-50 text-green-700 px-2 py-0.5 rounded-full">
+                  Freshness: {signal.freshness_score}%
+                </span>
+              )}
+              {signal.volatility && signal.volatility !== 'STABLE' && (
+                <span className={`text-xs px-2 py-0.5 rounded-full ${signal.volatility === 'INCREASING' ? 'bg-red-50 text-red-700' : 'bg-green-50 text-green-700'}`}>
+                  Vol: {signal.volatility}
+                </span>
+              )}
+              {signal.sector && signal.sector !== 'BROAD_MARKET' && (
+                <span className="text-xs bg-amber-50 text-amber-700 px-2 py-0.5 rounded-full">
+                  {signal.sector}
+                </span>
+              )}
+            </div>
+          )}
           <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
             <div>
               <p className="text-gray-600 font-medium">Entry Price</p>

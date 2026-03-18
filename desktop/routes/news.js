@@ -1,6 +1,7 @@
 const { Router } = require('express');
 const axios = require('axios');
 const crypto = require('crypto');
+const AIDecisionEngine = require('./ai_engine');
 let OpenAI;
 try { OpenAI = require('openai'); } catch (_) { OpenAI = null; }
 
@@ -8,6 +9,7 @@ function uuid() { return crypto.randomUUID(); }
 
 module.exports = function (db) {
   const router = Router();
+  const aiEngine = new AIDecisionEngine(db);
 
   // ============ Simple RSS Parser (no dependencies) ============
   function stripHtml(str) {
@@ -116,45 +118,26 @@ module.exports = function (db) {
   async function analyzeSentiment(article) {
     const aiKey = db.data.settings?.ai?.emergent_llm_key || '';
 
+    // Calculate freshness score
+    const freshnessScore = aiEngine.calculateFreshnessScore(article.published_at || new Date().toISOString());
+
     // Use AI if key available
     if (aiKey && OpenAI) {
       try {
         const client = new OpenAI({ apiKey: aiKey, baseURL: 'https://integrations.emergentagent.com/llm' });
 
-        const systemMsg = `You are an expert Indian stock market analyst with deep knowledge of Nifty 50, Bank Nifty, and sectoral indices. You specialize in options trading sentiment analysis.
+        // Use enhanced system prompt with market context
+        const systemMsg = aiEngine.getEnhancedSystemPrompt();
 
-Analyze the given news article considering:
-1. DIRECT MARKET IMPACT - How will this news move Nifty/BankNifty in the next 1-3 hours?
-2. SECTOR IMPACT - Which sector is most affected?
-3. FII/DII FLOW IMPACT - Will this attract or repel institutional money?
-4. GLOBAL CORRELATION - Is this aligned with global market trends?
-5. HISTORICAL PATTERN - Similar news in the past led to what market movement?
-
-Provide analysis in this EXACT format:
-SENTIMENT: [BULLISH/BEARISH/NEUTRAL]
-CONFIDENCE: [0-100]
-IMPACT: [HIGH/MEDIUM/LOW]
-SECTOR: [BANKING/IT/PHARMA/AUTO/ENERGY/METAL/FMCG/BROAD_MARKET]
-REASON: [Detailed one-line explanation with specific market impact prediction]
-TRADING_SIGNAL: [BUY_CALL/BUY_PUT/HOLD]
-
-Confidence Guide:
-- 85-100: Clear directional news with strong precedent (rate cuts, major earnings, policy changes)
-- 70-84: Strong sentiment with moderate certainty (sector rotation, FII data, global cues)
-- 55-69: Mild sentiment, mixed signals
-- Below 55: Unclear impact, recommend HOLD
-
-Be conservative - only recommend BUY_CALL/BUY_PUT when confidence >= 65 and impact is MEDIUM or HIGH.`;
-
-        const userMsg = `Title: ${article.title || ''}\nDescription: ${article.description || ''}\nSource: ${article.source || ''}\nPublished: ${article.published_at || ''}`;
+        const userMsg = `Title: ${article.title || ''}\nDescription: ${article.description || ''}\nSource: ${article.source || ''}\nPublished: ${article.published_at || ''}\nFreshness Score: ${freshnessScore}/100`;
 
         const completion = await client.chat.completions.create({
           model: 'openai/gpt-4.1-mini',
           messages: [{ role: 'system', content: systemMsg }, { role: 'user', content: userMsg }],
-          max_tokens: 400,
+          max_tokens: 500,
         });
 
-        const result = parseSentiment(completion.choices?.[0]?.message?.content || '');
+        const result = parseEnhancedSentiment(completion.choices?.[0]?.message?.content || '');
 
         // Apply trend adjustment
         const trendAdj = getTrendAdjustment(result.sentiment);
@@ -166,6 +149,30 @@ Be conservative - only recommend BUY_CALL/BUY_PUT when confidence >= 65 and impa
           result.sector = detectSector(`${article.title || ''} ${article.description || ''}`);
         }
 
+        // Update AI engine with this sentiment
+        aiEngine.updateSentimentWindows(result);
+        aiEngine.updateSectorMomentum(result.sector, result.sentiment, result.confidence);
+        aiEngine.addToSignalBuffer(result);
+
+        // Compute multi-signal correlation
+        const correlation = aiEngine.getCorrelationScore(result);
+        result.correlation_score = correlation.score;
+        result.correlation_detail = correlation.reason;
+
+        // Compute multi-timeframe confluence
+        const confluence = aiEngine.getTimeframeConfluence(result.sentiment);
+        result.confluence_score = confluence.score;
+        result.confluence_aligned = confluence.aligned;
+
+        // Compute final composite score
+        const historicalAdj = getHistoricalAdjustment(result.sector, result.sentiment);
+        result.composite_score = aiEngine.computeFinalScore(result, correlation, confluence, freshnessScore, historicalAdj);
+        result.freshness_score = freshnessScore;
+        result.market_regime = aiEngine.marketRegime;
+
+        // Override trading signal based on composite score and regime
+        result.trading_signal = computeEnhancedSignal(result);
+
         recentSentiments.push(result);
         if (recentSentiments.length > 20) recentSentiments.splice(0, recentSentiments.length - 20);
         return result;
@@ -174,15 +181,65 @@ Be conservative - only recommend BUY_CALL/BUY_PUT when confidence >= 65 and impa
       }
     }
 
-    // Fallback: keyword-based analysis
+    // Fallback: keyword-based analysis with AI engine integration
     const result = keywordSentiment(article);
+    result.freshness_score = freshnessScore;
+
+    aiEngine.updateSentimentWindows(result);
+    aiEngine.updateSectorMomentum(result.sector, result.sentiment, result.confidence);
+    aiEngine.addToSignalBuffer(result);
+
+    const correlation = aiEngine.getCorrelationScore(result);
+    result.correlation_score = correlation.score;
+    const confluence = aiEngine.getTimeframeConfluence(result.sentiment);
+    result.confluence_score = confluence.score;
+    result.market_regime = aiEngine.marketRegime;
+    result.trading_signal = computeEnhancedSignal(result);
+
     recentSentiments.push(result);
     if (recentSentiments.length > 20) recentSentiments.splice(0, recentSentiments.length - 20);
     return result;
   }
 
-  function parseSentiment(text) {
-    const result = { sentiment: 'NEUTRAL', confidence: 50, impact: 'LOW', sector: 'BROAD_MARKET', reason: '', trading_signal: 'HOLD' };
+  // Enhanced signal decision with regime awareness
+  function computeEnhancedSignal(result) {
+    const regime = aiEngine.marketRegime;
+    const composite = result.composite_score || result.confidence;
+    const impact = result.impact || 'LOW';
+    const sentiment = result.sentiment;
+
+    // Minimum thresholds based on market regime
+    let minConfidence = 65;
+    if (regime === 'VOLATILE') minConfidence = 75;
+    else if (regime === 'SIDEWAYS') minConfidence = 70;
+
+    // Time-of-day check
+    const now = new Date();
+    const istOffset = 5.5 * 60 * 60 * 1000;
+    const ist = new Date(now.getTime() + istOffset);
+    const totalMin = ist.getUTCHours() * 60 + ist.getUTCMinutes();
+    if (totalMin >= 870 && totalMin <= 930) minConfidence = 80; // Closing hour
+
+    if (composite >= minConfidence && impact !== 'LOW') {
+      if (sentiment === 'BULLISH') return 'BUY_CALL';
+      if (sentiment === 'BEARISH') return 'BUY_PUT';
+    }
+    return 'HOLD';
+  }
+
+  function getHistoricalAdjustment(sector, sentiment) {
+    const patterns = db.data.historical_patterns || [];
+    const matching = patterns.filter(p => p.sector === sector && p.sentiment === sentiment);
+    if (matching.length < 3) return 0;
+    const winRate = matching.filter(p => p.was_profitable).length / matching.length;
+    if (winRate >= 0.7) return 5;
+    if (winRate <= 0.3) return -8;
+    return 0;
+  }
+
+  // Parse enhanced AI response with new fields
+  function parseEnhancedSentiment(text) {
+    const result = { sentiment: 'NEUTRAL', confidence: 50, impact: 'LOW', sector: 'BROAD_MARKET', reason: '', trading_signal: 'HOLD', volatility: 'STABLE', time_horizon: 'SHORT_TERM', risk_level: 'MEDIUM', secondary_sector: 'NONE' };
     for (const line of text.split('\n')) {
       const l = line.trim();
       if (l.startsWith('SENTIMENT:')) result.sentiment = l.split(':').slice(1).join(':').trim();
@@ -191,6 +248,10 @@ Be conservative - only recommend BUY_CALL/BUY_PUT when confidence >= 65 and impa
       else if (l.startsWith('SECTOR:')) result.sector = l.split(':').slice(1).join(':').trim();
       else if (l.startsWith('REASON:')) result.reason = l.split(':').slice(1).join(':').trim();
       else if (l.startsWith('TRADING_SIGNAL:')) result.trading_signal = l.split(':').slice(1).join(':').trim();
+      else if (l.startsWith('VOLATILITY:')) result.volatility = l.split(':').slice(1).join(':').trim();
+      else if (l.startsWith('TIME_HORIZON:')) result.time_horizon = l.split(':').slice(1).join(':').trim();
+      else if (l.startsWith('RISK_LEVEL:')) result.risk_level = l.split(':').slice(1).join(':').trim();
+      else if (l.startsWith('SECONDARY_SECTOR:')) result.secondary_sector = l.split(':').slice(1).join(':').trim();
     }
     return result;
   }
@@ -462,6 +523,60 @@ Be conservative - only recommend BUY_CALL/BUY_PUT when confidence >= 65 and impa
     res.json({ status: 'success', count: news.length, news });
   });
 
+  // GET /api/ai/insights - AI Decision Engine Dashboard Data
+  router.get('/api/ai/insights', (req, res) => {
+    const insights = aiEngine.getAIInsights();
+
+    // Add recent signal performance
+    const signals = (db.data.signals || []).slice(-20);
+    const trades = (db.data.trades || []).filter(t => t.status === 'CLOSED').slice(-20);
+    const winRate = trades.length > 0 ? Math.round((trades.filter(t => t.pnl > 0).length / trades.length) * 100) : 0;
+    const totalPnl = trades.reduce((s, t) => s + (t.pnl || 0), 0);
+
+    insights.performance = {
+      recent_signals: signals.length,
+      closed_trades: trades.length,
+      win_rate: winRate,
+      total_pnl: Math.round(totalPnl * 100) / 100,
+      avg_confidence: signals.length > 0 ? Math.round(signals.reduce((s, sig) => s + (sig.confidence || 0), 0) / signals.length) : 0,
+    };
+
+    res.json({ status: 'success', insights });
+  });
+
+  // POST /api/ai/trade-review - Generate AI review for a completed trade
+  router.post('/api/ai/trade-review', async (req, res) => {
+    const { trade_id } = req.body;
+    const trade = (db.data.trades || []).find(t => t.id === trade_id);
+    if (!trade) return res.json({ status: 'error', message: 'Trade not found' });
+    if (trade.status !== 'CLOSED') return res.json({ status: 'error', message: 'Trade still open' });
+
+    const aiKey = db.data.settings?.ai?.emergent_llm_key || '';
+    const review = await aiEngine.generateTradeReview(trade, OpenAI, aiKey);
+
+    if (review) {
+      // Store review on the trade
+      trade.ai_review = review;
+      trade.reviewed_at = new Date().toISOString();
+      db.save();
+
+      // Update historical patterns
+      if (!db.data.historical_patterns) db.data.historical_patterns = [];
+      db.data.historical_patterns.push({
+        sector: trade.sector || 'BROAD_MARKET',
+        sentiment: trade.sentiment || 'NEUTRAL',
+        was_profitable: trade.pnl > 0,
+        pnl: trade.pnl,
+        pnl_pct: trade.pnl_percentage,
+        trade_type: trade.trade_type,
+        date: new Date().toISOString(),
+      });
+      db.save();
+    }
+
+    res.json({ status: 'success', review: review || 'AI review unavailable (no API key)' });
+  });
+
   // ============ Signal & Trade Generation Helpers ============
   function generateSignal(newsDoc) {
     const sentiment = newsDoc.sentiment_analysis || {};
@@ -481,19 +596,14 @@ Be conservative - only recommend BUY_CALL/BUY_PUT when confidence >= 65 and impa
     const todayValue = todayTrades.reduce((s, t) => s + (t.investment || 0), 0);
     if (todayValue >= dailyLimit) return null;
 
-    // Historical pattern adjustment - check if this sentiment+sector combo has been profitable
-    let confidenceAdj = 0;
-    const patterns = db.data.historical_patterns || [];
-    const sectorPatterns = patterns.filter(p => p.sector === (sentiment.sector || 'BROAD_MARKET') && p.sentiment === sentiment.sentiment);
-    if (sectorPatterns.length >= 3) {
-      const winRate = sectorPatterns.filter(p => p.was_profitable).length / sectorPatterns.length;
-      if (winRate >= 0.7) confidenceAdj = 5;
-      else if (winRate <= 0.3) confidenceAdj = -8;
-    }
-    const adjustedConfidence = Math.max(30, Math.min(98, (sentiment.confidence || 50) + confidenceAdj));
+    // Historical pattern adjustment
+    const historicalAdj = getHistoricalAdjustment(sentiment.sector || 'BROAD_MARKET', sentiment.sentiment);
+
+    // Use composite score instead of raw confidence
+    const adjustedConfidence = sentiment.composite_score || Math.max(30, Math.min(98, (sentiment.confidence || 50) + historicalAdj));
     if (adjustedConfidence < 55) return null;
 
-    // Check market hours - don't generate signals when market is closed
+    // Market hours check
     const now = new Date();
     const istOffset = 5.5 * 60 * 60 * 1000;
     const ist = new Date(now.getTime() + istOffset);
@@ -504,12 +614,29 @@ Be conservative - only recommend BUY_CALL/BUY_PUT when confidence >= 65 and impa
       return null;
     }
 
-    const positionSize = Math.min(maxTrade, available * rp.max_position_size, dailyLimit - todayValue);
+    // Dynamic position sizing via AI engine
+    const basePositionSize = Math.min(maxTrade, available * rp.max_position_size, dailyLimit - todayValue);
+    if (basePositionSize < 1000) return null;
+
+    const dynamicSize = aiEngine.calculateDynamicPositionSize(
+      basePositionSize,
+      adjustedConfidence,
+      sentiment.sector || 'BROAD_MARKET'
+    );
+
+    const positionSize = Math.min(dynamicSize.size, basePositionSize); // Never exceed base limits
     if (positionSize < 1000) return null;
 
     const optionPremium = 150;
     const quantity = Math.floor(positionSize / optionPremium);
     if (quantity === 0) return null;
+
+    // AI-enhanced reason with all scoring details
+    let enhancedReason = sentiment.reason || '';
+    if (sentiment.correlation_score) enhancedReason += ` | Correlation: ${sentiment.correlation_score}%`;
+    if (sentiment.confluence_score) enhancedReason += ` | Confluence: ${sentiment.confluence_score}%`;
+    if (sentiment.market_regime && sentiment.market_regime !== 'UNKNOWN') enhancedReason += ` | Regime: ${sentiment.market_regime}`;
+    if (historicalAdj !== 0) enhancedReason += ` | Historical: ${historicalAdj > 0 ? '+' : ''}${historicalAdj}`;
 
     return {
       id: uuid(), signal_type: signalType, symbol: 'NIFTY50',
@@ -518,9 +645,20 @@ Be conservative - only recommend BUY_CALL/BUY_PUT when confidence >= 65 and impa
       entry_price: optionPremium,
       stop_loss: Math.round(optionPremium * (1 - rp.stop_loss_pct / 100) * 100) / 100,
       target: Math.round(optionPremium * (1 + rp.target_pct / 100) * 100) / 100,
-      confidence: adjustedConfidence, sentiment: sentiment.sentiment,
+      confidence: adjustedConfidence,
+      composite_score: sentiment.composite_score || adjustedConfidence,
+      correlation_score: sentiment.correlation_score || 0,
+      confluence_score: sentiment.confluence_score || 0,
+      market_regime: sentiment.market_regime || 'UNKNOWN',
+      sentiment: sentiment.sentiment,
       sector: sentiment.sector || 'BROAD_MARKET',
-      reason: sentiment.reason + (confidenceAdj ? ` [Historical adj: ${confidenceAdj > 0 ? '+' : ''}${confidenceAdj}]` : ''),
+      secondary_sector: sentiment.secondary_sector || 'NONE',
+      volatility: sentiment.volatility || 'STABLE',
+      time_horizon: sentiment.time_horizon || 'SHORT_TERM',
+      risk_level: sentiment.risk_level || 'MEDIUM',
+      freshness_score: sentiment.freshness_score || 50,
+      position_sizing: dynamicSize.factors,
+      reason: enhancedReason,
       news_id: newsDoc.id, status: 'ACTIVE',
       created_at: new Date().toISOString(),
       expires_at: new Date(Date.now() + 7 * 86400000).toISOString(),

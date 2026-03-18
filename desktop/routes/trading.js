@@ -1,6 +1,8 @@
 const { Router } = require('express');
 const crypto = require('crypto');
 const axios = require('axios');
+let OpenAI;
+try { OpenAI = require('openai'); } catch (_) { OpenAI = null; }
 
 function uuid() { return crypto.randomUUID(); }
 
@@ -399,6 +401,23 @@ _Sent automatically by AI Trading Bot_`;
           was_profitable: pnl > 0,
           created_at: new Date().toISOString(),
         });
+
+        // AI-powered trade review (async, non-blocking)
+        const aiKey = db.data.settings?.ai?.emergent_llm_key || '';
+        if (aiKey && OpenAI) {
+          const AIDecisionEngine = require('./ai_engine');
+          const tempEngine = new AIDecisionEngine(db);
+          tempEngine.generateTradeReview(trade, OpenAI, aiKey).then(review => {
+            if (review) {
+              trade.ai_review = review;
+              trade.reviewed_at = new Date().toISOString();
+              db.save();
+              console.log(`[AI Review] Trade ${trade.id}: ${review.substring(0, 100)}...`);
+            }
+          }).catch(() => {});
+          // Update AI engine trade results
+          tempEngine.updateTradeResult({ pnl, sector: sig?.sector || 'BROAD_MARKET', sentiment: trade.sentiment });
+        }
 
         exitsCount++;
         exitDetails.push({

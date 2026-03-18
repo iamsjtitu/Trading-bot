@@ -709,6 +709,43 @@ async def get_historical_patterns():
         logger.error(f"Historical patterns error: {e}")
         return {"status": "error", "message": str(e)}
 
+
+@api_router.get("/ai/insights")
+async def get_ai_insights():
+    """Get AI Decision Engine insights - market regime, sector rotation, multi-timeframe data"""
+    try:
+        from sentiment_service import ai_engine
+        insights = ai_engine.get_ai_insights()
+
+        # Add trade performance data
+        trades = await db.paper_trades.find({"status": "CLOSED"}, {"_id": 0}).sort("exit_time", -1).to_list(20)
+        wins = sum(1 for t in trades if t.get('pnl', 0) > 0)
+        total_pnl = sum(t.get('pnl', 0) for t in trades)
+        insights['performance'] = {
+            'closed_trades': len(trades),
+            'win_rate': round((wins / max(len(trades), 1)) * 100),
+            'total_pnl': round(total_pnl, 2),
+        }
+
+        # Add historical pattern summary
+        patterns = await db.historical_patterns.find({}, {"_id": 0}).to_list(500)
+        if patterns:
+            sector_perf = {}
+            for p in patterns:
+                s = p.get('sector', 'BROAD_MARKET')
+                if s not in sector_perf:
+                    sector_perf[s] = {'wins': 0, 'total': 0}
+                sector_perf[s]['total'] += 1
+                if p.get('was_profitable'):
+                    sector_perf[s]['wins'] += 1
+            insights['sector_performance'] = {k: {'win_rate': round(v['wins'] / max(v['total'], 1) * 100), 'total': v['total']} for k, v in sector_perf.items()}
+
+        return {"status": "success", "insights": insights}
+    except Exception as e:
+        logger.error(f"AI insights error: {e}")
+        return {"status": "error", "message": str(e)}
+
+
 @api_router.post("/settings/update")
 async def update_bot_settings(request: dict):
     """Update bot settings"""
