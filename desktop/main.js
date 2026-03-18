@@ -175,13 +175,18 @@ function createApiServer(db) {
 
   // Trigger update check
   apiApp.post('/api/check-update', (req, res) => {
-    autoUpdater.checkForUpdates().catch(() => {});
+    console.log('[UPDATER] API: Manual update check');
+    autoUpdater.checkForUpdatesAndNotify().catch((e) => {
+      console.error('[UPDATER] API check failed:', e.message);
+    });
     res.json({ status: 'success', message: 'Checking for updates...' });
   });
 
-  // Trigger download
+  // Trigger download (auto-download is now enabled, but keep for manual trigger)
   apiApp.post('/api/download-update', (req, res) => {
-    autoUpdater.downloadUpdate().catch(() => {});
+    autoUpdater.downloadUpdate().catch((e) => {
+      console.error('[UPDATER] Download failed:', e.message);
+    });
     res.json({ status: 'success', message: 'Downloading...' });
   });
 
@@ -322,25 +327,37 @@ function createTray() {
 // ============ AUTO UPDATER ============
 function setupAutoUpdater() {
   updateState.currentVersion = app.getVersion();
-  autoUpdater.autoDownload = false;
+  autoUpdater.autoDownload = true;
   autoUpdater.autoInstallOnAppQuit = true;
+  autoUpdater.allowDowngrade = false;
+
+  // Explicitly set feed URL for GitHub releases
+  autoUpdater.setFeedURL({
+    provider: 'github',
+    owner: 'iamsjtitu',
+    repo: 'Trading-bot',
+    private: false,
+  });
 
   autoUpdater.on('checking-for-update', () => {
     updateState.status = 'checking';
     updateState.message = 'Checking for updates...';
+    console.log('[UPDATER] Checking for updates...');
     sendUpdateToRenderer();
   });
 
   autoUpdater.on('update-available', (info) => {
     updateState.status = 'available';
     updateState.newVersion = info.version;
-    updateState.message = `v${info.version} available! Current: v${app.getVersion()}`;
+    updateState.message = `v${info.version} available! Downloading...`;
+    console.log(`[UPDATER] Update available: v${info.version}`);
     sendUpdateToRenderer();
   });
 
-  autoUpdater.on('update-not-available', () => {
+  autoUpdater.on('update-not-available', (info) => {
     updateState.status = 'up-to-date';
     updateState.message = `v${app.getVersion()} is the latest version`;
+    console.log(`[UPDATER] No update available. Current: v${app.getVersion()}, Latest: v${info?.version || 'unknown'}`);
     sendUpdateToRenderer();
   });
 
@@ -356,19 +373,31 @@ function setupAutoUpdater() {
     updateState.status = 'downloaded';
     updateState.newVersion = info.version;
     updateState.progress = 100;
-    updateState.message = `v${info.version} ready to install! Restart to update.`;
+    updateState.message = `v${info.version} ready! Restarting in 5 seconds...`;
+    console.log(`[UPDATER] Update downloaded: v${info.version}. Will install on restart.`);
     if (mainWindow) mainWindow.setProgressBar(-1);
     sendUpdateToRenderer();
+    // Show notification
+    if (Notification.isSupported()) {
+      new Notification({ title: 'AI Trading Bot', body: `v${info.version} downloaded. Restart to update.` }).show();
+    }
   });
 
   autoUpdater.on('error', (e) => {
     updateState.status = 'error';
     updateState.message = `Update error: ${e.message || e}`;
+    console.error('[UPDATER] Error:', e.message || e);
     logError('UPDATER', e);
     sendUpdateToRenderer();
   });
 
-  setTimeout(() => autoUpdater.checkForUpdates().catch(() => {}), 5000);
+  // Check for updates 5 seconds after launch
+  setTimeout(() => {
+    console.log('[UPDATER] Initial update check starting...');
+    autoUpdater.checkForUpdatesAndNotify().catch((e) => {
+      console.error('[UPDATER] Check failed:', e.message || e);
+    });
+  }, 5000);
 }
 
 function sendUpdateToRenderer() {
@@ -411,4 +440,9 @@ app.on('window-all-closed', () => {});
 app.on('activate', () => { if (mainWindow) { mainWindow.show(); mainWindow.focus(); } });
 
 ipcMain.handle('get-version', () => app.getVersion());
-ipcMain.on('check-updates', () => autoUpdater.checkForUpdates().catch(() => {}));
+ipcMain.on('check-updates', () => {
+  console.log('[UPDATER] Manual update check triggered');
+  autoUpdater.checkForUpdatesAndNotify().catch((e) => {
+    console.error('[UPDATER] Manual check failed:', e.message || e);
+  });
+});
