@@ -27,12 +27,15 @@ export default function MarketTicker({ marketIndices, tradingMode, upstoxConnect
   const timeBasedOpen = isMarketOpen();
   // In LIVE mode with Upstox connected, treat market as live
   const marketOpen = (tradingMode === 'LIVE' && upstoxConnected) || timeBasedOpen;
+  const isLiveDisconnected = tradingMode === 'LIVE' && !upstoxConnected;
 
   return (
-    <div className={`border rounded-lg shadow-md p-3 mb-4 overflow-hidden ${marketOpen ? 'bg-white border-gray-200' : 'bg-gray-50 border-gray-300'}`} data-testid="market-ticker">
+    <div className={`border rounded-lg shadow-md p-3 mb-4 overflow-hidden ${isLiveDisconnected ? 'bg-yellow-50 border-yellow-300' : marketOpen ? 'bg-white border-gray-200' : 'bg-gray-50 border-gray-300'}`} data-testid="market-ticker">
       <div className="flex items-center gap-6 overflow-x-auto">
         <div className="flex items-center gap-2 flex-shrink-0">
-          {marketOpen ? (
+          {isLiveDisconnected ? (
+            <Badge className="bg-yellow-600 text-white text-xs" data-testid="market-status-badge">UPSTOX NOT CONNECTED</Badge>
+          ) : marketOpen ? (
             <Badge className="bg-green-600 text-white text-xs" data-testid="market-status-badge">LIVE MARKET</Badge>
           ) : (
             <Badge className="bg-gray-500 text-white text-xs" data-testid="market-status-badge">MARKET CLOSED</Badge>
@@ -57,7 +60,9 @@ export default function MarketTicker({ marketIndices, tradingMode, upstoxConnect
           <span className="text-xs text-gray-500 italic">
             {tradingMode === 'LIVE' && upstoxConnected
               ? 'Live data from Upstox'
-              : marketOpen ? 'Updating every 1 sec' : 'Market hours: 9:15 AM - 3:30 PM IST'}
+              : tradingMode === 'LIVE' && !upstoxConnected
+              ? 'Connect Upstox in Settings for live data'
+              : marketOpen ? 'Simulated data (Paper mode)' : 'Market hours: 9:15 AM - 3:30 PM IST'}
           </span>
         </div>
       </div>

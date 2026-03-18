@@ -2,8 +2,9 @@ import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 
-export default function RiskPanel({ riskMetrics, emergencyStop, onEmergencyStop, formatCurrency }) {
+export default function RiskPanel({ riskMetrics, emergencyStop, onEmergencyStop, formatCurrency, tradingMode, upstoxConnected }) {
   const isLive = riskMetrics?.isLive || false;
+  const isLiveDisconnected = tradingMode === 'LIVE' && !upstoxConnected;
 
   return (
     <Card className="bg-gradient-to-r from-orange-50 to-red-50 border-orange-200 p-4 mb-4 shadow-lg" data-testid="risk-management-panel">
@@ -13,6 +14,7 @@ export default function RiskPanel({ riskMetrics, emergencyStop, onEmergencyStop,
             Risk Management
             {emergencyStop && <Badge className="bg-red-600">STOPPED</Badge>}
             {isLive && <Badge className="bg-green-600 text-xs" data-testid="risk-live-badge">LIVE</Badge>}
+            {isLiveDisconnected && <Badge className="bg-yellow-600 text-xs" data-testid="risk-disconnected-badge">UPSTOX NOT CONNECTED</Badge>}
           </h2>
           <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
             <div>

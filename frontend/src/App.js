@@ -267,11 +267,12 @@ function App() {
     }, 1000);
     const squareOffInterval = setInterval(checkSquareOff, 60000);
 
-    // Market indices: use real data when live & connected, else simulate
+    // Market indices: use real data when live & connected, else simulate only in PAPER mode
     const marketInterval = setInterval(() => {
       if (tradingMode === 'LIVE' && upstoxConnected) {
         loadUpstoxData();
-      } else {
+      } else if (tradingMode !== 'LIVE') {
+        // Only simulate in PAPER mode
         setMarketIndices(prev => ({
           nifty50: { value: prev.nifty50.value + (Math.random() - 0.5) * 50, change: (Math.random() - 0.5) * 100, changePct: (Math.random() - 0.5) * 0.8 },
           sensex: { value: prev.sensex.value + (Math.random() - 0.5) * 150, change: (Math.random() - 0.5) * 300, changePct: (Math.random() - 0.5) * 0.8 },
@@ -279,6 +280,7 @@ function App() {
           finnifty: { value: prev.finnifty.value + (Math.random() - 0.5) * 40, change: (Math.random() - 0.5) * 80, changePct: (Math.random() - 0.5) * 0.7 }
         }));
       }
+      // LIVE mode + disconnected: do nothing, keep static values
     }, tradingMode === 'LIVE' && upstoxConnected ? 10000 : 1000);
 
     return () => {
@@ -309,36 +311,60 @@ function App() {
   };
 
   // Determine portfolio data based on mode
-  const displayPortfolio = (tradingMode === 'LIVE' && upstoxConnected && livePortfolio) ? {
-    current_value: (livePortfolio.funds?.total || 0),
-    total_pnl: livePortfolio.total_pnl || 0,
-    active_positions: livePortfolio.active_positions || 0,
-    total_trades: upstoxOrders.length,
-    winning_trades: upstoxOrders.filter(o => (o.status === 'complete' || o.status === 'traded')).length,
-    isLive: true,
-  } : portfolio;
+  const displayPortfolio = (() => {
+    if (tradingMode === 'LIVE') {
+      if (upstoxConnected && livePortfolio) {
+        return {
+          current_value: (livePortfolio.funds?.total || 0),
+          total_pnl: livePortfolio.total_pnl || 0,
+          active_positions: livePortfolio.active_positions || 0,
+          total_trades: upstoxOrders.length,
+          winning_trades: upstoxOrders.filter(o => (o.status === 'complete' || o.status === 'traded')).length,
+          isLive: true,
+        };
+      }
+      // LIVE mode but Upstox not connected - show zeros, not paper data
+      return {
+        current_value: 0,
+        total_pnl: 0,
+        active_positions: 0,
+        total_trades: 0,
+        winning_trades: 0,
+        isLive: false,
+        isDisconnected: true,
+      };
+    }
+    return portfolio;
+  })();
 
   // Determine active trades based on mode
-  const displayTrades = (tradingMode === 'LIVE' && upstoxConnected && livePortfolio?.positions?.length > 0)
-    ? livePortfolio.positions.map(pos => ({
-        trade_type: pos.quantity > 0 ? 'BUY' : 'SELL',
-        symbol: pos.symbol || pos.trading_symbol || 'N/A',
-        quantity: Math.abs(pos.quantity),
-        status: 'OPEN',
-        entry_price: pos.avg_price || pos.average_price || 0,
-        current_price: pos.ltp || pos.last_price || 0,
-        current_value: (pos.ltp || pos.last_price || 0) * Math.abs(pos.quantity),
-        investment: (pos.avg_price || pos.average_price || 0) * Math.abs(pos.quantity),
-        live_pnl: pos.pnl || 0,
-        pnl_percentage: (pos.avg_price || pos.average_price) > 0
-          ? (((pos.ltp || pos.last_price || 0) - (pos.avg_price || pos.average_price || 0)) / (pos.avg_price || pos.average_price || 1)) * 100
-          : 0,
-        stop_loss: 0,
-        target: 0,
-        entry_time: new Date().toISOString(),
-        isLive: true,
-      }))
-    : trades;
+  const displayTrades = (() => {
+    if (tradingMode === 'LIVE') {
+      if (upstoxConnected && livePortfolio?.positions?.length > 0) {
+        return livePortfolio.positions.map(pos => ({
+          trade_type: pos.quantity > 0 ? 'BUY' : 'SELL',
+          symbol: pos.symbol || pos.trading_symbol || 'N/A',
+          quantity: Math.abs(pos.quantity),
+          status: 'OPEN',
+          entry_price: pos.avg_price || pos.average_price || 0,
+          current_price: pos.ltp || pos.last_price || 0,
+          current_value: (pos.ltp || pos.last_price || 0) * Math.abs(pos.quantity),
+          investment: (pos.avg_price || pos.average_price || 0) * Math.abs(pos.quantity),
+          live_pnl: pos.pnl || 0,
+          pnl_percentage: (pos.avg_price || pos.average_price) > 0
+            ? (((pos.ltp || pos.last_price || 0) - (pos.avg_price || pos.average_price || 0)) / (pos.avg_price || pos.average_price || 1)) * 100
+            : 0,
+          stop_loss: 0,
+          target: 0,
+          entry_time: new Date().toISOString(),
+          isLive: true,
+        }));
+      }
+      // LIVE mode but Upstox not connected or no positions - show empty (not paper trades)
+      return [];
+    }
+    return trades;
+  })();
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-purple-50 text-gray-900">
@@ -433,7 +459,7 @@ function App() {
           </div>
         )}
 
-        <RiskPanel riskMetrics={riskMetrics} emergencyStop={emergencyStop} onEmergencyStop={handleEmergencyStop} formatCurrency={formatCurrency} />
+        <RiskPanel riskMetrics={riskMetrics} emergencyStop={emergencyStop} onEmergencyStop={handleEmergencyStop} formatCurrency={formatCurrency} tradingMode={tradingMode} upstoxConnected={upstoxConnected} />
         <AutoTradingSettings autoSettings={autoSettings} showAutoSettings={showAutoSettings} setShowAutoSettings={setShowAutoSettings} updateAutoSettings={updateAutoSettings} />
 
         {/* Portfolio Summary Cards */}
@@ -444,6 +470,7 @@ function App() {
                 <p className="text-sm text-gray-600 font-medium">Portfolio Value</p>
                 <p className="text-2xl font-bold text-gray-900">{formatCurrency(displayPortfolio?.current_value || 0)}</p>
                 {displayPortfolio?.isLive && <p className="text-xs text-green-600 mt-1">Live from Upstox</p>}
+                {displayPortfolio?.isDisconnected && <p className="text-xs text-yellow-600 mt-1">Connect Upstox for live data</p>}
               </div>
               <FaWallet className="text-3xl text-blue-500" />
             </div>
@@ -456,6 +483,7 @@ function App() {
                   {formatCurrency(displayPortfolio?.total_pnl || 0)}
                 </p>
                 {displayPortfolio?.isLive && <p className="text-xs text-green-600 mt-1">Live from Upstox</p>}
+                {displayPortfolio?.isDisconnected && <p className="text-xs text-yellow-600 mt-1">Connect Upstox for live data</p>}
               </div>
               <FaChartLine className="text-3xl text-green-500" />
             </div>
@@ -466,6 +494,7 @@ function App() {
                 <p className="text-sm text-gray-600 font-medium">Active Positions</p>
                 <p className="text-2xl font-bold text-gray-900">{displayPortfolio?.active_positions || 0}</p>
                 {displayPortfolio?.isLive && <p className="text-xs text-green-600 mt-1">Live from Upstox</p>}
+                {displayPortfolio?.isDisconnected && <p className="text-xs text-yellow-600 mt-1">Connect Upstox for live data</p>}
               </div>
               <FaBullseye className="text-3xl text-purple-500" />
             </div>
@@ -475,9 +504,10 @@ function App() {
               <div>
                 <p className="text-sm text-gray-600 font-medium">{displayPortfolio?.isLive ? 'Orders Today' : 'Win Rate'}</p>
                 <p className="text-2xl font-bold text-gray-900">
-                  {displayPortfolio?.isLive ? (displayPortfolio?.total_trades || 0) : `${stats?.win_rate?.toFixed(1) || 0}%`}
+                  {displayPortfolio?.isLive ? (displayPortfolio?.total_trades || 0) : displayPortfolio?.isDisconnected ? '--' : `${stats?.win_rate?.toFixed(1) || 0}%`}
                 </p>
                 {displayPortfolio?.isLive && <p className="text-xs text-green-600 mt-1">Live from Upstox</p>}
+                {displayPortfolio?.isDisconnected && <p className="text-xs text-yellow-600 mt-1">Connect Upstox for live data</p>}
               </div>
               <FaBullseye className="text-3xl text-yellow-500" />
             </div>
