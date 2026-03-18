@@ -2,26 +2,153 @@ import { useState, useEffect } from 'react';
 import { Card } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import axios from 'axios';
-import { FaBrain, FaChartPie, FaFire, FaShieldAlt, FaChartBar, FaSync, FaClock, FaBolt } from 'react-icons/fa';
+import { FaBrain, FaChartPie, FaFire, FaShieldAlt, FaChartBar, FaSync, FaClock, FaBolt, FaTh } from 'react-icons/fa';
 
 const API = process.env.REACT_APP_BACKEND_URL || '';
 
+// ===== Heatmap Cell Color Logic =====
+function getCellColor(cell) {
+  if (!cell || cell.total === 0) return 'bg-gray-100 text-gray-400';
+  const { bullish, bearish, total, avg_confidence } = cell;
+  const bullRatio = bullish / total;
+  const bearRatio = bearish / total;
+
+  if (bullRatio >= 0.7 && avg_confidence >= 70) return 'bg-green-600 text-white';
+  if (bullRatio >= 0.6 && avg_confidence >= 60) return 'bg-green-400 text-white';
+  if (bullRatio >= 0.5) return 'bg-green-200 text-green-900';
+  if (bearRatio >= 0.7 && avg_confidence >= 70) return 'bg-red-600 text-white';
+  if (bearRatio >= 0.6 && avg_confidence >= 60) return 'bg-red-400 text-white';
+  if (bearRatio >= 0.5) return 'bg-red-200 text-red-900';
+  return 'bg-yellow-100 text-yellow-800';
+}
+
+function getCellLabel(cell) {
+  if (!cell || cell.total === 0) return '--';
+  const { bullish, bearish, total, avg_confidence } = cell;
+  const bullRatio = bullish / total;
+  const bearRatio = bearish / total;
+  if (bullRatio >= 0.6) return `${avg_confidence}`;
+  if (bearRatio >= 0.6) return `${avg_confidence}`;
+  return `${avg_confidence}`;
+}
+
+function getSummaryBadge(summary) {
+  if (!summary || summary.total === 0) return { text: 'No Data', color: 'bg-gray-200 text-gray-500' };
+  const { bullish, bearish, total, avg_confidence } = summary;
+  const bullRatio = bullish / total;
+  const bearRatio = bearish / total;
+  if (bullRatio >= 0.65) return { text: `Bullish ${avg_confidence}%`, color: 'bg-green-100 text-green-700' };
+  if (bearRatio >= 0.65) return { text: `Bearish ${avg_confidence}%`, color: 'bg-red-100 text-red-700' };
+  return { text: `Mixed ${avg_confidence}%`, color: 'bg-yellow-100 text-yellow-700' };
+}
+
+// ===== Confidence Heatmap Component =====
+function ConfidenceHeatmap({ data }) {
+  if (!data) return null;
+
+  const { heatmap, sector_summary, active_sectors, time_buckets, sectors } = data;
+  const activeSectorKeys = Object.keys(active_sectors || {});
+
+  // Show all sectors with data + always show key sectors
+  const displaySectors = sectors.filter(s => activeSectorKeys.includes(s) || ['BANKING', 'IT', 'BROAD_MARKET'].includes(s));
+  const bucketLabels = { '0-4h': 'Last 4h', '4-8h': '4-8h', '8-12h': '8-12h', '12-16h': '12-16h', '16-20h': '16-20h', '20-24h': '20-24h' };
+
+  return (
+    <Card className="p-4 bg-white border-gray-200 shadow-sm" data-testid="confidence-heatmap-card">
+      <div className="flex items-center justify-between mb-4">
+        <div className="flex items-center gap-2">
+          <FaTh className="text-lg text-orange-500" />
+          <h3 className="font-semibold text-gray-800">Sector Confidence Heatmap</h3>
+          <span className="text-xs text-gray-400">Last 24 hours</span>
+        </div>
+        <div className="flex items-center gap-3 text-xs">
+          <span className="flex items-center gap-1"><span className="w-3 h-3 rounded bg-green-600 inline-block" /> Strong Bull</span>
+          <span className="flex items-center gap-1"><span className="w-3 h-3 rounded bg-green-300 inline-block" /> Bull</span>
+          <span className="flex items-center gap-1"><span className="w-3 h-3 rounded bg-yellow-200 inline-block" /> Mixed</span>
+          <span className="flex items-center gap-1"><span className="w-3 h-3 rounded bg-red-300 inline-block" /> Bear</span>
+          <span className="flex items-center gap-1"><span className="w-3 h-3 rounded bg-red-600 inline-block" /> Strong Bear</span>
+        </div>
+      </div>
+
+      {displaySectors.length === 0 ? (
+        <p className="text-sm text-gray-500 text-center py-4">No sector data yet. Fetch news to populate the heatmap.</p>
+      ) : (
+        <div className="overflow-x-auto">
+          <table className="w-full text-xs" data-testid="heatmap-table">
+            <thead>
+              <tr>
+                <th className="text-left p-2 font-semibold text-gray-600 w-28">Sector</th>
+                {time_buckets.map(b => (
+                  <th key={b} className="text-center p-2 font-medium text-gray-500">{bucketLabels[b] || b}</th>
+                ))}
+                <th className="text-center p-2 font-semibold text-gray-600 w-28">24h Summary</th>
+              </tr>
+            </thead>
+            <tbody>
+              {displaySectors.map(sector => {
+                const summary = (sector_summary || {})[sector] || {};
+                const badge = getSummaryBadge(summary);
+                return (
+                  <tr key={sector} className="border-t border-gray-100 hover:bg-gray-50/50">
+                    <td className="p-2 font-semibold text-gray-700">{sector}</td>
+                    {time_buckets.map(bucket => {
+                      const cell = (heatmap || {})[sector]?.[bucket] || {};
+                      const color = getCellColor(cell);
+                      const label = getCellLabel(cell);
+                      return (
+                        <td key={bucket} className="p-1 text-center">
+                          <div
+                            className={`rounded-md py-2 px-1 font-bold text-sm transition-all ${color}`}
+                            title={cell.total > 0 ? `${cell.bullish}B / ${cell.bearish}Be / ${cell.neutral}N (${cell.total} total) - Avg: ${cell.avg_confidence}%` : 'No data'}
+                            data-testid={`heatmap-cell-${sector}-${bucket}`}
+                          >
+                            {label}
+                          </div>
+                        </td>
+                      );
+                    })}
+                    <td className="p-1 text-center">
+                      <Badge className={`text-xs ${badge.color}`} data-testid={`heatmap-summary-${sector}`}>{badge.text}</Badge>
+                      {summary.total > 0 && (
+                        <p className="text-gray-400 text-xs mt-0.5">{summary.total} signals</p>
+                      )}
+                    </td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        </div>
+      )}
+
+      <p className="text-xs text-gray-400 mt-3 text-center">
+        Cell values show average confidence %. Hover for breakdown. Green = Bullish dominant. Red = Bearish dominant. Yellow = Mixed.
+      </p>
+    </Card>
+  );
+}
+
 export default function AIInsights() {
   const [insights, setInsights] = useState(null);
+  const [heatmap, setHeatmap] = useState(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    fetchInsights();
-    const interval = setInterval(fetchInsights, 30000);
+    fetchAll();
+    const interval = setInterval(fetchAll, 30000);
     return () => clearInterval(interval);
   }, []);
 
-  const fetchInsights = async () => {
+  const fetchAll = async () => {
     try {
-      const res = await axios.get(`${API}/api/ai/insights`);
-      if (res.data?.status === 'success') setInsights(res.data.insights);
+      const [insightsRes, heatmapRes] = await Promise.all([
+        axios.get(`${API}/api/ai/insights`),
+        axios.get(`${API}/api/ai/heatmap`),
+      ]);
+      if (insightsRes.data?.status === 'success') setInsights(insightsRes.data.insights);
+      if (heatmapRes.data?.status === 'success') setHeatmap(heatmapRes.data);
     } catch (err) {
-      console.error('AI insights error:', err);
+      console.error('AI data error:', err);
     } finally { setLoading(false); }
   };
 
@@ -210,6 +337,9 @@ export default function AIInsights() {
           </div>
         </div>
       </Card>
+
+      {/* Confidence Heatmap */}
+      <ConfidenceHeatmap data={heatmap} />
     </div>
   );
 }

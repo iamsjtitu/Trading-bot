@@ -746,6 +746,128 @@ async def get_ai_insights():
         return {"status": "error", "message": str(e)}
 
 
+@api_router.get("/ai/heatmap")
+async def get_ai_heatmap():
+    """Sector-wise confidence heatmap data for last 24 hours"""
+    try:
+        from datetime import datetime, timezone, timedelta
+        cutoff = (datetime.now(timezone.utc) - timedelta(hours=24)).isoformat()
+
+        # Get recent news with sentiment
+        articles = await db.news_articles.find(
+            {"created_at": {"$gte": cutoff}},
+            {"_id": 0, "sentiment_analysis": 1, "created_at": 1}
+        ).to_list(500)
+
+        # Also check signals for sector data
+        signals = await db.trading_signals.find(
+            {"created_at": {"$gte": cutoff}},
+            {"_id": 0, "sector": 1, "confidence": 1, "sentiment": 1, "composite_score": 1, "created_at": 1}
+        ).to_list(500)
+
+        # Build heatmap: sector -> time_bucket -> {bullish, bearish, neutral, avg_confidence}
+        sectors = ['BANKING', 'IT', 'PHARMA', 'AUTO', 'ENERGY', 'METAL', 'FMCG', 'INFRA', 'REALTY', 'BROAD_MARKET']
+        time_buckets = ['0-4h', '4-8h', '8-12h', '12-16h', '16-20h', '20-24h']
+
+        now = datetime.now(timezone.utc)
+        heatmap = {}
+        sector_summary = {}
+
+        for sector in sectors:
+            heatmap[sector] = {}
+            sector_summary[sector] = {'bullish': 0, 'bearish': 0, 'neutral': 0, 'total': 0, 'avg_confidence': 0, 'confidences': []}
+            for bucket in time_buckets:
+                heatmap[sector][bucket] = {'bullish': 0, 'bearish': 0, 'neutral': 0, 'total': 0, 'avg_confidence': 0, 'confidences': []}
+
+        def get_bucket(created_at_str):
+            try:
+                t = datetime.fromisoformat(created_at_str.replace('Z', '+00:00'))
+                hours_ago = (now - t).total_seconds() / 3600
+                if hours_ago < 4: return '0-4h'
+                elif hours_ago < 8: return '4-8h'
+                elif hours_ago < 12: return '8-12h'
+                elif hours_ago < 16: return '12-16h'
+                elif hours_ago < 20: return '16-20h'
+                else: return '20-24h'
+            except Exception:
+                return '0-4h'
+
+        # Process articles
+        for art in articles:
+            sa = art.get('sentiment_analysis', {})
+            sector = sa.get('sector', 'BROAD_MARKET')
+            if sector not in heatmap:
+                sector = 'BROAD_MARKET'
+            sentiment = sa.get('sentiment', 'NEUTRAL')
+            confidence = sa.get('confidence', 50)
+            bucket = get_bucket(art.get('created_at', ''))
+
+            cell = heatmap[sector][bucket]
+            cell['total'] += 1
+            cell['confidences'].append(confidence)
+            if sentiment == 'BULLISH': cell['bullish'] += 1
+            elif sentiment == 'BEARISH': cell['bearish'] += 1
+            else: cell['neutral'] += 1
+
+            ss = sector_summary[sector]
+            ss['total'] += 1
+            ss['confidences'].append(confidence)
+            if sentiment == 'BULLISH': ss['bullish'] += 1
+            elif sentiment == 'BEARISH': ss['bearish'] += 1
+            else: ss['neutral'] += 1
+
+        # Process signals
+        for sig in signals:
+            sector = sig.get('sector', 'BROAD_MARKET')
+            if sector not in heatmap:
+                sector = 'BROAD_MARKET'
+            sentiment = sig.get('sentiment', 'NEUTRAL')
+            confidence = sig.get('composite_score') or sig.get('confidence', 50)
+            bucket = get_bucket(sig.get('created_at', ''))
+
+            cell = heatmap[sector][bucket]
+            cell['total'] += 1
+            cell['confidences'].append(confidence)
+            if sentiment == 'BULLISH': cell['bullish'] += 1
+            elif sentiment == 'BEARISH': cell['bearish'] += 1
+            else: cell['neutral'] += 1
+
+            ss = sector_summary[sector]
+            ss['total'] += 1
+            ss['confidences'].append(confidence)
+            if sentiment == 'BULLISH': ss['bullish'] += 1
+            elif sentiment == 'BEARISH': ss['bearish'] += 1
+            else: ss['neutral'] += 1
+
+        # Compute averages and clean up
+        for sector in sectors:
+            for bucket in time_buckets:
+                cell = heatmap[sector][bucket]
+                if cell['confidences']:
+                    cell['avg_confidence'] = round(sum(cell['confidences']) / len(cell['confidences']))
+                del cell['confidences']
+            ss = sector_summary[sector]
+            if ss['confidences']:
+                ss['avg_confidence'] = round(sum(ss['confidences']) / len(ss['confidences']))
+            del ss['confidences']
+
+        # Filter out empty sectors
+        active_sectors = {k: v for k, v in sector_summary.items() if v['total'] > 0}
+
+        return {
+            "status": "success",
+            "heatmap": heatmap,
+            "sector_summary": sector_summary,
+            "active_sectors": active_sectors,
+            "time_buckets": time_buckets,
+            "sectors": sectors,
+        }
+    except Exception as e:
+        logger.error(f"Heatmap error: {e}")
+        return {"status": "error", "message": str(e)}
+
+
+
 @api_router.post("/settings/update")
 async def update_bot_settings(request: dict):
     """Update bot settings"""

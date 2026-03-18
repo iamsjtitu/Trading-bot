@@ -78,4 +78,20 @@ Build an AI-powered automated options trading bot that connects to world news, u
 - Advanced trade history analytics
 - CI/CD pipeline stability
 
-## Version: Desktop v1.3.3
+## Version: Desktop v1.3.4
+
+## Changelog
+### v1.3.4 (March 18, 2026)
+- Added Sector Confidence Heatmap to AI Brain tab
+- Shows sector-wise sentiment breakdown across 6 time buckets (last 24 hours)
+- Color-coded cells: Green (Bullish), Red (Bearish), Yellow (Mixed)
+- New `/api/ai/heatmap` endpoint (both Python + Node.js backends)
+
+### v1.3.3 (March 18, 2026)
+- Full AI Decision Engine: Multi-Signal Correlation, Market Regime Detection, Multi-Timeframe Sentiment, Dynamic Position Sizing, Sector Rotation, AI Trade Review, News Freshness Decay
+- AI Brain dashboard tab
+- Enhanced signal cards with composite scoring
+
+### v1.3.2
+- Bug fixes: Market status, LIVE mode data isolation, HTML tags in news
+- Market data API upgrade to full quotes endpoint

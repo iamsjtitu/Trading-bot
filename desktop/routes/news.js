@@ -577,6 +577,83 @@ module.exports = function (db) {
     res.json({ status: 'success', review: review || 'AI review unavailable (no API key)' });
   });
 
+  // GET /api/ai/heatmap - Sector-wise confidence heatmap for last 24 hours
+  router.get('/api/ai/heatmap', (req, res) => {
+    const sectors = ['BANKING', 'IT', 'PHARMA', 'AUTO', 'ENERGY', 'METAL', 'FMCG', 'INFRA', 'REALTY', 'BROAD_MARKET'];
+    const timeBuckets = ['0-4h', '4-8h', '8-12h', '12-16h', '16-20h', '20-24h'];
+    const now = Date.now();
+    const cutoff = now - 86400000;
+
+    const heatmap = {};
+    const sectorSummary = {};
+    for (const s of sectors) {
+      heatmap[s] = {};
+      sectorSummary[s] = { bullish: 0, bearish: 0, neutral: 0, total: 0, avg_confidence: 0, confs: [] };
+      for (const b of timeBuckets) {
+        heatmap[s][b] = { bullish: 0, bearish: 0, neutral: 0, total: 0, avg_confidence: 0, confs: [] };
+      }
+    }
+
+    function getBucket(createdAt) {
+      const t = new Date(createdAt).getTime();
+      const hoursAgo = (now - t) / 3600000;
+      if (hoursAgo < 4) return '0-4h';
+      if (hoursAgo < 8) return '4-8h';
+      if (hoursAgo < 12) return '8-12h';
+      if (hoursAgo < 16) return '12-16h';
+      if (hoursAgo < 20) return '16-20h';
+      return '20-24h';
+    }
+
+    function addEntry(sector, sentiment, confidence, createdAt) {
+      if (!sectors.includes(sector)) sector = 'BROAD_MARKET';
+      const bucket = getBucket(createdAt);
+      const cell = heatmap[sector][bucket];
+      cell.total++;
+      cell.confs.push(confidence);
+      if (sentiment === 'BULLISH') cell.bullish++;
+      else if (sentiment === 'BEARISH') cell.bearish++;
+      else cell.neutral++;
+
+      const ss = sectorSummary[sector];
+      ss.total++;
+      ss.confs.push(confidence);
+      if (sentiment === 'BULLISH') ss.bullish++;
+      else if (sentiment === 'BEARISH') ss.bearish++;
+      else ss.neutral++;
+    }
+
+    // Process articles
+    for (const art of (db.data.news_articles || [])) {
+      if (new Date(art.created_at).getTime() < cutoff) continue;
+      const sa = art.sentiment_analysis || {};
+      addEntry(sa.sector || 'BROAD_MARKET', sa.sentiment || 'NEUTRAL', sa.confidence || 50, art.created_at);
+    }
+
+    // Process signals
+    for (const sig of (db.data.signals || [])) {
+      if (new Date(sig.created_at).getTime() < cutoff) continue;
+      addEntry(sig.sector || 'BROAD_MARKET', sig.sentiment || 'NEUTRAL', sig.composite_score || sig.confidence || 50, sig.created_at);
+    }
+
+    // Compute averages
+    for (const s of sectors) {
+      for (const b of timeBuckets) {
+        const c = heatmap[s][b];
+        if (c.confs.length) c.avg_confidence = Math.round(c.confs.reduce((a, b) => a + b, 0) / c.confs.length);
+        delete c.confs;
+      }
+      const ss = sectorSummary[s];
+      if (ss.confs.length) ss.avg_confidence = Math.round(ss.confs.reduce((a, b) => a + b, 0) / ss.confs.length);
+      delete ss.confs;
+    }
+
+    const activeSectors = Object.fromEntries(Object.entries(sectorSummary).filter(([_, v]) => v.total > 0));
+    res.json({ status: 'success', heatmap, sector_summary: sectorSummary, active_sectors: activeSectors, time_buckets: timeBuckets, sectors });
+  });
+
+
+
   // ============ Signal & Trade Generation Helpers ============
   function generateSignal(newsDoc) {
     const sentiment = newsDoc.sentiment_analysis || {};
