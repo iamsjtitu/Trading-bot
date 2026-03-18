@@ -294,7 +294,7 @@ export default function SettingsPanel({ onClose, onSave }) {
                   ))}
                 </div>
                 <div className="mt-3 p-3 bg-yellow-50 border border-yellow-200 rounded text-xs text-gray-700">
-                  <p className="font-semibold">Current: <Badge className="bg-indigo-600">{instruments[activeInstrument]?.label || activeInstrument}</Badge></p>
+                  <div className="font-semibold">Current: <Badge className="bg-indigo-600">{instruments[activeInstrument]?.label || activeInstrument}</Badge></div>
                   <p className="mt-1">Instrument change applies to new signals only. Existing trades remain on their original instrument.</p>
                 </div>
               </div>

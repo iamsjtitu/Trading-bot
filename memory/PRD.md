@@ -19,25 +19,39 @@ Build an AI-powered automated options trading bot that connects to world news, u
 - Auto-Exit: Real-time SL/target monitoring with Upstox sell orders
 - News feed with AI sentiment (multi-source, HTML stripped, freshness decay)
 - Trade analytics, tax reporting, Telegram notifications, desktop app auto-updater
+- **Multi-Instrument Trading**: NIFTY50, BANKNIFTY, FINNIFTY, MIDCPNIFTY with instrument-specific lot sizes, strike steps, and premiums
+- **9 News Sources**: Demo, Moneycontrol, Economic Times, NSE India, NDTV Profit, CNBC TV18, Livemint, NewsAPI.org, Alpha Vantage
 
-## Key Fixes (v1.3.5 - March 18, 2026)
-1. **Market data auto-refresh**: Fixed useCallback for stable interval, 5-sec refresh for LIVE
-2. **0.00% change**: Now using `net_change` from Upstox full market quote (NOT ohlc.close which = current close, not prev day close)
-3. **Auto-Entry coupled with Auto-Fetch**: When auto_entry is ON, news fetch runs every 3 min automatically (was decoupled before)
-4. **Tax route added for desktop app**
-5. **loadUpstoxData wrapped in useCallback** for stable reference in setInterval
+## Key Fixes (v1.3.6 - March 18, 2026)
+1. **3 New News Sources**: NDTV Profit (feedburner RSS), CNBC TV18 (RSS), Livemint (RSS) - all free, no API key needed
+2. **Multi-Instrument Trading**: 4 instruments supported with Settings > Trading tab for selection
+3. **loadUpstoxData TDZ fix**: Moved useCallback before loadData to prevent "Cannot access before initialization" error
+4. **Instrument-aware signals**: Signals now use active instrument's lot_size, strike_step, option_premium
 
 ## Pending Tasks
 ### P0
-- MCX & Commodities Trading
+- None
 
 ### P1
+- Desktop rebuild & verification (package new features into .exe/.dmg)
 - Telegram e2e testing
-- Desktop rebuild & verification
 
-## Version: Desktop v1.3.5
+### P2
+- MCX & Commodities Trading
+- More broker integrations
+- Advanced Trade History analytics
+
+## Version: Desktop v1.3.6
 
 ## Changelog
+### v1.3.6 (March 18, 2026)
+- Added NDTV Profit, CNBC TV18, Livemint as free news sources
+- Multi-instrument trading: NIFTY50, BANKNIFTY, FINNIFTY, MIDCPNIFTY
+- New Settings > Trading tab for instrument selection
+- Fixed loadUpstoxData temporal dead zone in App.js
+- Instrument-specific lot sizes, strike steps, premiums in signal generation
+- /api/instruments and /api/instruments/set endpoints
+
 ### v1.3.5 (March 18, 2026)
 - Fixed market data auto-refresh (5s interval, useCallback, loadUpstoxData dependency)
 - Fixed 0.00% change: use net_change from Upstox API instead of ohlc.close
