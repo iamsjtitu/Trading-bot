@@ -8,45 +8,33 @@ Build an AI-powered automated options trading bot that connects to world news, u
 - **Backend (Web):** Python FastAPI + MongoDB
 - **Desktop:** Electron + electron-builder + electron-updater
 
-## What's Implemented (v1.6.0)
+## What's Implemented (v1.7.0)
 
 ### Core Trading
-- AI Decision Engine (multi-signal, market regime, dynamic sizing, sector rotation)
-- Auto-Entry: Signal → Live order placement via broker (LIVE mode) + paper trade
-- Auto-Exit: SL/target monitoring for paper + live positions
-- 500ms ultra-fast market data polling + WebSocket support
-- 9 News sources with AI sentiment
+- AI Decision Engine + Auto-Entry (signal → live broker order) + Auto-Exit (SL/target monitoring)
+- 500ms ultra-fast market data polling (ISOLATED useEffect - won't get killed by state changes)
+- Auto-entry/exit settings persist across restarts (loaded from MongoDB at startup)
+- 9 News sources, AI sentiment analysis, signal generation with logging
 
 ### 9 Trading Instruments
-- **NSE Index**: NIFTY50, BANKNIFTY, FINNIFTY, MIDCPNIFTY
-- **BSE Index**: SENSEX, BANKEX
-- **MCX Commodities**: CRUDEOIL, GOLD, SILVER
-- Exchange mapping: NSE→NFO, BSE→BFO, MCX→MCX for live orders
+- NSE: NIFTY50, BANKNIFTY, FINNIFTY, MIDCPNIFTY
+- BSE: SENSEX, BANKEX
+- MCX: CRUDEOIL, GOLD, SILVER (with correct exchange mapping MCX→MCX)
 
 ### 6 Broker Integrations
 - Upstox, Zerodha, Angel One, 5paisa, Paytm Money, IIFL
+- Broker abstraction layer + Settings selector
 
-### Option Chain with Greeks
-- Black-Scholes: Delta, Gamma, Theta, Vega, Rho, IV
-- All 9 instruments supported (6 index + 3 MCX)
-- Live broker data → fallback to simulated
-- Auto-refresh toggle (2s interval)
-- LIVE DATA / SIMULATED badge
+### Option Chain + Greeks + OI Buildup Alerts
+- Black-Scholes greeks, live broker data with simulated fallback
+- Auto-refresh toggle (2s), PCR, Max Pain, OI Buildup detection
 
-### OI Buildup Alerts
-- Support/Resistance from max OI
-- PCR bullish/bearish signals
-- Long/Short Buildup detection
-- Max Pain proximity alerts
+## Key Bug Fixes (v1.7.0)
+- **Market data polling isolated** into separate useEffect (was being killed by 13-dep useEffect)
+- **Auto-entry settings loaded at startup** from MongoDB (was defaulting to False)
+- **Settings broker connection** now uses active broker API (was hardcoded to Upstox)
+- **Immediate news fetch** when auto-entry is turned ON
+- **Signal generation logging** - shows WHY signals pass or fail
+- **CI/CD NSIS install** - 3x retry + SourceForge fallback
 
-## Pending Tasks
-### P1
-- Desktop rebuild (.exe/.dmg) v1.6.0
-- Telegram notifications e2e testing
-- Test auto-entry/exit with real Upstox credentials
-
-### P2
-- Advanced Trade History analytics
-- Stock F&O options support
-
-## Version: 1.6.0
+## Version: 1.7.0
