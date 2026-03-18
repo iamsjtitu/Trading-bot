@@ -58,21 +58,33 @@ module.exports = function (db) {
     try {
       // Resolve MCX keys dynamically
       const mcxKeys = await getMCXKeys();
+      console.log('[QuickData] MCX keys resolved:', JSON.stringify(mcxKeys));
       const allKeys = { ...INDEX_KEYS, ...mcxKeys };
       const keysStr = Object.values(allKeys).join(',');
       const resp = await axios.get(`https://api.upstox.com/v2/market-quote/quotes?instrument_key=${encodeURIComponent(keysStr)}`, {
-        headers: apiHeaders(token), timeout: 5000,
+        headers: apiHeaders(token), timeout: 10000,
       });
       if (resp.data?.status === 'success') {
         const raw = resp.data.data || {};
+        const rawKeys = Object.keys(raw);
+        console.log('[QuickData] API returned keys:', rawKeys.join(', '));
         const indices = {};
         for (const [key, instrument] of Object.entries(allKeys)) {
           let quote = raw[instrument];
           if (!quote) {
-            const matchKey = Object.keys(raw).find(k => k.includes(instrument.split('|')[1] || ''));
-            if (matchKey) quote = raw[matchKey];
+            // Try partial match - API might return slightly different key format
+            const namePart = instrument.split('|')[1] || '';
+            const matchKey = rawKeys.find(k => k === instrument || k.includes(namePart));
+            if (matchKey) {
+              quote = raw[matchKey];
+              console.log(`[QuickData] Partial match for ${key}: ${instrument} -> ${matchKey}`);
+            }
           }
-          if (!quote) { indices[key] = { value: 0, change: 0, changePct: 0 }; continue; }
+          if (!quote) {
+            console.log(`[QuickData] No match for ${key}: ${instrument}`);
+            indices[key] = { value: 0, change: 0, changePct: 0 };
+            continue;
+          }
           const ltp = quote.last_price || 0;
           const netChange = quote.net_change || 0;
           const prevClose = ltp - netChange;
@@ -80,9 +92,11 @@ module.exports = function (db) {
           indices[key] = { value: ltp, change: Math.round(netChange * 100) / 100, changePct: Math.round(changePct * 100) / 100 };
         }
         return res.json({ status: 'success', data: indices, source: 'rest', ts: new Date().toISOString() });
+      } else {
+        console.log('[QuickData] API response not success:', resp.data?.status, resp.data?.message);
       }
     } catch (e) {
-      console.log('[QuickData] Error:', e.message);
+      console.error('[QuickData] Error:', e.message);
     }
     res.json({ status: 'success', data: null, source: 'none' });
   });
