@@ -1,4 +1,4 @@
-from fastapi import FastAPI, APIRouter, BackgroundTasks
+from fastapi import FastAPI, APIRouter, BackgroundTasks, WebSocket, WebSocketDisconnect
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import Response
 from dotenv import load_dotenv
@@ -11,6 +11,7 @@ from typing import List, Dict, Optional
 import uuid
 from datetime import datetime, timezone, timedelta
 import httpx
+import json
 
 # Import our services
 from news_service import NewsService
@@ -19,6 +20,7 @@ from sentiment_service import SentimentService
 from trading_engine import TradingEngine
 from settings_manager import SettingsManager
 from upstox_service import UpstoxService
+from ws_market_data import market_data_manager
 
 ROOT_DIR = Path(__file__).parent
 load_dotenv(ROOT_DIR / '.env')
@@ -1103,6 +1105,29 @@ async def set_active_instrument(request: dict):
         "details": trading_engine.instruments[instrument],
     }
 
+@api_router.get("/ws/status")
+async def get_ws_status():
+    """Get WebSocket market data streaming status"""
+    return {
+        "status": "success",
+        **market_data_manager.get_status(),
+    }
+
+@api_router.post("/ws/start")
+async def start_ws_streaming():
+    """Start WebSocket streaming (auto-starts when Upstox is connected)"""
+    token = await upstox_service._get_access_token()
+    if not token:
+        return {"status": "error", "message": "No Upstox access token. Login first."}
+    await market_data_manager.start(token)
+    return {"status": "success", "message": "WebSocket streaming started"}
+
+@api_router.post("/ws/stop")
+async def stop_ws_streaming():
+    """Stop WebSocket streaming"""
+    await market_data_manager.stop()
+    return {"status": "success", "message": "WebSocket streaming stopped"}
+
 # ==================== Combined Status (Paper + Live) ====================
 
 @api_router.get("/combined-status")
@@ -1128,10 +1153,21 @@ async def get_combined_status():
             result['upstox_connected'] = upstox_connected
 
             if upstox_connected:
-                # Fetch real data
-                market = await upstox_service.get_live_market_data()
-                if market.get('status') == 'success':
-                    result['market_data'] = market['data']
+                # Auto-start WebSocket if not already running
+                if not market_data_manager.is_connected:
+                    token = await upstox_service._get_access_token()
+                    if token:
+                        await market_data_manager.start(token)
+
+                # Use WebSocket cached data if available, else fall back to REST
+                if market_data_manager.latest_data:
+                    result['market_data'] = market_data_manager.latest_data
+                    result['market_data_source'] = 'websocket'
+                else:
+                    market = await upstox_service.get_live_market_data()
+                    if market.get('status') == 'success':
+                        result['market_data'] = market['data']
+                    result['market_data_source'] = 'rest'
 
                 portfolio = await upstox_service.get_portfolio()
                 if portfolio.get('status') == 'success':
@@ -1145,6 +1181,7 @@ async def get_combined_status():
                 if profile.get('status') == 'success':
                     result['profile'] = profile['profile']
 
+        result['ws_status'] = market_data_manager.get_status()
         return {"status": "success", **result}
     except Exception as e:
         logger.error(f"Combined status error: {e}")
@@ -1152,6 +1189,28 @@ async def get_combined_status():
 
 # Include the router in the main app
 app.include_router(api_router)
+
+# WebSocket endpoint for real-time market data (must be on app, not router)
+@app.websocket("/api/ws/market-data")
+async def websocket_market_data(websocket: WebSocket):
+    """WebSocket endpoint for real-time market data streaming to frontend"""
+    await websocket.accept()
+    await market_data_manager.add_client(websocket)
+    logger.info(f"WS client connected. Total: {len(market_data_manager.clients)}")
+    try:
+        while True:
+            # Keep connection alive, handle client messages
+            data = await websocket.receive_text()
+            msg = json.loads(data) if data else {}
+            if msg.get('action') == 'ping':
+                await websocket.send_json({"type": "pong"})
+    except WebSocketDisconnect:
+        pass
+    except Exception as e:
+        logger.debug(f"WS client error: {e}")
+    finally:
+        await market_data_manager.remove_client(websocket)
+        logger.info(f"WS client disconnected. Total: {len(market_data_manager.clients)}")
 
 app.add_middleware(
     CORSMiddleware,
@@ -1174,14 +1233,21 @@ async def startup_event():
         if inst in trading_engine.instruments:
             trading_engine.active_instrument = inst
             logger.info(f"Active instrument: {inst}")
+        # Auto-start WebSocket if in LIVE mode with token
+        if settings.get('trading_mode') == 'LIVE':
+            token = await upstox_service._get_access_token()
+            if token:
+                await market_data_manager.start(token)
+                logger.info("WebSocket market data streaming started")
     except Exception as e:
         logger.error(f"Startup error: {e}")
 
 @app.on_event("shutdown")
 async def shutdown_db_client():
+    await market_data_manager.stop()
     if mongo_url:
         client.close()
-    logger.info("👋 Trading Bot API Shutdown")
+    logger.info("Trading Bot API Shutdown")
 
 # Serve frontend build if available (for desktop/local mode)
 frontend_build = ROOT_DIR.parent / 'frontend' / 'build'

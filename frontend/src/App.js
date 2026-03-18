@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import '@/App.css';
 import axios from 'axios';
 import { FaChartLine, FaBullseye, FaWallet, FaSync, FaRobot, FaCog } from 'react-icons/fa';
@@ -32,6 +32,12 @@ const BACKEND_URL = (() => {
 })();
 const API = `${BACKEND_URL}/api`;
 
+// Build WebSocket URL from the backend URL
+const WS_URL = (() => {
+  const base = BACKEND_URL || window.location.origin;
+  return base.replace(/^http/, 'ws') + '/api/ws/market-data';
+})();
+
 function App() {
   const [portfolio, setPortfolio] = useState(null);
   const [news, setNews] = useState([]);
@@ -63,6 +69,8 @@ function App() {
   const [upstoxProfile, setUpstoxProfile] = useState(null);
   const [livePortfolio, setLivePortfolio] = useState(null);
   const [upstoxOrders, setUpstoxOrders] = useState([]);
+  const [wsConnected, setWsConnected] = useState(false);
+  const wsRef = useRef(null);
 
   const addNotification = useCallback((type, message) => {
     const id = Date.now();
@@ -272,30 +280,112 @@ function App() {
     }, 1000);
     const squareOffInterval = setInterval(checkSquareOff, 60000);
 
-    // Market indices: auto-refresh for LIVE mode
-    const marketInterval = setInterval(() => {
-      if (tradingMode === 'LIVE' && upstoxConnected) {
-        loadUpstoxData();
-      } else if (tradingMode !== 'LIVE') {
-        // Only simulate in PAPER mode
+    // Market indices: use WebSocket for LIVE mode, simulation for PAPER
+    let marketInterval;
+    if (tradingMode === 'LIVE' && upstoxConnected) {
+      // WebSocket handles LIVE data, only poll as fallback every 30s
+      if (!wsConnected) {
+        marketInterval = setInterval(loadUpstoxData, 30000);
+      }
+    } else if (tradingMode !== 'LIVE') {
+      // Only simulate in PAPER mode
+      marketInterval = setInterval(() => {
         setMarketIndices(prev => ({
           nifty50: { value: prev.nifty50.value + (Math.random() - 0.5) * 50, change: (Math.random() - 0.5) * 100, changePct: (Math.random() - 0.5) * 0.8 },
           sensex: { value: prev.sensex.value + (Math.random() - 0.5) * 150, change: (Math.random() - 0.5) * 300, changePct: (Math.random() - 0.5) * 0.8 },
           banknifty: { value: prev.banknifty.value + (Math.random() - 0.5) * 80, change: (Math.random() - 0.5) * 150, changePct: (Math.random() - 0.5) * 0.9 },
           finnifty: { value: prev.finnifty.value + (Math.random() - 0.5) * 40, change: (Math.random() - 0.5) * 80, changePct: (Math.random() - 0.5) * 0.7 }
         }));
-      }
-    }, tradingMode === 'LIVE' && upstoxConnected ? 5000 : 1000); // 5 sec refresh for LIVE
+      }, 1000);
+    }
 
     return () => {
       clearInterval(dataInterval);
       clearInterval(exitInterval);
       clearInterval(analysisInterval);
       clearInterval(countdownInterval);
-      clearInterval(marketInterval);
+      if (marketInterval) clearInterval(marketInterval);
       clearInterval(squareOffInterval);
     };
-  }, [autoAnalyze, autoSettings.auto_exit, autoSettings.auto_entry, emergencyStop, tradingMode, upstoxConnected, checkAutoExits, fetchNewNews, loadData, checkSquareOff, loadUpstoxData]);
+  }, [autoAnalyze, autoSettings.auto_exit, autoSettings.auto_entry, emergencyStop, tradingMode, upstoxConnected, wsConnected, checkAutoExits, fetchNewNews, loadData, checkSquareOff, loadUpstoxData]);
+
+  // WebSocket connection for real-time market data
+  useEffect(() => {
+    if (tradingMode !== 'LIVE' || !upstoxConnected) {
+      // Disconnect WS when not in LIVE or Upstox not connected
+      if (wsRef.current) {
+        wsRef.current.close();
+        wsRef.current = null;
+        setWsConnected(false);
+      }
+      return;
+    }
+
+    let ws;
+    let reconnectTimer;
+    let pingTimer;
+
+    const connect = () => {
+      try {
+        ws = new WebSocket(WS_URL);
+        wsRef.current = ws;
+
+        ws.onopen = () => {
+          setWsConnected(true);
+          addNotification('success', 'Real-time WebSocket connected');
+          // Start ping keepalive
+          pingTimer = setInterval(() => {
+            if (ws.readyState === WebSocket.OPEN) {
+              ws.send(JSON.stringify({ action: 'ping' }));
+            }
+          }, 25000);
+        };
+
+        ws.onmessage = (event) => {
+          try {
+            const msg = JSON.parse(event.data);
+            if (msg.type === 'market_data' && msg.data) {
+              setMarketIndices(prev => ({
+                ...prev,
+                ...Object.fromEntries(
+                  Object.entries(msg.data).map(([k, v]) => [k, {
+                    value: v.value || prev[k]?.value || 0,
+                    change: v.change || 0,
+                    changePct: v.changePct || 0,
+                  }])
+                ),
+              }));
+            }
+          } catch (_) {}
+        };
+
+        ws.onclose = () => {
+          setWsConnected(false);
+          wsRef.current = null;
+          if (pingTimer) clearInterval(pingTimer);
+          // Auto-reconnect after 5s
+          reconnectTimer = setTimeout(connect, 5000);
+        };
+
+        ws.onerror = () => {
+          ws.close();
+        };
+      } catch (e) {
+        console.error('WS connect error:', e);
+        reconnectTimer = setTimeout(connect, 5000);
+      }
+    };
+
+    connect();
+
+    return () => {
+      if (ws) ws.close();
+      if (reconnectTimer) clearTimeout(reconnectTimer);
+      if (pingTimer) clearInterval(pingTimer);
+      wsRef.current = null;
+      setWsConnected(false);
+    };
+  }, [tradingMode, upstoxConnected, addNotification]);
 
   const formatCurrency = (amount) => new Intl.NumberFormat('en-IN', { style: 'currency', currency: 'INR', maximumFractionDigits: 0 }).format(amount);
   const formatTime = (isoString) => {
@@ -392,6 +482,11 @@ function App() {
                   {tradingMode === 'LIVE' && (
                     <Badge data-testid="upstox-status-badge" className={upstoxConnected ? 'bg-green-600' : 'bg-yellow-600'}>
                       {upstoxConnected ? `Upstox: ${upstoxProfile?.name || 'Connected'}` : 'Upstox: Disconnected'}
+                    </Badge>
+                  )}
+                  {tradingMode === 'LIVE' && upstoxConnected && (
+                    <Badge data-testid="ws-status-badge" className={wsConnected ? 'bg-emerald-600' : 'bg-orange-500'}>
+                      {wsConnected ? 'WS: Live' : 'WS: Polling'}
                     </Badge>
                   )}
                 </div>
