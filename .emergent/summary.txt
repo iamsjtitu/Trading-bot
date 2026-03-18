@@ -4,8 +4,8 @@ The user wants to build an AI-powered automated options trading bot. The bot sho
 **PRODUCT REQUIREMENTS:**
 - **Broker:** Upstox
 - **AI Model:** Emergent LLM Key (using GPT-4o)
-- **News Source:** Live APIs (NewsAPI.org, Alpha Vantage) and scraped news (Moneycontrol, Economic Times, NSE India).
-- **Trading Style:** Intraday, weekly expiry focus.
+- **News Source:** Live APIs (NewsAPI.org, Alpha Vantage) and scraped news (Moneycontrol, Economic Times, NSE India). The user has recently requested to add NDTV Profit, CNBC TV18, and Zee Business.
+- **Trading Style:** Intraday, weekly expiry focus. The user has requested to expand beyond NIFTY50 to other instruments like BANKNIFTY.
 - **Mode:** Switchable between Paper Trading and Live Trading.
 - **Risk Management:** Configurable trade limits, stop-loss, and an emergency stop button.
 - **Core Features:** Automated trading, real-time dashboard, live P&L, auto-exit/entry, desktop notifications, trade analytics charts, capital gains tax reporting.
@@ -14,135 +14,170 @@ The user wants to build an AI-powered automated options trading bot. The bot sho
 **User's preferred language**: Hinglish. The next agent MUST respond in Hinglish.
 
 **what currently exists?**
-A feature-rich desktop application built with Electron, React, and a Node.js backend. The application supports both paper and live trading via Upstox, AI-driven sentiment analysis from news feeds, a real-time dashboard, trade analytics with charts, and a comprehensive capital gains tax reporting module with PDF/Excel export. It also features a fully automated CI/CD pipeline using GitHub Actions to build and release  and  files, complete with a functional auto-updater. A legacy Python backend exists but is no longer the primary focus.
+A feature-rich desktop application built with Electron, React, and a Node.js backend. The application supports paper/live trading via Upstox, a highly advanced AI decision-making engine (AI Brain) with a dedicated dashboard, trade analytics, and tax reporting. It has a CI/CD pipeline for building releases. However, critical functionalities like real-time data updates and automatic live trade entry are currently broken. The agent was starting to add more news sources and multi-instrument trading capabilities before being blocked by these critical bugs.
 
 **Last working item**:
-- **Last item agent was working**: The user reported four new issues:
-    1.  The market status indicator remains MARKET CLOSED even when Upstox is connected during live market hours.
-    2.  Some news feed articles still contain raw HTML tags.
-    3.  In LIVE mode, the Signals and Active Trades tables are showing paper trading data instead of live Upstox data.
-    The agent acknowledged the bugs and agreed to fix them before implementing the user's new feature request for MCX/Commodities trading. The agent has just begun investigating by identifying the relevant files to inspect.
+- **Last item agent was working**: The user requested two new features: 1) Add more free news sources (NDTV Profit, CNBC TV18, Zee Business). 2) Enable trading on multiple instruments like BANKNIFTY. The agent found RSS feeds for the new sources and was about to start implementation, but was blocked by critical bugs.
 - **Status**: IN PROGRESS
 - **Agent Testing Done**: N
-- **Which testing method agent to use?**: both. The fixes will involve backend logic (data sources for live vs. paper mode) and frontend rendering. The testing agent should be used to validate that the dashboard, signals, and news feed display the correct data and UI state in both paper and live modes after the fixes are applied.
+- **Which testing method agent to use?**: both. The bug fixes for auto-refresh and auto-entry require backend and frontend validation. The new features will also need full-stack testing. The testing agent is recommended after the critical bugs are resolved.
 - **User Testing Done**: N
 
 **All Pending/In progress Issue list**:
-- **Issue 1 (P0): Data Mismatch in LIVE Mode.** The Signals and Active Trades tables on the dashboard show paper trading data even when the application is in LIVE mode and connected to Upstox.
-- **Issue 2 (P0): Incorrect Live Market Status.** The market status indicator does not switch from MARKET CLOSED to LIVE MARKET when connected to Upstox during trading hours.
-- **Issue 3 (P1): HTML Tags in News Feed.** Some articles in the news feed are still rendering with raw HTML tags, which affects readability.
+- **Issue 1 (P0): Market Data Does Not Auto-Refresh.** User reported that the dashboard data does not update automatically in real-time; it only changes on a manual refresh.
+- **Issue 2 (P0): Auto-Entry Fails to Place Live Trades.** User reported that even with funds in their Upstox account and Auto Entry enabled, the bot is not placing any live trades based on new signals.
+- **Issue 3 (P1): Desktop App Rebuild is Pending.** A rebuild is needed to package all recent features (AI Brain, heatmap) and bug fixes into the / files for the user.
 
   **Issues Detail:**
-  - **Issue 1, 2 & 3:**
-     - **Attempted fixes:** None. The agent has just started the investigation.
+  - **Issue 1: Market Data Does Not Auto-Refresh**
+     - **Attempted fixes:** The agent identified the issue was related to React / dependency loops in , which caused the data-fetching interval to behave incorrectly. Multiple attempts to fix this resulted in file corruption, which was later restored. The root dependency problem still exists.
      - **Next debug checklist:**
-        1.  View the contents of the relevant files identified by the previous agent: , , , and .
-        2.  For **Issue 1 & 2**, trace the logic in  and  to see how the  and Upstox connection status are used to fetch and display data. Verify the backend endpoints are returning the correct live data.
-        3.  For **Issue 3**, re-examine the HTML stripping logic in  and its Python equivalent to identify why some tags are being missed.
-     - **Why fix this issue and what will be achieved with the fix?**: Fixing these bugs is critical for the application's core functionality. It will ensure that the user sees accurate, real-time data when in LIVE mode, which is essential for making trading decisions.
+        1. Review  and correctly structure the  function and its  and  hooks to prevent re-renders from breaking the .
+        2. Ensure the function is defined before it's used within the  effect, or its dependencies are properly memoized.
+     - **Why fix this issue and what will be achieved with the fix?**: Real-time data is non-negotiable for a trading bot. This fix will make the dashboard reflect live market changes automatically.
      - **Status**: IN PROGRESS
-     - **Is recurring issue?**: N
+     - **Is recurring issue?**: Y
+     - **Should Test frontend/backend/both after fix?**: both
+     - **Blocked on other issue**: No
+
+  - **Issue 2: Auto-Entry Fails to Place Live Trades**
+     - **Attempted fixes:** The agent found that the core news analysis logic only generates paper trades. The flow to trigger a live Upstox order () from a new signal in LIVE mode is missing or broken.
+     - **Next debug checklist:**
+        1. Trace the function call from when a new signal is generated (in  and ).
+        2. Modify the logic to check if  is 'LIVE' and  is enabled.
+        3. If so, call the function responsible for placing live Upstox orders (e.g.,  in ) instead of just writing to the paper trades JSON file.
+     - **Why fix this issue and what will be achieved with the fix?**: This is the bot's primary purpose. Fixing it will enable the application to perform automated trading as intended.
+     - **Status**: IN PROGRESS
+     - **Is recurring issue?**: Y
      - **Should Test frontend/backend/both after fix?**: both
      - **Blocked on other issue**: No
 
 **In progress Task List**:
-- **Task 1: Fix User-Reported Bugs**
-    - **Where to resume**: The previous agent has identified the key files for investigation. The next step is to read these files, diagnose the root cause of the data mismatch and UI bugs, and implement fixes.
-    - **What will be achieved with this?**: A stable application where the UI correctly and reliably reflects the selected trading mode (Paper vs. Live) and all data is displayed cleanly.
-    - **Status**: IN PROGRESS
+- **Task 1: Add New News Sources & Multi-Instrument Trading (Blocked)**
+    - **Where to resume**: This task is blocked by the P0 issues. Once they are resolved, resume by integrating the identified RSS feeds for NDTV Profit, CNBC TV18, and Zee Business into the backend news service ( and ). Then, add a UI element (e.g., dropdown) to select the trading instrument and update the backend to handle trades for instruments other than NIFTY50.
+    - **What will be achieved with this?**: The bot will have broader data sources for its AI and the flexibility to trade different market indices.
+    - **Status**: BLOCKED
     - **Should Test frontend/backend/both after fix?**: both
-    - **Blocked on something**: No.
+    - **Blocked on something**: Blocked by Market Data Does Not Auto-Refresh and Auto-Entry Fails to Place Live Trades.
 
 **Upcoming and Future Tasks**
 - **Upcoming Tasks:**
-    - **P0: Implement MCX & Commodities Trading:** After fixing the current bugs, get user confirmation to proceed with this feature. This involves researching Upstox API capabilities for commodities, updating the news analysis engine, and modifying the frontend to support selection and trading of commodities.
+  - **P1**: Implement UI for selecting trading instruments (part of the blocked task).
+  - **P2**: Trigger a rebuild of the desktop app once all bugs are fixed.
 - **Future Tasks:**
-    - Test end-to-end Telegram notification functionality (pending user credentials).
-    - Further enhance the AI model's decision-making capabilities.
-    - Add support for additional brokers.
-    - Implement more advanced analytics and filtering on the Trade History page.
+  - Test and integrate Telegram notifications.
+  - Add support for more brokers.
+  - Enhance the Trade History page with advanced analytics.
 
 **Completed work in this session**
-- **Feature: Capital Gains Tax Reporting:** Implemented a new Tax Reports page showing F&O turnover, net P&L, and calculated tax liability as per Indian tax laws. Added functionality to export reports to PDF and Excel.
-- **Critical Bug Fix: Live Auto-Exit Logic:** Corrected a major bug where LIVE mode auto-exit used simulated prices instead of fetching real-time market data from Upstox and placing actual sell orders.
-- **Bug Fix: LIVE Mode Data Consistency:** Resolved issues where the Risk Management panel and dashboard cards showed paper trading data in LIVE mode.
-- **Feature: Market Status Indicator:** Implemented a MARKET CLOSED badge that appears outside of trading hours.
-- **Bug Fix: News Feed Deduplication:** Added logic to prevent the same news article from appearing multiple times.
-- **Feature: Auto Square-Off Warning:** Added a scheduled job to send a Telegram warning if trades are open near market close.
-- **Feature: Historical Pattern Matching for AI:** Enhanced the AI model to reference past trade patterns for a given stock and sentiment.
-- **Critical Bug Fix: CI/CD Build Failures:** Diagnosed and fixed multiple critical build failures in the GitHub Actions workflow related to  and Node.js version incompatibilities by pinning the build environment to Node.js v18.
+- **Feature: AI Brain Engine & Dashboard:** A sophisticated AI decision-making module was built and integrated, with a new AI Brain tab in the UI () to visualize market regime, AI performance, and decision factors.
+- **Feature: AI Confidence Heatmap:** A heatmap was added to the AI Brain dashboard to show sector-wise sentiment confidence over different timeframes.
+- **Bug Fix: Data Leak in LIVE Mode:** Fixed multiple issues where paper trading data was incorrectly displayed in LIVE mode. The UI now shows appropriate Connect Upstox messages or zeroed-out data.
+- **Bug Fix: HTML Tags in News:** Added robust stripping of HTML tags from all news sources on both the backend and frontend.
+- **Version Bump:** Application version was updated to  in .
 
 **Earlier issues found/mentioned but not fixed**
-None.
+The critical P0 issues listed above (Auto-Refresh and Auto-Entry) were reported by the user in this session and remain unresolved.
 
 **Known issue recurrence from previous fork**
-- **Issue:** The CI/CD build process in  is fragile and has broken multiple times due to dependency conflicts, especially with Node.js version updates.
-- **Recurrence count:** 3+ times in this session.
-- **Status:** RESOLVED (by pinning to Node.js v18). However, this is a brittle fix and may break again if dependencies are updated. It should be monitored closely during future development.
+- **Issue:** The CI/CD build process in  is fragile.
+- **Recurrence count:** 3+
+- **Status:** RESOLVED (for now, by pinning to Node.js v18). This remains a potential risk area.
 
 **Code Architecture**
 
 
 **Key Technical Concepts**
 - **Frontend**: React, Tailwind CSS, Chart.js, Axios
-- **Backend (Desktop)**: Node.js, Express.js
+- **Backend (Primary)**: Node.js, Express.js (running inside Electron)
+- **AI**: OpenAI (via ), complex multi-factor prompting
 - **Desktop**: Electron, , 
 - **Database**: File-based JSON ()
 - **CI/CD**: GitHub Actions
-- **Report Generation**: ,  (Python), ,  (Node.js)
 
 **key DB schema**
-- ****: A single JSON file storing objects for , , , and . No schema changes were made.
+- ****: A single JSON file storing objects for , , , and . No changes.
 
 **changes in tech stack**
-- Added , ,  to the Python backend for tax report generation.
-- Added , ,  to the Node.js backend for tax report generation.
+- usage: openai [-h] [-v] [-b API_BASE] [-k API_KEY] [-p PROXY [PROXY ...]]
+              [-o ORGANIZATION] [-t {openai,azure}]
+              [--api-version API_VERSION] [--azure-endpoint AZURE_ENDPOINT]
+              [--azure-ad-token AZURE_AD_TOKEN] [-V]
+              {api,tools,migrate,grit} ...
+
+positional arguments:
+  {api,tools,migrate,grit}
+    api                 Direct API calls
+    tools               Client side tools for convenience
+
+options:
+  -h, --help            show this help message and exit
+  -v, --verbose         Set verbosity.
+  -b API_BASE, --api-base API_BASE
+                        What API base url to use.
+  -k API_KEY, --api-key API_KEY
+                        What API key to use.
+  -p PROXY [PROXY ...], --proxy PROXY [PROXY ...]
+                        What proxy to use.
+  -o ORGANIZATION, --organization ORGANIZATION
+                        Which organization to run as (will use your default
+                        organization if not specified)
+  -t {openai,azure}, --api-type {openai,azure}
+                        The backend API to call, must be `openai` or `azure`
+  --api-version API_VERSION
+                        The Azure API version, e.g.
+                        'https://learn.microsoft.com/en-us/azure/ai-
+                        services/openai/reference#rest-api-versioning'
+  --azure-endpoint AZURE_ENDPOINT
+                        The Azure endpoint, e.g.
+                        'https://endpoint.openai.azure.com'
+  --azure-ad-token AZURE_AD_TOKEN
+                        A token from Azure Active Directory,
+                        https://www.microsoft.com/en-
+                        us/security/business/identity-access/microsoft-entra-
+                        id
+  -V, --version         show program's version number and exit library was added as a dependency to  for the new AI engine.
 
 **All files of reference**
-- : Critical file for CI/CD. Was modified multiple times to fix build errors.
-- : New file for Python tax calculation logic.
-- : Modified to add tax endpoints.
-- : New file for Node.js tax reporting endpoints.
-- : Modified to fix live auto-exit logic.
-- : Modified for news deduplication.
-- : New frontend component for the Tax Reports page.
-- : Modified to add the Tax Reports tab and fix data flow for live mode.
-- : Modified to fix live mode data display issues.
+- : **Critical file for the auto-refresh bug.** Contains the core data fetching logic and state management.
+- : **Critical file for the auto-entry bug.** Contains live trade execution logic.
+- : Backend logic for fetching market data.
+- : Logic for processing news and generating signals.
+- : The new, advanced AI decision-making engine.
+- : The new AI Brain dashboard component.
 
 **Areas that need refactoring**:
-- None identified, but the  file is brittle and could benefit from a more robust dependency management strategy.
+-  is overly complex and is the source of the critical auto-refresh bug. It should be refactored to use custom hooks or a state management library to simplify effects and state.
+- The dual backend setup (Node.js and legacy Python) leads to code duplication. Consolidating all logic into the primary Node.js backend is recommended for maintainability.
 
 **key api endpoints**
-- : GET - Fetches the calculated tax report data.
-- : GET - Downloads the tax report as an Excel file.
-- : GET - Downloads the tax report as a PDF file.
+- : Primary dashboard endpoint for fetching market data, positions, and portfolio.
+- : Endpoint that should be used for placing live trades (part of the auto-entry bug fix).
+- : Fetches data for the AI Brain dashboard.
+- : Fetches data for the sentiment heatmap.
 
 **Critical Info for New Agent**
-- **Priority 1: Fix Bugs.** The user's highest priority is fixing the three bugs related to live data display and HTML tags. Do not proceed with new features until these are resolved and verified.
-- **Primary Backend is Node.js:** All new development and bug fixes should target the  backend. The Python backend is for legacy purposes.
-- **CI/CD is Fragile:** The  workflow is sensitive to Node.js versions. Be cautious when changing dependencies. The build is currently stable on Node.js 18.
-- **Communicate in Hinglish:** This is a strict user requirement.
+- **TOP PRIORITY:** You must fix the two critical P0 bugs before anything else: **1) Market data auto-refresh** and **2) Auto-entry not placing live trades**. The user has specifically funded their account to test these features and is completely blocked.
+- **BUG 1 CONTEXT (Auto-Refresh):** The issue is in . The previous agent got stuck in a React hook dependency loop (/). Approach this file with caution. The goal is to make the  for data fetching stable across re-renders.
+- **BUG 2 CONTEXT (Auto-Entry):** The issue is that the signal generation flow only creates paper trades. You need to intercept this flow in  mode and call the endpoint/function that places an actual order on Upstox.
+- **After Bugs are Fixed:** Proceed with the user's feature requests: adding new news sources and implementing multi-instrument trading.
+- **Primary Backend:** The main backend logic for the desktop app is in . Ensure fixes are applied here.
 
 **documents and test reports created in this job**
-- Multiple test reports were generated by the testing agent, located in . The last successful run verified the tax reporting feature.
+- : Verified the AI Brain feature before the critical bugs were discovered.
 
 **Last 10 User Messages and any pending HUMAN messages**
-- **10.** User requested a version bump. (Done)
-- **9.** User reported the  build was failing. (Agent investigated and fixed  error)
-- **8.** User requested a permanent fix for the build. (Agent investigated further and pinned Node.js version)
-- **7.** User asked for a version bump after the fix. (Done)
-- **6.** User requested a new feature: Capital Gains Tax reporting with PDF/Excel export. (Implemented)
-- **5.** User approved the scope for the tax feature. (Agent proceeded with implementation)
-- **4.** User reported several bugs: market not showing live, HTML codes in news, and paper trading data showing in live mode. (Current pending tasks)
-- **3.** User also asked if MCX/Commodities trading can be implemented. (Agent planned to address after bug fixes)
-- **2.** User confirmed to fix the bugs first. (Agent started investigation)
-- **1.** User approved the agent's plan to fix bugs before starting new features.
+- **10.** User reports market data isn't live and auto-entry isn't working, even with funds available. Provides a screenshot for proof.
+- **9.** User asks what instruments are supported and suggests adding more news sources (NDTV Profit, CNBC, ZeeBiz).
+- **8.** User approves the plan to add new news sources and multi-instrument trading.
+- **7.** User asks to rebuild the desktop app with all recent changes.
+- **6.** User asks to implement the Confidence Heatmap and bump the version.
+- **5-1.** Messages relate to the successful implementation of the AI Brain, previous bug fixes, and general progress.
 
 **Project Health Check:**
 - **Broken**:
-  - Live market status indicator.
-  - Data display in Signals and Active Trades tables during LIVE mode.
-  - HTML tag rendering in the news feed.
+  - **Market Data Auto-Refresh**: The dashboard is not real-time.
+  - **Automated Live Trade Entry**: The bot's core function is not working.
 - **Mocked**: None.
 
 **3rd Party Integrations**
@@ -152,17 +187,16 @@ None.
 - **Web Scraping**: Moneycontrol, Economic Times.
 - **Desktop App**: Electron, electron-builder, electron-updater.
 - **Charting**: Chart.js.
-- **Notifications**: Telegram (requires User Bot Token/Chat ID).
-- **Report Generation**: jspdf, exceljs (for Node.js); fpdf, openpyxl (for Python).
+- **Notifications**: Telegram (pending setup).
 
 **Testing status**
-- **Testing agent used after significant changes**: YES. All major features in this session (Tax Reports, Live Trading fixes) were verified by the testing agent.
-- **Troubleshoot agent used after agent stuck in loop**: NO.
+- **Testing agent used after significant changes**: YES, for the AI features. Will be needed again after fixing the critical bugs.
+- **Troubleshoot agent used after agent stuck in loop**: NO
 - **Test files created**: None.
-- **Known regressions**: The bugs reported by the user at the end of the session are regressions or previously unnoticed issues.
+- **Known regressions**: Market Data Auto-Refresh and Auto Trade Entry are critical regressions that have surfaced.
 
 **Credentials to test flow:**
-N/A. The user provides all necessary API keys through the application's settings UI. For testing, the agent should use the Paper Trading mode or assume the user will provide keys for Live Trading validation.
+N/A. Use Paper Trading mode for development. The user has confirmed their live account is funded and ready for testing once the fixes are deployed.
 
 **What agent forgot to execute**
-The previous agent correctly identified the next steps (investigating user-reported bugs) but did not get a chance to execute them. The plan is sound, but the implementation is pending.</analysis>
+The agent correctly diagnosed the critical bugs but failed to fix the React hook dependency issue for the auto-refresh feature, getting stuck in a file corruption loop. The agent also did not complete the implementation for the auto-entry fix. Consequently, the user's requests to add new features and rebuild the desktop app were not started.</analysis>
