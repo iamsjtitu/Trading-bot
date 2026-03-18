@@ -358,13 +358,32 @@ class UpstoxService(BrokerBase):
         token = await self._get_access_token()
         if not token:
             return {'status': 'error', 'message': 'Not logged in'}
-        url = f"{UPSTOX_API_BASE}/option/chain?instrument_key=NSE_INDEX|{instrument}&expiry_date={expiry}"
+
+        # Map instrument to correct Upstox instrument_key format
+        instrument_key_map = {
+            'Nifty 50': 'NSE_INDEX|Nifty 50',
+            'Nifty Bank': 'NSE_INDEX|Nifty Bank',
+            'Nifty Fin Service': 'NSE_INDEX|Nifty Fin Service',
+            'NIFTY MID SELECT': 'NSE_INDEX|NIFTY MID SELECT',
+            'SENSEX': 'BSE_INDEX|SENSEX',
+            'BANKEX': 'BSE_INDEX|BANKEX',
+            'CRUDEOIL': 'MCX_FO|CRUDEOIL',
+            'GOLD': 'MCX_FO|GOLD',
+            'SILVER': 'MCX_FO|SILVER',
+        }
+        inst_key = instrument_key_map.get(instrument, f'NSE_INDEX|{instrument}')
+
+        url = f"{UPSTOX_API_BASE}/option/chain"
+        params = {'instrument_key': inst_key}
+        if expiry:
+            params['expiry_date'] = expiry
+
         try:
-            resp = requests.get(url, headers=self._api_headers(token), timeout=15)
+            resp = requests.get(url, headers=self._api_headers(token), params=params, timeout=15)
             result = resp.json()
             if result.get('status') == 'success':
                 return {'status': 'success', 'data': result.get('data', [])}
-            return {'status': 'error', 'message': result.get('message', 'Failed')}
+            return {'status': 'error', 'message': result.get('message', result.get('errors', [{}])[0].get('message', 'Failed'))}
         except Exception as e:
             return {'status': 'error', 'message': str(e)}
 

@@ -180,46 +180,84 @@ module.exports = function (db) {
 
   router.get('/api/option-chain/:instrument', async (req, res) => {
     const instrument = req.params.instrument;
-    const spotPrice = parseFloat(req.query.spot_price) || 0;
-    const strikes = parseInt(req.query.strikes) || 15;
-    const expiryDays = parseInt(req.query.expiry_days) || 7;
-
     const instConfig = INSTRUMENTS[instrument] || INSTRUMENTS.NIFTY50;
-    const spot = spotPrice || getDefaultSpot(instrument);
-    const strikeStep = getStrikeStep(instrument, spot);
-    const atmStrike = Math.round(spot / strikeStep) * strikeStep;
+    const exchange = instConfig.exchange || 'NSE';
 
-    // Generate simulated option chain using Black-Scholes
-    const chain = [];
-    for (let i = -strikes; i <= strikes; i++) {
-      const strike = atmStrike + i * strikeStep;
-      const iv = 15 + Math.random() * 10;
-      const t = expiryDays / 365;
-      const r = 0.07;
+    // Check market status
+    const ist = new Date(new Date().getTime() + 5.5 * 60 * 60 * 1000);
+    const weekday = ist.getUTCDay();
+    const h = ist.getUTCHours();
+    const m = ist.getUTCMinutes();
+    const totalMin = h * 60 + m;
 
-      const cePrice = blackScholesCall(spot, strike, t, r, iv / 100);
-      const pePrice = blackScholesPut(spot, strike, t, r, iv / 100);
-      const ceOI = Math.floor(Math.random() * 5000000) + 100000;
-      const peOI = Math.floor(Math.random() * 5000000) + 100000;
+    let marketOpen = false;
+    let marketMsg = 'Market Closed';
+    let nextOpenLabel = '';
 
-      chain.push({
-        strike,
-        ce: { price: Math.round(cePrice * 100) / 100, oi: ceOI, volume: Math.floor(ceOI * 0.3), iv: Math.round(iv * 100) / 100, delta: calcDelta(spot, strike, t, r, iv / 100, 'CE'), gamma: 0.001, theta: -cePrice * 0.01, vega: cePrice * 0.05 },
-        pe: { price: Math.round(pePrice * 100) / 100, oi: peOI, volume: Math.floor(peOI * 0.3), iv: Math.round(iv * 100) / 100, delta: calcDelta(spot, strike, t, r, iv / 100, 'PE'), gamma: 0.001, theta: -pePrice * 0.01, vega: pePrice * 0.05 },
+    if (exchange === 'MCX') {
+      // MCX: 9:00 AM - 11:30 PM IST (540 - 1410 min), Mon-Fri
+      marketOpen = weekday >= 1 && weekday <= 5 && totalMin >= 540 && totalMin < 1410;
+      marketMsg = marketOpen ? 'MCX Open' : 'MCX Closed';
+    } else {
+      // NSE/BSE: 9:15 AM - 3:30 PM IST (555 - 930 min), Mon-Fri, no holidays
+      marketOpen = weekday >= 1 && weekday <= 5 && totalMin >= 555 && totalMin < 930;
+      marketMsg = marketOpen ? 'Market Open' : 'Market Closed';
+    }
+
+    if (!marketOpen) {
+      return res.json({
+        status: 'success',
+        source: 'market_closed',
+        instrument,
+        config: instConfig,
+        market_message: marketMsg,
+        next_open: nextOpenLabel,
+        chain: [],
+        summary: null,
+        timestamp: new Date().toISOString(),
       });
     }
 
-    const totalCeOI = chain.reduce((s, c) => s + c.ce.oi, 0);
-    const totalPeOI = chain.reduce((s, c) => s + c.pe.oi, 0);
-    const pcr = totalCeOI > 0 ? Math.round((totalPeOI / totalCeOI) * 100) / 100 : 1;
-    const maxPainStrike = chain.reduce((best, c) => (c.ce.oi + c.pe.oi) > (best.ce.oi + best.pe.oi) ? c : best, chain[0]).strike;
+    // Market is open - try broker data
+    // For desktop, the broker token would be in the store
+    const settings = await db.getSettings();
+    const brokerToken = (settings.broker || {})[`${settings.active_broker || 'upstox'}_token`] || settings.broker?.access_token || '';
 
-    res.json({
-      status: 'success',
-      instrument, spot_price: spot, atm_strike: atmStrike,
-      expiry_days: expiryDays, chain, pcr, max_pain: maxPainStrike,
-      is_simulated: true, source: 'black_scholes',
-    });
+    if (!brokerToken) {
+      return res.json({
+        status: 'success',
+        source: 'broker_disconnected',
+        instrument,
+        config: instConfig,
+        market_message: 'No broker connected. Go to Settings and connect your broker.',
+        chain: [],
+        summary: null,
+        timestamp: new Date().toISOString(),
+      });
+    }
+
+    // Try fetching live option chain from Upstox
+    try {
+      const axios = require('axios');
+      const instKeyMap = {
+        'NIFTY50': 'NSE_INDEX|Nifty 50', 'BANKNIFTY': 'NSE_INDEX|Nifty Bank',
+        'FINNIFTY': 'NSE_INDEX|Nifty Fin Service', 'MIDCPNIFTY': 'NSE_INDEX|NIFTY MID SELECT',
+        'SENSEX': 'BSE_INDEX|SENSEX', 'BANKEX': 'BSE_INDEX|BANKEX',
+        'CRUDEOIL': 'MCX_FO|CRUDEOIL', 'GOLD': 'MCX_FO|GOLD', 'SILVER': 'MCX_FO|SILVER',
+      };
+      const instKey = instKeyMap[instrument] || `NSE_INDEX|${instrument}`;
+      const ocResp = await axios.get('https://api.upstox.com/v2/option/chain', {
+        headers: { Authorization: `Bearer ${brokerToken}`, 'Api-Version': '2.0', Accept: 'application/json' },
+        params: { instrument_key: instKey },
+        timeout: 15000,
+      });
+      if (ocResp.data?.status === 'success' && ocResp.data?.data?.length) {
+        return res.json({ status: 'success', source: 'live', data: ocResp.data.data, instrument, timestamp: new Date().toISOString() });
+      }
+      return res.json({ status: 'success', source: 'broker_error', instrument, config: instConfig, market_message: 'No data from broker', chain: [], summary: null, timestamp: new Date().toISOString() });
+    } catch (err) {
+      return res.json({ status: 'success', source: 'broker_error', instrument, config: instConfig, market_message: `Broker error: ${err.message}`, chain: [], summary: null, timestamp: new Date().toISOString() });
+    }
   });
 
   router.get('/api/oi-buildup-alerts', (req, res) => {

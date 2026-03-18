@@ -7,6 +7,7 @@ import logging
 import requests
 from typing import Dict, List, Optional
 from datetime import datetime, timezone, timedelta
+from market_hours_service import get_market_status, get_mcx_status
 
 logger = logging.getLogger(__name__)
 
@@ -125,28 +126,103 @@ class OptionChainService:
         """Return all supported option chain instruments"""
         return {k: {**v} for k, v in OPTION_INSTRUMENTS.items()}
 
-    async def get_live_option_chain(self, instrument: str, spot_price: float = 0, num_strikes: int = 15, expiry_days: int = 7) -> Dict:
-        """Try fetching live option chain from broker, fallback to simulated"""
-        if self.broker_service:
-            try:
-                # Map instrument name to broker-compatible key
-                inst_map = {
-                    'NIFTY50': 'Nifty 50', 'BANKNIFTY': 'Nifty Bank',
-                    'FINNIFTY': 'Nifty Fin Service', 'MIDCPNIFTY': 'NIFTY MID SELECT',
-                    'SENSEX': 'SENSEX', 'BANKEX': 'BANKEX',
-                    'CRUDEOIL': 'CRUDEOIL', 'GOLD': 'GOLD', 'SILVER': 'SILVER',
-                }
-                broker_key = inst_map.get(instrument, instrument)
-                result = await self.broker_service.get_option_chain(broker_key)
-                
-                if result.get('status') == 'success' and result.get('data'):
-                    live_data = result['data']
-                    return self._parse_live_chain(instrument, live_data, spot_price, num_strikes, expiry_days)
-            except Exception as e:
-                logger.warning(f"Live option chain failed for {instrument}: {e}")
+    def _get_market_status_for_instrument(self, instrument: str) -> Dict:
+        """Get market status based on instrument's exchange"""
+        config = OPTION_INSTRUMENTS.get(instrument)
+        if not config:
+            return {'is_open': False, 'reason': 'unknown', 'message': 'Unknown instrument'}
+        exchange = config.get('exchange', 'NSE')
+        if exchange == 'MCX':
+            return get_mcx_status()
+        return get_market_status()
 
-        # Fallback to simulated
-        return self.generate_option_chain(instrument, spot_price, num_strikes, expiry_days)
+    async def get_live_option_chain(self, instrument: str, spot_price: float = 0, num_strikes: int = 15, expiry_days: int = 7) -> Dict:
+        """Fetch live option chain from broker. No simulation fallback."""
+        config = OPTION_INSTRUMENTS.get(instrument)
+        if not config:
+            return {'status': 'error', 'message': f'Unknown instrument: {instrument}'}
+
+        # Step 1: Check market status
+        market_status = self._get_market_status_for_instrument(instrument)
+        if not market_status.get('is_open'):
+            return {
+                'status': 'success',
+                'source': 'market_closed',
+                'instrument': instrument,
+                'config': config,
+                'market_message': market_status.get('message', 'Market Closed'),
+                'next_open': market_status.get('next_open_label', ''),
+                'chain': [],
+                'summary': None,
+                'timestamp': datetime.now(timezone.utc).isoformat(),
+            }
+
+        # Step 2: Check broker connection
+        if not self.broker_service:
+            return {
+                'status': 'success',
+                'source': 'broker_disconnected',
+                'instrument': instrument,
+                'config': config,
+                'market_message': 'No broker connected. Go to Settings and connect your broker.',
+                'chain': [],
+                'summary': None,
+                'timestamp': datetime.now(timezone.utc).isoformat(),
+            }
+
+        # Step 3: Try fetching live data from broker
+        try:
+            conn = await self.broker_service.check_connection()
+            if not conn.get('connected'):
+                return {
+                    'status': 'success',
+                    'source': 'broker_disconnected',
+                    'instrument': instrument,
+                    'config': config,
+                    'market_message': 'Broker not connected. Please login to your broker first.',
+                    'chain': [],
+                    'summary': None,
+                    'timestamp': datetime.now(timezone.utc).isoformat(),
+                }
+
+            inst_map = {
+                'NIFTY50': 'Nifty 50', 'BANKNIFTY': 'Nifty Bank',
+                'FINNIFTY': 'Nifty Fin Service', 'MIDCPNIFTY': 'NIFTY MID SELECT',
+                'SENSEX': 'SENSEX', 'BANKEX': 'BANKEX',
+                'CRUDEOIL': 'CRUDEOIL', 'GOLD': 'GOLD', 'SILVER': 'SILVER',
+            }
+            broker_key = inst_map.get(instrument, instrument)
+            result = await self.broker_service.get_option_chain(broker_key)
+
+            if result.get('status') == 'success' and result.get('data'):
+                live_data = result['data']
+                return self._parse_live_chain(instrument, live_data, spot_price, num_strikes, expiry_days)
+
+            # Broker returned an error (e.g. no data for this instrument)
+            error_msg = result.get('message', 'No data available from broker')
+            return {
+                'status': 'success',
+                'source': 'broker_error',
+                'instrument': instrument,
+                'config': config,
+                'market_message': f'Broker error: {error_msg}',
+                'chain': [],
+                'summary': None,
+                'timestamp': datetime.now(timezone.utc).isoformat(),
+            }
+
+        except Exception as e:
+            logger.warning(f"Live option chain failed for {instrument}: {e}")
+            return {
+                'status': 'success',
+                'source': 'broker_error',
+                'instrument': instrument,
+                'config': config,
+                'market_message': f'Failed to fetch data: {str(e)}',
+                'chain': [],
+                'summary': None,
+                'timestamp': datetime.now(timezone.utc).isoformat(),
+            }
 
     def _parse_live_chain(self, instrument: str, live_data: list, spot_price: float, num_strikes: int, expiry_days: int) -> Dict:
         """Parse live option chain data from broker into our format"""
@@ -398,7 +474,18 @@ class OptionChainService:
         return {'iv': iv, 'option_type': option_type}
 
     def detect_oi_buildup(self, instrument: str, spot_price: float = 0, expiry_days: int = 7) -> Dict:
-        """Detect OI buildup patterns and generate alerts"""
+        """Detect OI buildup patterns and generate alerts - only when market is open"""
+        market_status = self._get_market_status_for_instrument(instrument)
+        if not market_status.get('is_open'):
+            return {
+                'status': 'success',
+                'instrument': instrument,
+                'alerts': [],
+                'message': market_status.get('message', 'Market Closed'),
+                'source': 'market_closed',
+                'timestamp': datetime.now(timezone.utc).isoformat(),
+            }
+
         chain_data = self.generate_option_chain(instrument, spot_price, 10, expiry_days)
         if chain_data.get('status') != 'success':
             return {'status': 'error', 'alerts': []}

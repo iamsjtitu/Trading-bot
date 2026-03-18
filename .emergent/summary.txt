@@ -1,165 +1,174 @@
 <analysis>**original_problem_statement:**
-The user wants to build an AI-powered automated options trading bot. The bot should connect to world news, use an AI model (like GPT-4o) to perform sentiment analysis (Bullish/Bearish), and automatically execute options (Call/Put) trades on various brokers (starting with Upstox) based on these signals. The user's final requirement is for this to be a standalone desktop application for Windows and Mac that bundles all dependencies and includes an auto-update mechanism.
+The user wants to build an AI-powered automated options trading bot. The bot should connect to world news, use an AI model (like GPT-4o) to perform sentiment analysis (Bullish/Bearish), and automatically execute options (Call/Put) trades on various brokers (starting with Upstox). The user's final requirement is for this to be a standalone desktop application for Windows and Mac that bundles all dependencies and includes an auto-update mechanism.
 
 **PRODUCT REQUIREMENTS:**
-- **Brokers:** Upstox (primary), with a newly built framework to support Zerodha, Angel One, 5paisa, Paytm Money, and IIFL.
+- **Brokers:** Upstox (primary), with a fully implemented API framework for Zerodha, Angel One, 5paisa, Paytm Money, and IIFL.
 - **AI Model:** Emergent LLM Key (using GPT-4o).
-- **News Source:** Live APIs and scraped news from 9 sources (including NDTV Profit, CNBC TV18, Livemint).
+- **News Source:** Live APIs and scraped news from 9 sources.
 - **Instruments:** Nifty, BankNifty, FinNifty, MidcapNifty, Sensex, Bankex, and MCX Commodities (Gold, Silver, Crude).
 - **Core Features:**
     - Switchable Paper and Live trading modes.
-    - Automated trade entry and exit based on AI signals.
+    - Automated trade entry and exit based on AI signals for all instruments.
     - Real-time market data (via WebSocket).
     - Live Option Chain with Greeks (Delta, Gamma, Theta, Vega) and OI Buildup alerts.
-    - Multi-broker support.
+    - Multi-broker support with per-broker credential storage.
     - Configurable risk management.
     - Desktop application with auto-updates.
 
 **User's preferred language**: Hinglish. The next agent MUST respond in Hinglish.
 
 **what currently exists?**
-A comprehensive Electron/React desktop application with a Python/FastAPI backend. It features a multi-broker architecture, a sophisticated AI engine for signal generation, real-time WebSocket-based market data, a live Option Chain with Greeks and OI Buildup alerts, and support for multiple indices and commodities. The previous agent implemented major bug fixes for long-standing issues with real-time data refresh and automated trade execution, which are now pending user verification. A CI/CD pipeline for building desktop releases is in place and was recently made more robust.
+A comprehensive Electron/React desktop application with a synchronized Python/FastAPI backend (for web preview) and Node.js backend (for the desktop app). The application now has a robust, broker-agnostic architecture where all 6 requested brokers (Upstox, Zerodha, etc.) are fully implemented in the backend, with per-broker credential storage. It features an AI engine, real-time WebSocket data, a live Option Chain, and a dual-market-hours indicator for NSE and MCX. The application version is **2.4.0**.
+
+Key recent fixes include:
+1.  **Desktop Backend Sync:** All feature endpoints from the Python backend were ported to the desktop's Node.js backend, resolving a major discrepancy.
+2.  **Broker Switching:** Fixed a critical bug where all brokers shared the same credentials. Now, each broker has its own separate credential and token storage.
+3.  **MCX Live Data:** Implemented a dynamic instrument key resolver to fetch correct, real-time MCX commodity data from Upstox.
 
 **Last working item**:
-- **Last item agent was working**: The user requested a new feature: display a Market Closed message with the reopening date and time when the market is not active. The agent was in the initial planning phase for this feature after acknowledging the user's request.
-- **Status**: NOT STARTED
+- **Last item agent was working**: The user reported that the Option Chain always shows simulated data (from the Black-Scholes model) regardless of the instrument selected or market status. The user wants the Option Chain to fetch **LIVE data** from the connected broker when the market is open and to show a Market Closed message when it's inactive. The agent had started investigating  to implement this logic.
+- **Status**: IN PROGRESS
 - **Agent Testing Done**: N
-- **Which testing method agent to use?**: Frontend testing agent or screenshot tool to verify the new UI element.
+- **Which testing method agent to use?**: Both backend and frontend testing agents.
+    - **Backend:** Verify that the  correctly returns live data when the broker is connected and the market is open, and returns a market closed or broker disconnected status otherwise.
+    - **Frontend:** Verify that the  component correctly displays the live data or the status messages.
 - **User Testing Done**: N
 
 **All Pending/In progress Issue list**:
-- **Issue 1 (P0): User Verification for Critical Bug Fixes.** The user had reported that market data was not refreshing in real-time and that auto-entry/exit was not working. The previous agent implemented significant fixes for both.
-  - **Auto-Refresh Fix:** Isolated the market data polling into its own  hook in  to prevent it from being reset by other state changes. A 500ms polling interval was established for live mode.
-  - **Auto-Entry/Exit Fix:** Ensured that  and  settings are correctly loaded from  on backend startup in . Added logging to trace signal generation and trade execution flow in .
-  - These fixes are functionally complete but **require the user to test and confirm** they work as expected in their live environment.
-- **Issue 2 (P2): CI/CD Build Fragility.** A recurring issue where the GitHub Actions build fails due to a timeout when installing NSIS via Chocolatey.
-  - **Attempted fix:** The agent added a 3-step retry logic and a fallback to directly download NSIS from SourceForge in .
-  - While this should make the build more resilient, it remains a potential point of failure.
+- **Issue 1 (P0): Option Chain shows simulated data instead of live broker data.** This is the current .
+- **Issue 2 (P1): Full user verification pending for multiple critical fixes.** The user has not yet had a stable version to test the end-to-end live functionality of previous major fixes.
 
-  **Issues Detail:**
-  - **Issue 1: User Verification for Critical Bug Fixes**
-     - **Attempted fixes**: As described above, the logic for data polling and setting initialization was completely overhauled.
-     - **Next debug checklist**:
-        1.  Engage the user to test the application with a live broker connection.
-        2.  Ask them to verify if the market data updates automatically every ~500ms in LIVE mode.
-        3.  Ask them to enable Auto Entry and confirm if new signals generate live trades.
-        4.  If issues persist, inspect the backend logs () for errors from the newly added logging statements.
-     - **Why fix this issue and what will be achieved with the fix?**: This validates that the bot's core functionalities—seeing live data and trading on it—are finally working as intended.
-     - **Status**: USER VERIFICATION PENDING
-     - **Is recurring issue?**: Y
-     - **Should Test frontend/backend/both after fix?**: User testing required.
-     - **Blocked on other issue**: No.
+**Issues Detail:**
+- **Issue 1: Option Chain shows simulated data**
+    - **Attempted fixes**: None. The agent was in the process of investigating when the session ended.
+    - **Next debug checklist**:
+        1.  Modify  in .
+        2.  First, check the market status (NSE or MCX) based on the selected instrument.
+        3.  If the market is closed, return a response with .
+        4.  If the market is open, check if a broker is connected.
+        5.  If the broker is connected, call the active broker's method to fetch the live option chain (e.g., ). Parse this live data and return it with .
+        6.  If the broker is NOT connected, return a response with . **Do not fall back to the Black-Scholes simulation.**
+        7.  Update the frontend component  to handle the new  states (, ) by displaying an appropriate message instead of the data table.
+    - **Why fix this issue and what will be achieved with the fix?**: This is a core feature for a trading bot. The user needs to see real-time data to trust and use the application effectively.
+    - **Status**: IN PROGRESS
+    - **Is recurring issue?**: N
+    - **Should Test frontend/backend/both after fix?**: Both.
+    - **Blocked on other issue**: None.
+
+- **Issue 2: User Verification for Critical Bug Fixes**
+    - **Attempted fixes**: N/A (Pending user action).
+    - **Next debug checklist**: After fixing the Option Chain, prompt the user to perform a complete end-to-end test in a LIVE environment, including:
+        - Connecting a live broker account.
+        - Verifying market data auto-refreshes.
+        - Verifying live option chain data appears.
+        - Enabling and verifying auto-trade entry/exit for both NSE and MCX instruments.
+        - Testing the broker switching functionality with at least two different broker accounts.
+    - **Why fix this issue and what will be achieved with the fix?**: To confirm that the application's core functionalities are finally stable and working as the user expects.
+    - **Status**: USER VERIFICATION PENDING
+    - **Is recurring issue?**: Y
+    - **Should Test frontend/backend/both after fix?**: User testing is required.
+    - **Blocked on other issue**: Issue 1 (Option Chain Live Data).
 
 **In progress Task List**:
-There are no tasks currently in progress.
+- **Task 1: Implement Live Option Chain Data & Disable Simulation**
+    - **Where to resume**: Continue editing  and  as per the checklist for Issue 1.
+    - **What will be achieved with this?**: The option chain will show real data from a connected broker or a clear status message, fulfilling a critical user requirement.
+    - **Status**: IN PROGRESS
+    - **Should Test frontend/backend/both after fix?**: Both.
+    - **Blocked on something**: No.
 
 **Upcoming and Future Tasks**
 - **Upcoming Tasks:**
-  - **P0: Implement Market Closed Indicator.** Display a message on the dashboard indicating that the market is closed and showing the next opening time. This was the user's most recent request.
-  - **P1: Rebuild Desktop App.** After the user confirms the critical bug fixes are working and the Market Closed feature is added, trigger a new build to package all the changes into  and  files.
+  - **P0: Automatically bump version to 2.5.0** after the next change, as per the user's request.
+  - **P1: User verification of all fixes.** (See Issue 2).
+  - **P2: Trigger new Desktop App Build.** After user confirmation, create a new version tag to build the final  and  files.
 - **Future Tasks:**
   - Add support for trading Stock Options.
   - Enhance trade analytics and tax reporting.
   - Integrate Telegram notifications.
+  - Refactor the large  component.
 
 **Completed work in this session**
-- **Feature: Multi-Broker Architecture:** Created a base abstraction layer () and added placeholder services for Zerodha, Angel One, 5paisa, Paytm Money, and IIFL. The UI was updated to allow broker selection.
-- **Feature: Live Option Chain & Greeks:** Implemented a new Option Chain tab that fetches live data from a connected broker or simulates it using the Black-Scholes model. It displays all option Greeks (Delta, Theta, etc.) in real-time.
-- **Feature: MCX Commodity Trading:** Added support for Gold, Silver, and Crude Oil in the option chain and trading engine.
-- **Feature: OI Buildup Alerts:** Created a service to analyze option chain data and provide real-time alerts for Support/Resistance levels, Long/Short Buildup, and Max Pain.
-- **Feature: Real-time WebSocket Data:** Replaced the slow polling mechanism with an Upstox WebSocket integration for instant market data updates in LIVE mode.
-- **Critical Bug Fix: Auto-Refresh:** Fixed the long-standing issue of market data not updating by isolating the data-fetching logic in  into its own  hook.
-- **Critical Bug Fix: Auto-Entry/Exit:** Fixed the bug where the trading engine would not place live trades by ensuring settings were loaded correctly on startup and fixing the logic flow.
-- **CI/CD Fix:** Made the Windows build process in GitHub Actions more robust by adding retry logic and a fallback for the NSIS installer.
-- **Enhancement: Version Bump:** Application version was updated to **1.7.0**.
+- **Feature: Dual Market Hours Indicator:** Added a banner with separate open/close status and countdowns for NSE/BSE and MCX markets.
+- **Critical Bug Fix: Desktop App Backend Synchronization:** Identified and fixed a major architectural flaw where the desktop app used an outdated Node.js backend. Ported all modern features (multi-broker, market status, option chain, etc.) to the Node.js backend, synchronizing it with the Python backend.
+- **Critical Bug Fix: Multi-Broker Credential Isolation:** Fixed the bug where all brokers shared the same credentials and connection status. Implemented a per-broker storage system for API keys and access tokens.
+- **Critical Bug Fix: MCX Live Market Data:** Fixed MCX data not appearing by creating a dynamic instrument key resolver that fetches the correct daily contract keys from the Upstox master file.
+- **Bug Fixes:** Resolved numerous smaller issues, including the option chain instrument dropdown, setting refresh intervals, adding broker descriptions, and making all API calls broker-agnostic.
+- **CI/CD Fix:** Made the Windows build process more robust by fixing a  issue with the  executable in .
+- **Versioning:** The application was incrementally versioned from v1.7.0 to **v2.4.0**.
 
 **Earlier issues found/mentioned but not fixed**
-All major issues reported by the user in this session have been addressed and are pending user verification.
+None. All issues raised during the session were addressed.
 
 **Known issue recurrence from previous fork**
-- **Issue recurrence in previous fork**: The CI/CD build process in  is fragile.
-- **Recurrence count**: 4+
-- **Status**: RESOLVED (for now, with a more robust installation script).
+- **Issue recurrence in previous fork**: The CI/CD build process for the desktop app was fragile.
+- **Recurrence count**: 5+
+- **Status**: RESOLVED (by adding the  PATH explicitly to the GitHub Actions workflow).
 
 **Code Architecture**
 
 
 **Key Technical Concepts**
 - **Frontend**: React, Tailwind CSS, Chart.js, Axios
-- **Backend**: Python (FastAPI), **WebSocket** for real-time data
-- **AI**: OpenAI (GPT-4o via )
+- **Backend**: Python (FastAPI), Node.js (Express)
 - **Desktop**: Electron, 
-- **Architecture**: **Broker Abstraction Layer** for multi-broker support
-- **Finance**: **Black-Scholes Model** for Option Greeks calculation (fallback)
+- **Architecture**: **Dual Backend (Python/Node.js)** with synchronized features, **Broker Abstraction Layer**, **Dynamic Instrument Key Resolution**.
+- **Finance**: Black-Scholes Model for Option Greeks (to be disabled in favor of live data).
 
 **key DB schema**
-- ****: File-based JSON for , , . No changes.
+- The file-based database now stores credentials and tokens on a per-broker basis within the main settings object (e.g., , , , ).
 
 **changes in tech stack**
-- Backend: Added usage: websockets [--version | <uri>] and  for real-time data streaming.
+- No new technologies were added, but the existing architecture was significantly refactored to support true multi-broker functionality and synchronize the dual backends.
 
 **All files of reference**
-- : Critical file. **Refactored to fix the auto-refresh bug.**
-- : Critical file. **Updated to load auto-trade settings and integrate all new services** (Broker Manager, Option Chain, WebSocket).
-- : Critical file. **Updated to fix auto-entry/exit logic** and handle MCX trades.
-- : New file defining the interface for all brokers.
-- : New file for all Option Chain logic.
-- : New UI component for the Option Chain.
-- : Updated to fix the recurring CI/CD failure.
+- : **File to modify for the current task.**
+- : **File to modify for the current task.**
+- : Core file, now broker-agnostic.
+- : Core UI for broker settings.
+- : Main UI component, now broker-agnostic.
+- : Critical new file for MCX data.
+- : New central router for the desktop app's backend.
+- : CI/CD workflow file.
 
 **Areas that need refactoring**:
-- The dual backend setup (Python and legacy Node.js) still exists. Consolidating logic into the Python backend remains a long-term goal.
--  is still a very large component, although the most critical performance issue has been resolved.
+- The **dual backend architecture** remains the biggest source of complexity. While functionality is now synchronized, any new feature requires implementation in both Python and Node.js. The ideal long-term solution is to make the desktop app a thin client for the Python backend.
+-  is still a very large component that could be broken down.
 
 **key api endpoints**
-- : **NEW** WebSocket endpoint for real-time market data.
-- : **NEW** Lightweight polling endpoint (500ms).
-- : **NEW** Endpoint to get option chain data.
-- : **NEW** Endpoint to list available brokers.
-- : **NEW** Endpoint for Open Interest alerts.
-- : Updated to handle new settings like  and .
+- : **NEW**, provides separate status for NSE and MCX.
+- : Sets the active broker for the session.
+- : Checks the connection status of the *active* broker.
+-  & : Generic OAuth endpoints for the active broker.
+- , , : Generic data-fetching endpoints for the active broker.
+- : **NEW**, internal API used by the desktop backend to get resolved MCX keys.
 
 **Critical Info for New Agent**
-- **Your first task is to implement the Market Closed indicator**, as requested by the user.
-- **After that, you MUST verify with the user if the critical bug fixes for auto-refresh and auto-entry are working.** This is the highest priority after the new feature. Use the logs and new status endpoints () to debug if the user still reports issues.
-- The app now has a robust multi-broker framework. The option chain uses live data when a broker is connected but falls back to a Black-Scholes simulation otherwise. Be aware of this dual-mode functionality during testing.
+- **User wants LIVE data, no more simulation.** The immediate task is to make the Option Chain fetch data from the connected broker and explicitly show a Market Closed or Connect Broker message instead of falling back to the Black-Scholes model.
+- **The user expects a version bump with every change.** After completing the current task, remember to bump the version to **2.5.0**.
+- **The dual backend architecture is tricky.** Remember that for desktop app functionality, changes are often required in both the  (Python) and  (Node.js) directories.
 
 **documents and test reports created in this job**
-- Multiple test reports were created, with the last one being , which confirmed all features and fixes were working correctly in the testing environment.
+-  (updated)
+-  (last successful test run)
 
 **Last 10 User Messages and any pending HUMAN messages**
-- **10. User:** Asks for a Market Closed indicator with reopening date/time.
-- **9. User:** Provides a screen recording showing that market data is static and auto-entry/exit is not working, despite the UI indicating they are enabled.
-- **8. User:** Confirms the version bump.
-- **7. User:** Asks for a detailed explanation of how the entire bot works.
-- **6. User:** Asks to bump the version.
-- **5. User:** Reports a CI/CD build failure from a GitHub Actions screenshot.
-- **4. User:** Confirms the implementation of MCX and real-time option chain.
-- **3. User:** Asks what is this? regarding the backlog items for MCX execution and real-time option chain streaming.
-- **2. User:** Confirms the version bump to 1.6.0.
-- **1. User:** Asks to add real-time option chain streaming with OI Buildup alerts.
+1.  **User:** Option chain is showing the same simulated data for all instruments, even when the market is closed. I want LIVE data. (CURRENT P0 TASK)
+2.  **User:** MCX live data is not showing in the market ticker. (FIXED)
+3.  **User:** Broker switching is not working; every broker shows Connected and uses Upstox data. (FIXED)
+4.  **User:** Always bump the version after any change. (ACKNOWLEDGED)
+5.  **User:** Add a separate market hours indicator for MCX. (DONE)
+6.  **User:** Reported multiple issues: broken instrument dropdown in option chain, slow refresh, broker switching failure, and couldn't find MCX data. (FIXED)
+7.  **User:** Asks to bump version and confirm commodity trading is included. (DONE)
+8.  **User:** Expressed frustration that no changes were visible in the desktop app. (This led to the discovery and fix of the dual-backend issue).
+9.  **User:** Approved the plan to add the Market Closed indicator.
+10. **User:** Requested the agent to confirm its plan.
 
 **Project Health Check:**
-- **Broken**: None. However, two critical systems are pending user verification.
-  - **User Verification Pending**: Market Data Auto-Refresh, Automated Live Trade Entry/Exit.
-- **Mocked**:
-  - Option Chain data is simulated using the Black-Scholes model when no broker is connected.
+- **Broken**: The Option Chain feature is not meeting user expectations (shows simulated data), making it functionally broken from the user's perspective.
+- **User Verification Pending**: A large number of critical fixes (Auto-Refresh, Auto-Trade, Multi-Broker Switching, MCX Data) are functionally complete but have not been confirmed by the user in a live environment.
+- **Mocked**: The Option Chain is still using a Black-Scholes simulation, which is the P0 issue that needs to be removed.
 
 **3rd Party Integrations**
 - **OpenAI GPT-4o**: Uses Emergent LLM Key.
-- **Upstox**: Requires User API Key (Live).
-- **Zerodha, Angel One, 5paisa, Paytm Money, IIFL**: Placeholders, require implementation and User API Keys.
-- **News APIs / Web Scraping**: Active.
-- **Desktop App**: Electron, electron-builder, electron-updater.
-
-**Testing status**
-- **Testing agent used after significant changes**: YES. The testing agent was used successfully multiple times to validate all new features and bug fixes, with the last run showing 100% pass rates for both frontend and backend.
-- **Troubleshoot agent used after agent stuck in loop**: NO.
-- **Test files created**: None.
-- **Known regressions**: None. The previous regressions (auto-refresh, auto-entry) have been fixed and are pending verification.
-
-**Credentials to test flow:**
-N/A. Use Paper Trading mode for development. The application is designed to work with simulated data when no live broker is connected.
-
-**What agent forgot to execute**
-The agent has been thorough and addressed all user requests and bug reports from the session. No tasks were forgotten.</analysis>
+- **Upstox</analysis>

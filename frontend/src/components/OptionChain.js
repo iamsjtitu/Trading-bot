@@ -5,6 +5,7 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Switch } from '@/components/ui/switch';
+import { AlertCircle, WifiOff, Clock, RefreshCw, Eye, EyeOff } from 'lucide-react';
 
 const API = `${process.env.REACT_APP_BACKEND_URL}/api`;
 
@@ -134,20 +135,64 @@ export default function OptionChain() {
           <div className="flex items-end gap-2 pt-4">
             <Button onClick={() => { loadChain(); loadAlerts(); }} size="sm" disabled={loading} data-testid="refresh-chain-btn"
               className="bg-blue-600 hover:bg-blue-700 text-white">
-              {loading ? 'Loading...' : 'Refresh'}
+              {loading ? 'Loading...' : <><RefreshCw className="w-3 h-3 mr-1" />Refresh</>}
             </Button>
             <Button onClick={() => setShowGreeks(!showGreeks)} size="sm" variant="outline" data-testid="toggle-greeks-btn">
-              {showGreeks ? 'Hide Greeks' : 'Show Greeks'}
+              {showGreeks ? <><EyeOff className="w-3 h-3 mr-1" />Hide Greeks</> : <><Eye className="w-3 h-3 mr-1" />Show Greeks</>}
             </Button>
             <div className="flex items-center gap-2 ml-2">
               <Switch checked={autoRefresh} onCheckedChange={setAutoRefresh} data-testid="auto-refresh-toggle" />
               <label className="text-xs text-gray-600 whitespace-nowrap">Auto Refresh</label>
             </div>
-            {chain?.source === 'live' && <Badge className="bg-green-600 ml-2">LIVE DATA</Badge>}
-            {chain?.source !== 'live' && <Badge className="bg-gray-500 ml-2">SIMULATED</Badge>}
+            {chain?.source === 'live' && <Badge className="bg-green-600 ml-2" data-testid="source-badge">LIVE DATA</Badge>}
+            {chain?.source === 'market_closed' && <Badge className="bg-amber-600 ml-2" data-testid="source-badge">MARKET CLOSED</Badge>}
+            {chain?.source === 'broker_disconnected' && <Badge className="bg-red-600 ml-2" data-testid="source-badge">BROKER OFFLINE</Badge>}
+            {chain?.source === 'broker_error' && <Badge className="bg-orange-600 ml-2" data-testid="source-badge">DATA ERROR</Badge>}
           </div>
         </div>
       </Card>
+
+      {/* Status Message (Market Closed / Broker Disconnected / Error) */}
+      {chain && chain.source !== 'live' && chain.chain?.length === 0 && (
+        <Card className="p-8 bg-white border-gray-200 shadow-md" data-testid="option-chain-status-card">
+          <div className="flex flex-col items-center justify-center text-center space-y-4">
+            {chain.source === 'market_closed' && (
+              <>
+                <div className="w-16 h-16 rounded-full bg-amber-100 flex items-center justify-center">
+                  <Clock className="w-8 h-8 text-amber-600" />
+                </div>
+                <h3 className="text-lg font-bold text-gray-800">{chain.market_message || 'Market Closed'}</h3>
+                {chain.next_open && (
+                  <p className="text-sm text-gray-500">Next opens: <span className="font-medium text-gray-700">{chain.next_open}</span></p>
+                )}
+                <p className="text-xs text-gray-400 max-w-md">Option chain data is available only during market hours. The chain will automatically load live data when the market opens and your broker is connected.</p>
+              </>
+            )}
+            {chain.source === 'broker_disconnected' && (
+              <>
+                <div className="w-16 h-16 rounded-full bg-red-100 flex items-center justify-center">
+                  <WifiOff className="w-8 h-8 text-red-600" />
+                </div>
+                <h3 className="text-lg font-bold text-gray-800">Broker Not Connected</h3>
+                <p className="text-sm text-gray-500">{chain.market_message || 'Please connect your broker to view live option chain data.'}</p>
+                <p className="text-xs text-gray-400 max-w-md">Go to <span className="font-semibold">Settings &gt; Broker</span> to connect your trading account.</p>
+              </>
+            )}
+            {chain.source === 'broker_error' && (
+              <>
+                <div className="w-16 h-16 rounded-full bg-orange-100 flex items-center justify-center">
+                  <AlertCircle className="w-8 h-8 text-orange-600" />
+                </div>
+                <h3 className="text-lg font-bold text-gray-800">Data Unavailable</h3>
+                <p className="text-sm text-gray-500">{chain.market_message || 'Could not fetch option chain data from broker.'}</p>
+                <Button onClick={() => { loadChain(); }} size="sm" className="mt-2 bg-blue-600 hover:bg-blue-700 text-white" data-testid="retry-btn">
+                  <RefreshCw className="w-3 h-3 mr-1" />Retry
+                </Button>
+              </>
+            )}
+          </div>
+        </Card>
+      )}
 
       {/* Summary Bar */}
       {chain?.summary && (
@@ -212,7 +257,7 @@ export default function OptionChain() {
       )}
 
       {/* Option Chain Table */}
-      {chain?.chain && (
+      {chain?.chain && chain.chain.length > 0 && (
         <Card className="bg-white border-gray-200 shadow-md overflow-hidden">
           <div className="overflow-x-auto">
             <table className="w-full text-xs" data-testid="option-chain-table">
@@ -318,12 +363,14 @@ export default function OptionChain() {
       )}
 
       {/* Legend */}
-      <div className="flex flex-wrap gap-4 text-xs text-gray-500 px-2">
-        <span><span className="inline-block w-3 h-3 bg-yellow-100 border border-yellow-300 rounded mr-1"></span>ATM Strike</span>
-        <span><span className="inline-block w-3 h-3 bg-green-50 border border-green-200 rounded mr-1"></span>ITM Calls</span>
-        <span>PCR &gt; 1 = Bullish | PCR &lt; 1 = Bearish</span>
-        <span>Max Pain = Strike where option writers lose least</span>
-      </div>
+      {chain?.chain && chain.chain.length > 0 && (
+        <div className="flex flex-wrap gap-4 text-xs text-gray-500 px-2">
+          <span><span className="inline-block w-3 h-3 bg-yellow-100 border border-yellow-300 rounded mr-1"></span>ATM Strike</span>
+          <span><span className="inline-block w-3 h-3 bg-green-50 border border-green-200 rounded mr-1"></span>ITM Calls</span>
+          <span>PCR &gt; 1 = Bullish | PCR &lt; 1 = Bearish</span>
+          <span>Max Pain = Strike where option writers lose least</span>
+        </div>
+      )}
     </div>
   );
 }
