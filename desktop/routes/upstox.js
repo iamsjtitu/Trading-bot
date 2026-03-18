@@ -126,10 +126,10 @@ module.exports = function (db) {
           if (!quote) { indices[key] = { value: 0, change: 0, changePct: 0 }; continue; }
 
           const ltp = quote.last_price || 0;
-          const cp = quote.ohlc?.close || quote.close_price || quote.cp || quote.prev_close || 0;
-          const change = cp ? ltp - cp : 0;
-          const changePct = cp ? (change / cp) * 100 : 0;
-          indices[key] = { value: ltp, change: Math.round(change * 100) / 100, changePct: Math.round(changePct * 100) / 100 };
+          const netChange = quote.net_change || 0;
+          const prevClose = ltp - netChange;
+          const changePct = prevClose > 0 ? (netChange / prevClose) * 100 : 0;
+          indices[key] = { value: ltp, change: Math.round(netChange * 100) / 100, changePct: Math.round(changePct * 100) / 100 };
         }
         return res.json({ status: 'success', data: indices });
       }

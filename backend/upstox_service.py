@@ -139,14 +139,13 @@ class UpstoxService:
                         continue
 
                     ltp = quote.get('last_price', 0)
-                    # Try multiple field names for close/previous close price
-                    ohlc = quote.get('ohlc', {})
-                    cp = ohlc.get('close', 0) or quote.get('close_price', 0) or quote.get('cp', 0) or quote.get('prev_close', 0)
-                    change = ltp - cp if cp else 0
-                    change_pct = (change / cp * 100) if cp else 0
+                    # Use net_change directly from Upstox (change from prev day close)
+                    net_change = quote.get('net_change', 0)
+                    prev_close = ltp - net_change if net_change else 0
+                    change_pct = (net_change / prev_close * 100) if prev_close > 0 else 0
                     indices[key] = {
                         'value': ltp,
-                        'change': round(change, 2),
+                        'change': round(net_change, 2),
                         'changePct': round(change_pct, 2)
                     }
                 return {'status': 'success', 'data': indices}

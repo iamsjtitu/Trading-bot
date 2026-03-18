@@ -114,9 +114,9 @@ function App() {
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [loadUpstoxData]);
 
-  const loadUpstoxData = async () => {
+  const loadUpstoxData = useCallback(async () => {
     try {
       const res = await axios.get(`${API}/combined-status`);
       const data = res.data;
@@ -160,7 +160,7 @@ function App() {
     } catch (e) {
       console.error('Upstox data error:', e);
     }
-  };
+  }, []);
 
   const loadAutoSettings = async () => {
     try {
@@ -236,7 +236,7 @@ function App() {
     };
     init();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+    }, []);
 
   // Auto square-off check near market close (3:15 PM IST)
   const checkSquareOff = useCallback(async () => {
@@ -260,15 +260,19 @@ function App() {
     const exitInterval = setInterval(() => {
       if (autoSettings.auto_exit && !emergencyStop) checkAutoExits();
     }, 10000);
+
+    // Auto news fetch: run when autoAnalyze is ON OR when auto_entry is ON (entry needs fresh signals)
+    const shouldAutoFetch = autoAnalyze || autoSettings.auto_entry;
     const analysisInterval = setInterval(() => {
-      if (autoAnalyze) fetchNewNews();
-    }, 5 * 60 * 1000);
+      if (shouldAutoFetch && !emergencyStop) fetchNewNews();
+    }, 3 * 60 * 1000); // Every 3 minutes for faster signal generation
+
     const countdownInterval = setInterval(() => {
-      if (autoAnalyze) setNextAnalysis(Math.ceil((300000 - (Date.now() % 300000)) / 1000));
+      if (shouldAutoFetch) setNextAnalysis(Math.ceil((180000 - (Date.now() % 180000)) / 1000));
     }, 1000);
     const squareOffInterval = setInterval(checkSquareOff, 60000);
 
-    // Market indices: use real data when live & connected, else simulate only in PAPER mode
+    // Market indices: auto-refresh for LIVE mode
     const marketInterval = setInterval(() => {
       if (tradingMode === 'LIVE' && upstoxConnected) {
         loadUpstoxData();
@@ -281,8 +285,7 @@ function App() {
           finnifty: { value: prev.finnifty.value + (Math.random() - 0.5) * 40, change: (Math.random() - 0.5) * 80, changePct: (Math.random() - 0.5) * 0.7 }
         }));
       }
-      // LIVE mode + disconnected: do nothing, keep static values
-    }, tradingMode === 'LIVE' && upstoxConnected ? 10000 : 1000);
+    }, tradingMode === 'LIVE' && upstoxConnected ? 5000 : 1000); // 5 sec refresh for LIVE
 
     return () => {
       clearInterval(dataInterval);
@@ -292,7 +295,7 @@ function App() {
       clearInterval(marketInterval);
       clearInterval(squareOffInterval);
     };
-  }, [autoAnalyze, autoSettings.auto_exit, emergencyStop, tradingMode, upstoxConnected, checkAutoExits, fetchNewNews, loadData, checkSquareOff]);
+  }, [autoAnalyze, autoSettings.auto_exit, autoSettings.auto_entry, emergencyStop, tradingMode, upstoxConnected, checkAutoExits, fetchNewNews, loadData, checkSquareOff, loadUpstoxData]);
 
   const formatCurrency = (amount) => new Intl.NumberFormat('en-IN', { style: 'currency', currency: 'INR', maximumFractionDigits: 0 }).format(amount);
   const formatTime = (isoString) => {

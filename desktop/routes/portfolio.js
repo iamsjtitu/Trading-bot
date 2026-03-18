@@ -199,11 +199,11 @@ module.exports = function (db) {
                 if (!quote) { indices[key] = { value: 0, change: 0, changePct: 0 }; continue; }
 
                 const ltp = quote.last_price || 0;
-                // Try multiple field names for close/previous close price
-                const cp = quote.ohlc?.close || quote.close_price || quote.cp || quote.prev_close || 0;
-                const change = cp ? ltp - cp : 0;
-                const changePct = cp ? (change / cp) * 100 : 0;
-                indices[key] = { value: ltp, change: Math.round(change * 100) / 100, changePct: Math.round(changePct * 100) / 100 };
+                // Use net_change directly from Upstox (change from prev day close)
+                const netChange = quote.net_change || 0;
+                const prevClose = ltp - netChange; // Derive previous close
+                const changePct = prevClose > 0 ? (netChange / prevClose) * 100 : 0;
+                indices[key] = { value: ltp, change: Math.round(netChange * 100) / 100, changePct: Math.round(changePct * 100) / 100 };
               }
               result.market_data = indices;
             }
