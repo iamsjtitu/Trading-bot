@@ -1,0 +1,137 @@
+{
+  "summary": "Iteration 16 Bug Fix Testing Complete - All 11 backend tests passed, All frontend tests passed. Auto-entry settings persist across backend restarts. Market data quick endpoint responds fast (<200ms). Settings > Broker tab now uses /api/brokers/connection correctly. Separated useEffect for market polling (500ms in LIVE mode).",
+  "backend_issues": {
+    "critical": [],
+    "minor": []
+  },
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": [
+      {"screen": "Console", "issues": ["404 errors for favicon - not affecting functionality"]}
+    ]
+  },
+  "test_report_links": [
+    "/app/test_reports/pytest/iteration16_results.xml",
+    "/app/backend/tests/test_iteration16_bugfixes.py"
+  ],
+  "action_items": [],
+  "critical_code_review_comments": [
+    "Market data polling useEffect correctly isolated - dependencies are minimal (tradingMode, upstoxConnected, loadMarketDataQuick)",
+    "Auto-entry settings now load from MongoDB at startup via settings_manager",
+    "Settings broker connection check uses /api/brokers/connection which routes to active broker"
+  ],
+  "updated_files": [
+    "/app/backend/tests/test_iteration16_bugfixes.py"
+  ],
+  "success_rate": {
+    "backend": "100% (11/11 tests passed)",
+    "frontend": "100% (All UI elements verified)"
+  },
+  "test_credentials": "None required - uses public preview URL",
+  "seed_data_creation": "None",
+  "retest_needed": false,
+  "main_agent_can_self_test": false,
+  "context_for_next_testing_agent": "Iteration 16 bug fixes verified. Auto-entry persists across restarts. Market data polling is separated into dedicated useEffect. Settings > Broker tab uses active broker's connection status. All 9 instruments work in option chain. SIMULATED badge shows when broker not connected.",
+  "tested_features": {
+    "auto_entry_persistence": {
+      "status": "PASS",
+      "description": "Auto-entry settings persist across backend restarts",
+      "verified_by": "Restarted backend, checked /api/auto-entry/status - auto_entry_enabled=true"
+    },
+    "market_data_quick_endpoint": {
+      "status": "PASS",
+      "description": "GET /api/market-data/quick responds fast (<200ms)",
+      "api_verified": {
+        "endpoint": "GET /api/market-data/quick",
+        "response_time": "<200ms",
+        "returns": "status, data, source (ws_cache|rest|none)"
+      }
+    },
+    "auto_entry_status_api": {
+      "status": "PASS",
+      "description": "GET /api/auto-entry/status returns correct engine state",
+      "api_verified": {
+        "endpoint": "GET /api/auto-entry/status",
+        "returns": "auto_entry_enabled, auto_exit_enabled, trading_mode, active_instrument, broker_connected"
+      }
+    },
+    "settings_update_syncs_engine": {
+      "status": "PASS",
+      "description": "POST /api/settings/update updates trading_engine state",
+      "api_verified": {
+        "endpoint": "POST /api/settings/update",
+        "auto_trading_syncs": true,
+        "trading_mode_syncs": true
+      }
+    },
+    "broker_connection_api": {
+      "status": "PASS",
+      "description": "GET /api/brokers/connection returns active broker status",
+      "api_verified": {
+        "endpoint": "GET /api/brokers/connection",
+        "returns": "connected (bool), message"
+      }
+    },
+    "frontend_load": {
+      "status": "PASS",
+      "description": "Frontend loads without JavaScript errors",
+      "ui_verified": {
+        "app_title": "AI Trading Bot - visible",
+        "trading_mode_badge": "LIVE TRADING - visible",
+        "upstox_status_badge": "Upstox: Disconnected - visible",
+        "market_ticker": "NIFTY, SENSEX, BANKNIFTY, FINNIFTY values shown"
+      }
+    },
+    "settings_broker_tab": {
+      "status": "PASS",
+      "description": "Settings > Broker tab shows connection status",
+      "ui_verified": {
+        "broker_tab": "visible and clickable",
+        "broker_selection": "6 brokers shown (Upstox, Zerodha, Angel One, 5paisa, Paytm, IIFL)",
+        "connection_badge": "DISCONNECTED badge shown correctly"
+      }
+    },
+    "option_chain_tab": {
+      "status": "PASS",
+      "description": "Option Chain tab renders correctly",
+      "ui_verified": {
+        "instrument_dropdown": "NIFTY 50 (NSE) selected",
+        "spot_price": "24,000 shown",
+        "atm_strike": "24,000 shown",
+        "pcr": "1 shown",
+        "max_pain": "24,000 shown",
+        "simulated_badge": "SIMULATED badge shown (expected)",
+        "oi_alerts": "Buildup alerts showing"
+      }
+    },
+    "market_polling_useeffect_isolation": {
+      "status": "PASS",
+      "description": "Market polling useEffect is separated from other intervals",
+      "code_verified": {
+        "file": "App.js",
+        "line_range": "319-338",
+        "dependencies": "tradingMode, upstoxConnected, loadMarketDataQuick only"
+      }
+    }
+  },
+  "api_verification_summary": {
+    "total_endpoints_tested": 11,
+    "passed": 11,
+    "failed": 0,
+    "endpoints": [
+      "GET /api/auto-entry/status",
+      "POST /api/settings/update (auto_trading)",
+      "POST /api/settings/update (trading_mode)",
+      "GET /api/market-data/quick (performance test)",
+      "GET /api/market-data/quick (source field)",
+      "GET /api/brokers/connection",
+      "GET /api/health",
+      "GET /api/option-chain/NIFTY",
+      "GET /api/instruments",
+      "GET /api/settings"
+    ]
+  },
+  "mocked_apis_note": "Market data returns source=none (no Upstox token in preview). Option chain data is SIMULATED. This is expected behavior.",
+  "console_errors": "404 for favicon - not affecting functionality"
+}

@@ -295,12 +295,28 @@ function App() {
       if (shouldAutoFetch && !emergencyStop) fetchNewNews();
     }, 3 * 60 * 1000); // Every 3 minutes for faster signal generation
 
+    // Immediate first news fetch when auto-entry turns ON
+    if (autoSettings.auto_entry && !emergencyStop) {
+      fetchNewNews();
+    }
+
     const countdownInterval = setInterval(() => {
       if (shouldAutoFetch) setNextAnalysis(Math.ceil((180000 - (Date.now() % 180000)) / 1000));
     }, 1000);
     const squareOffInterval = setInterval(checkSquareOff, 60000);
 
-    // Market indices: ultra-fast polling for LIVE mode, simulation for PAPER
+    return () => {
+      clearInterval(dataInterval);
+      clearInterval(exitInterval);
+      clearInterval(analysisInterval);
+      clearInterval(countdownInterval);
+      clearInterval(squareOffInterval);
+    };
+  }, [autoAnalyze, autoSettings.auto_exit, autoSettings.auto_entry, emergencyStop, checkAutoExits, fetchNewNews, loadData, checkSquareOff]);
+
+  // SEPARATE useEffect for ultra-fast market data polling (500ms)
+  // This MUST be isolated so other state changes don't kill the interval
+  useEffect(() => {
     let marketInterval;
     if (tradingMode === 'LIVE' && upstoxConnected) {
       // Immediate first load
@@ -318,16 +334,8 @@ function App() {
         }));
       }, 1000);
     }
-
-    return () => {
-      clearInterval(dataInterval);
-      clearInterval(exitInterval);
-      clearInterval(analysisInterval);
-      clearInterval(countdownInterval);
-      if (marketInterval) clearInterval(marketInterval);
-      clearInterval(squareOffInterval);
-    };
-  }, [autoAnalyze, autoSettings.auto_exit, autoSettings.auto_entry, emergencyStop, tradingMode, upstoxConnected, wsConnected, checkAutoExits, fetchNewNews, loadData, checkSquareOff, loadUpstoxData, loadMarketDataQuick]);
+    return () => { if (marketInterval) clearInterval(marketInterval); };
+  }, [tradingMode, upstoxConnected, loadMarketDataQuick]);
 
   // WebSocket connection for real-time market data
   useEffect(() => {

@@ -136,15 +136,17 @@ class TradingEngine:
             # Check if confidence is high enough
             confidence = sentiment.get('confidence', 0)
             if confidence < 60:  # Only trade on confident signals
-                logger.info(f"Confidence {confidence} too low, skipping signal")
+                logger.info(f"Signal SKIP: confidence {confidence}% < 60% for '{news_with_sentiment.get('title', '')[:50]}'")
                 return None
             
             trading_signal = sentiment.get('trading_signal', 'HOLD')
             if trading_signal == 'HOLD':
+                logger.info(f"Signal SKIP: HOLD signal for '{news_with_sentiment.get('title', '')[:50]}'")
                 return None
             
             # Determine signal type
             signal_type = 'CALL' if trading_signal == 'BUY_CALL' else 'PUT'
+            logger.info(f"Signal GENERATING: {signal_type} (confidence={confidence}%, mode={self.trading_mode}, auto_entry={self.auto_entry_enabled})")
             
             # Get current portfolio status
             portfolio = await self.db.portfolio.find_one({'type': 'paper'})

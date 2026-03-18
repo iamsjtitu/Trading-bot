@@ -92,7 +92,7 @@ export default function SettingsPanel({ onClose, onSave }) {
 
   const checkUpstoxConnection = async () => {
     try {
-      const res = await axios.get(`${API}/upstox/connection`);
+      const res = await axios.get(`${API}/brokers/connection`);
       setUpstoxStatus(res.data);
     } catch (e) {
       setUpstoxStatus({ connected: false, message: 'Failed to check' });

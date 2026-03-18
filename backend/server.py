@@ -535,6 +535,24 @@ async def get_stats():
         logger.error(f"Get stats error: {e}")
         return {"status": "error", "message": str(e)}
 
+@api_router.get("/auto-entry/status")
+async def get_auto_entry_status():
+    """Get current auto-entry/exit engine status"""
+    live_orders_count = await db.live_orders.count_documents({'status': 'PLACED'})
+    recent_signals = await db.trading_signals.count_documents({
+        'created_at': {'$gte': (datetime.now(timezone.utc) - timedelta(hours=1)).isoformat()}
+    })
+    return {
+        "status": "success",
+        "auto_entry_enabled": trading_engine.auto_entry_enabled,
+        "auto_exit_enabled": trading_engine.auto_exit_enabled,
+        "trading_mode": trading_engine.trading_mode,
+        "active_instrument": trading_engine.active_instrument,
+        "broker_connected": trading_engine.broker_service is not None,
+        "live_open_orders": live_orders_count,
+        "signals_last_hour": recent_signals,
+    }
+
 @api_router.post("/auto-exit/check")
 async def check_auto_exits():
     """Check and execute auto-exits for trades (paper + live)"""
@@ -1226,13 +1244,15 @@ async def get_market_data_quick():
     # First try WebSocket cache (instant)
     if market_data_manager.latest_data:
         return {"status": "success", "data": market_data_manager.latest_data, "source": "ws_cache", "ts": market_data_manager._last_update}
-    # Then try Upstox REST
+    # Then try broker REST
     try:
-        market = await upstox_service.get_live_market_data()
-        if market.get('status') == 'success' and market.get('data'):
-            return {"status": "success", "data": market['data'], "source": "rest", "ts": datetime.now(timezone.utc).isoformat()}
-    except Exception:
-        pass
+        token = await upstox_service._get_access_token()
+        if token:
+            market = await upstox_service.get_live_market_data()
+            if market.get('status') == 'success' and market.get('data'):
+                return {"status": "success", "data": market['data'], "source": "rest", "ts": datetime.now(timezone.utc).isoformat()}
+    except Exception as e:
+        logger.debug(f"Quick market data error: {e}")
     return {"status": "success", "data": None, "source": "none"}
 
 @api_router.get("/combined-status")
@@ -1346,6 +1366,11 @@ async def startup_event():
         # Set trading mode
         trading_engine.trading_mode = settings.get('trading_mode', 'PAPER')
         logger.info(f"Trading mode: {trading_engine.trading_mode}")
+        # Load auto-trading settings
+        auto_trading = settings.get('auto_trading', {})
+        trading_engine.auto_entry_enabled = auto_trading.get('auto_entry', False)
+        trading_engine.auto_exit_enabled = auto_trading.get('auto_exit', True)
+        logger.info(f"Auto-entry: {trading_engine.auto_entry_enabled}, Auto-exit: {trading_engine.auto_exit_enabled}")
         # Auto-start WebSocket if in LIVE mode with token
         if settings.get('trading_mode') == 'LIVE':
             token = await upstox_service._get_access_token()
