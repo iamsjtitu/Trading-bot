@@ -73,6 +73,25 @@ function App() {
   const [wsConnected, setWsConnected] = useState(false);
   const wsRef = useRef(null);
 
+  // Ultra-fast market data polling for LIVE mode (500ms)
+  const loadMarketDataQuick = useCallback(async () => {
+    try {
+      const res = await axios.get(`${API}/market-data/quick`);
+      if (res.data.status === 'success' && res.data.data) {
+        setMarketIndices(prev => ({
+          ...prev,
+          ...Object.fromEntries(
+            Object.entries(res.data.data).map(([k, v]) => [k, {
+              value: v.value || prev[k]?.value || 0,
+              change: v.change || 0,
+              changePct: v.changePct || 0,
+            }])
+          ),
+        }));
+      }
+    } catch (_) {}
+  }, []);
+
   const addNotification = useCallback((type, message) => {
     const id = Date.now();
     setNotifications(prev => [{ id, type, message, timestamp: new Date() }, ...prev].slice(0, 5));
@@ -281,13 +300,13 @@ function App() {
     }, 1000);
     const squareOffInterval = setInterval(checkSquareOff, 60000);
 
-    // Market indices: use WebSocket for LIVE mode, simulation for PAPER
+    // Market indices: ultra-fast polling for LIVE mode, simulation for PAPER
     let marketInterval;
     if (tradingMode === 'LIVE' && upstoxConnected) {
-      // WebSocket handles LIVE data, only poll as fallback every 30s
-      if (!wsConnected) {
-        marketInterval = setInterval(loadUpstoxData, 30000);
-      }
+      // Immediate first load
+      loadMarketDataQuick();
+      // Then poll every 500ms for near real-time
+      marketInterval = setInterval(loadMarketDataQuick, 500);
     } else if (tradingMode !== 'LIVE') {
       // Only simulate in PAPER mode
       marketInterval = setInterval(() => {
@@ -308,7 +327,7 @@ function App() {
       if (marketInterval) clearInterval(marketInterval);
       clearInterval(squareOffInterval);
     };
-  }, [autoAnalyze, autoSettings.auto_exit, autoSettings.auto_entry, emergencyStop, tradingMode, upstoxConnected, wsConnected, checkAutoExits, fetchNewNews, loadData, checkSquareOff, loadUpstoxData]);
+  }, [autoAnalyze, autoSettings.auto_exit, autoSettings.auto_entry, emergencyStop, tradingMode, upstoxConnected, wsConnected, checkAutoExits, fetchNewNews, loadData, checkSquareOff, loadUpstoxData, loadMarketDataQuick]);
 
   // WebSocket connection for real-time market data
   useEffect(() => {

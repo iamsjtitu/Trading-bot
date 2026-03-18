@@ -13,6 +13,8 @@ class TradingEngine:
         self.max_trade_amount = float(os.getenv('MAX_TRADE_AMOUNT', 20000))
         self.daily_limit = float(os.getenv('DAILY_LIMIT', 100000))
         self.risk_tolerance = os.getenv('RISK_TOLERANCE', 'medium')
+        self.trading_mode = 'PAPER'  # PAPER or LIVE
+        self.broker_service = None   # Set by server.py after init
         
         # Risk parameters based on tolerance
         self.risk_params = {
@@ -174,7 +176,13 @@ class TradingEngine:
             # Save signal
             await self.db.trading_signals.insert_one(signal)
             
-            # Execute paper trade
+            # Execute trade based on mode
+            if self.trading_mode == 'LIVE' and self.broker_service:
+                live_result = await self._execute_live_trade(signal)
+                signal['live_order'] = live_result
+                logger.info(f"LIVE trade executed: {live_result}")
+            
+            # Always create paper trade record for tracking
             await self._execute_paper_trade(signal)
             
             return signal
@@ -231,6 +239,131 @@ class TradingEngine:
             
         except Exception as e:
             logger.error(f"Paper trade execution error: {e}")
+
+    async def _execute_live_trade(self, signal: Dict) -> Dict:
+        """Execute a live trade on the connected broker"""
+        try:
+            if not self.broker_service:
+                return {'status': 'error', 'message': 'No broker connected'}
+
+            inst = self.instruments.get(self.active_instrument, self.instruments['NIFTY50'])
+            # Build order params for broker
+            order_params = {
+                'instrument_token': f"{signal.get('symbol', self.active_instrument)}{signal['strike_price']}{signal['signal_type'][:2]}",
+                'exchange': inst.get('exchange', 'NFO'),
+                'transaction_type': 'BUY',
+                'order_type': 'MARKET',
+                'quantity': signal['quantity'],
+                'product': 'MIS',  # Intraday
+                'validity': 'DAY',
+                'price': 0,
+                'trigger_price': 0,
+            }
+
+            result = await self.broker_service.place_order(order_params)
+            
+            if result.get('status') == 'success':
+                # Record live order in DB
+                live_order = {
+                    'signal_id': signal['id'],
+                    'order_id': result.get('order_id', ''),
+                    'broker_order': result,
+                    'trade_type': signal['signal_type'],
+                    'symbol': signal['symbol'],
+                    'quantity': signal['quantity'],
+                    'entry_price': signal['entry_price'],
+                    'stop_loss': signal['stop_loss'],
+                    'target': signal['target'],
+                    'status': 'PLACED',
+                    'created_at': datetime.now(timezone.utc).isoformat(),
+                }
+                await self.db.live_orders.insert_one(live_order)
+                logger.info(f"LIVE ORDER PLACED: {signal['signal_type']} {signal['symbol']} qty={signal['quantity']} order_id={result.get('order_id')}")
+                return {'status': 'success', 'order_id': result.get('order_id', ''), 'message': 'Live order placed'}
+            else:
+                logger.error(f"LIVE ORDER FAILED: {result.get('message', 'Unknown error')}")
+                return {'status': 'error', 'message': result.get('message', 'Order failed')}
+
+        except Exception as e:
+            logger.error(f"Live trade execution error: {e}")
+            return {'status': 'error', 'message': str(e)}
+
+    async def check_and_execute_live_exits(self) -> Dict:
+        """Check live positions for SL/Target exits and place exit orders"""
+        exits = 0
+        details = []
+        try:
+            if not self.broker_service or self.trading_mode != 'LIVE':
+                return {'exits': 0, 'details': []}
+
+            # Get live open orders
+            live_orders = await self.db.live_orders.find({'status': 'PLACED'}, {'_id': 0}).to_list(100)
+            if not live_orders:
+                return {'exits': 0, 'details': []}
+
+            # Get current positions from broker
+            portfolio = await self.broker_service.get_portfolio()
+            positions = portfolio.get('positions', []) if portfolio.get('status') == 'success' else []
+
+            for order in live_orders:
+                # Find matching position
+                matching = [p for p in positions if p.get('quantity', 0) != 0]
+                for pos in matching:
+                    ltp = pos.get('ltp', 0)
+                    if ltp <= 0:
+                        continue
+
+                    sl = order.get('stop_loss', 0)
+                    target = order.get('target', 0)
+                    entry = order.get('entry_price', 0)
+                    exit_reason = None
+
+                    if sl > 0 and ltp <= sl:
+                        exit_reason = 'STOP_LOSS'
+                    elif target > 0 and ltp >= target:
+                        exit_reason = 'TARGET_HIT'
+
+                    if exit_reason:
+                        # Place exit order
+                        exit_params = {
+                            'instrument_token': pos.get('instrument_token', ''),
+                            'exchange': 'NFO',
+                            'transaction_type': 'SELL',
+                            'order_type': 'MARKET',
+                            'quantity': abs(pos.get('quantity', order['quantity'])),
+                            'product': 'MIS',
+                            'validity': 'DAY',
+                            'price': 0,
+                            'trigger_price': 0,
+                        }
+                        exit_result = await self.broker_service.place_order(exit_params)
+
+                        await self.db.live_orders.update_one(
+                            {'signal_id': order['signal_id']},
+                            {'$set': {
+                                'status': 'CLOSED',
+                                'exit_reason': exit_reason,
+                                'exit_price': ltp,
+                                'exit_order_id': exit_result.get('order_id', ''),
+                                'closed_at': datetime.now(timezone.utc).isoformat(),
+                            }}
+                        )
+                        exits += 1
+                        pnl = (ltp - entry) * order['quantity']
+                        details.append({
+                            'signal_id': order['signal_id'],
+                            'exit_reason': exit_reason,
+                            'exit_price': ltp,
+                            'pnl': round(pnl, 2),
+                        })
+                        logger.info(f"LIVE EXIT: {exit_reason} pnl={pnl:.2f}")
+                        break
+
+        except Exception as e:
+            logger.error(f"Live exits check error: {e}")
+
+        return {'exits': exits, 'details': details}
+
     
     async def _get_today_trade_value(self) -> float:
         """Get total trade value for today"""

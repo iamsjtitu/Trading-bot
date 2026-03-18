@@ -260,6 +260,106 @@ class OptionChainService:
         iv = implied_volatility(market_price, spot, strike, T, RISK_FREE_RATE, option_type)
         return {'iv': iv, 'option_type': option_type}
 
+    def detect_oi_buildup(self, instrument: str, spot_price: float = 0, expiry_days: int = 7) -> Dict:
+        """Detect OI buildup patterns and generate alerts"""
+        chain_data = self.generate_option_chain(instrument, spot_price, 10, expiry_days)
+        if chain_data.get('status') != 'success':
+            return {'status': 'error', 'alerts': []}
+
+        alerts = []
+        chain = chain_data['chain']
+        atm = chain_data['atm_strike']
+        spot = chain_data['spot_price']
+        config = chain_data['config']
+
+        # Analyze OI patterns
+        max_ce_oi_strike = max(chain, key=lambda r: r['ce']['oi'])
+        max_pe_oi_strike = max(chain, key=lambda r: r['pe']['oi'])
+
+        # 1. Support/Resistance from max OI
+        alerts.append({
+            'type': 'RESISTANCE',
+            'severity': 'high',
+            'strike': max_ce_oi_strike['strike'],
+            'message': f"Highest CE OI at {max_ce_oi_strike['strike']} ({max_ce_oi_strike['ce']['oi']:,}) - Strong Resistance",
+            'oi': max_ce_oi_strike['ce']['oi'],
+            'side': 'CE',
+        })
+        alerts.append({
+            'type': 'SUPPORT',
+            'severity': 'high',
+            'strike': max_pe_oi_strike['strike'],
+            'message': f"Highest PE OI at {max_pe_oi_strike['strike']} ({max_pe_oi_strike['pe']['oi']:,}) - Strong Support",
+            'oi': max_pe_oi_strike['pe']['oi'],
+            'side': 'PE',
+        })
+
+        # 2. PCR-based signal
+        pcr = chain_data['summary']['pcr']
+        if pcr > 1.5:
+            alerts.append({'type': 'BULLISH_PCR', 'severity': 'high',
+                          'message': f'PCR={pcr} (>1.5) - Extremely Bullish! PE writers dominating', 'pcr': pcr, 'side': 'PE'})
+        elif pcr > 1.2:
+            alerts.append({'type': 'BULLISH_PCR', 'severity': 'medium',
+                          'message': f'PCR={pcr} (>1.2) - Bullish. More PE OI than CE', 'pcr': pcr, 'side': 'PE'})
+        elif pcr < 0.5:
+            alerts.append({'type': 'BEARISH_PCR', 'severity': 'high',
+                          'message': f'PCR={pcr} (<0.5) - Extremely Bearish! CE writers dominating', 'pcr': pcr, 'side': 'CE'})
+        elif pcr < 0.8:
+            alerts.append({'type': 'BEARISH_PCR', 'severity': 'medium',
+                          'message': f'PCR={pcr} (<0.8) - Bearish. More CE OI than PE', 'pcr': pcr, 'side': 'CE'})
+
+        # 3. Long/Short Buildup detection (simulated OI change)
+        for row in chain:
+            strike = row['strike']
+            near_atm = abs(strike - atm) <= config['strike_step'] * 3
+
+            if near_atm:
+                # CE side: high OI + price up = short covering, high OI + price down = short buildup
+                if row['ce']['change_pct'] > 3 and row['ce']['oi'] > 30000:
+                    alerts.append({'type': 'CE_LONG_BUILDUP', 'severity': 'medium',
+                                  'strike': strike, 'message': f'CE Long Buildup at {strike} (OI: {row["ce"]["oi"]:,}, LTP +{row["ce"]["change_pct"]:.1f}%)',
+                                  'side': 'CE'})
+                elif row['ce']['change_pct'] < -3 and row['ce']['oi'] > 30000:
+                    alerts.append({'type': 'CE_SHORT_BUILDUP', 'severity': 'medium',
+                                  'strike': strike, 'message': f'CE Short Buildup at {strike} (OI: {row["ce"]["oi"]:,}, LTP {row["ce"]["change_pct"]:.1f}%)',
+                                  'side': 'CE'})
+
+                # PE side
+                if row['pe']['change_pct'] > 3 and row['pe']['oi'] > 30000:
+                    alerts.append({'type': 'PE_LONG_BUILDUP', 'severity': 'medium',
+                                  'strike': strike, 'message': f'PE Long Buildup at {strike} (OI: {row["pe"]["oi"]:,}, LTP +{row["pe"]["change_pct"]:.1f}%)',
+                                  'side': 'PE'})
+                elif row['pe']['change_pct'] < -3 and row['pe']['oi'] > 30000:
+                    alerts.append({'type': 'PE_SHORT_BUILDUP', 'severity': 'medium',
+                                  'strike': strike, 'message': f'PE Short Buildup at {strike} (OI: {row["pe"]["oi"]:,}, LTP {row["pe"]["change_pct"]:.1f}%)',
+                                  'side': 'PE'})
+
+        # 4. Max Pain proximity alert
+        max_pain = chain_data['summary']['max_pain']
+        distance_pct = abs(spot - max_pain) / spot * 100
+        if distance_pct < 0.5:
+            alerts.append({'type': 'MAX_PAIN_NEAR', 'severity': 'high',
+                          'message': f'Spot ({spot:.0f}) very close to Max Pain ({max_pain}) - {distance_pct:.2f}% away. Expect consolidation.',
+                          'max_pain': max_pain, 'distance_pct': round(distance_pct, 2)})
+        elif distance_pct < 1.5:
+            alerts.append({'type': 'MAX_PAIN_DRIFT', 'severity': 'low',
+                          'message': f'Spot drifting towards Max Pain ({max_pain}). Distance: {distance_pct:.2f}%',
+                          'max_pain': max_pain, 'distance_pct': round(distance_pct, 2)})
+
+        # Sort by severity
+        severity_order = {'high': 0, 'medium': 1, 'low': 2}
+        alerts.sort(key=lambda a: severity_order.get(a.get('severity', 'low'), 3))
+
+        return {
+            'status': 'success',
+            'instrument': instrument,
+            'spot_price': spot,
+            'alerts': alerts,
+            'summary': chain_data['summary'],
+            'timestamp': datetime.now(timezone.utc).isoformat(),
+        }
+
 
 # Singleton
 option_chain_service = OptionChainService()

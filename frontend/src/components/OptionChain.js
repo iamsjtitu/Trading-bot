@@ -15,6 +15,8 @@ export default function OptionChain() {
   const [expiryDays, setExpiryDays] = useState(7);
   const [numStrikes, setNumStrikes] = useState(15);
   const [showGreeks, setShowGreeks] = useState(true);
+  const [alerts, setAlerts] = useState([]);
+  const [alertsLoading, setAlertsLoading] = useState(false);
 
   useEffect(() => {
     axios.get(`${API}/option-chain/instruments`).then(r => {
@@ -31,7 +33,16 @@ export default function OptionChain() {
     setLoading(false);
   }, [selected, expiryDays, numStrikes]);
 
-  useEffect(() => { loadChain(); }, [loadChain]);
+  const loadAlerts = useCallback(async () => {
+    setAlertsLoading(true);
+    try {
+      const r = await axios.get(`${API}/option-chain/oi-buildup/${selected}?expiry_days=${expiryDays}`);
+      if (r.data.status === 'success') setAlerts(r.data.alerts || []);
+    } catch (e) { console.error(e); }
+    setAlertsLoading(false);
+  }, [selected, expiryDays]);
+
+  useEffect(() => { loadChain(); loadAlerts(); }, [loadChain, loadAlerts]);
 
   const fmt = (v, d = 2) => typeof v === 'number' ? v.toFixed(d) : '--';
   const fmtInt = (v) => typeof v === 'number' ? v.toLocaleString('en-IN') : '--';
@@ -143,6 +154,40 @@ export default function OptionChain() {
             <p className="text-lg font-bold text-orange-600" data-testid="atm-iv">{chain.summary.iv_atm}%</p>
           </Card>
         </div>
+      )}
+
+      {/* OI Buildup Alerts */}
+      {alerts.length > 0 && (
+        <Card className="p-4 bg-white border-gray-200 shadow-md" data-testid="oi-alerts-panel">
+          <div className="flex items-center justify-between mb-3">
+            <h3 className="font-bold text-gray-800 text-sm">OI Buildup Alerts</h3>
+            <Button onClick={loadAlerts} size="sm" variant="outline" disabled={alertsLoading} className="text-xs h-7">
+              {alertsLoading ? 'Scanning...' : 'Rescan'}
+            </Button>
+          </div>
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2 max-h-[200px] overflow-y-auto">
+            {alerts.map((a, i) => (
+              <div key={i} className={`p-2.5 rounded-lg border text-xs ${
+                a.severity === 'high' ? 'bg-red-50 border-red-300' : 
+                a.severity === 'medium' ? 'bg-yellow-50 border-yellow-300' : 'bg-blue-50 border-blue-200'}`}
+                data-testid={`oi-alert-${i}`}
+              >
+                <div className="flex items-center gap-2 mb-1">
+                  <Badge className={`text-[9px] px-1.5 py-0 ${
+                    a.severity === 'high' ? 'bg-red-600' : a.severity === 'medium' ? 'bg-yellow-600' : 'bg-blue-500'}`}>
+                    {a.severity?.toUpperCase()}
+                  </Badge>
+                  <Badge className={`text-[9px] px-1.5 py-0 ${
+                    a.type?.includes('BULL') || a.type === 'SUPPORT' || a.type?.includes('PE_LONG') ? 'bg-green-600' : 
+                    a.type?.includes('BEAR') || a.type === 'RESISTANCE' || a.type?.includes('CE_SHORT') ? 'bg-red-600' : 'bg-gray-500'}`}>
+                    {a.type?.replace(/_/g, ' ')}
+                  </Badge>
+                </div>
+                <p className="text-gray-700 leading-tight">{a.message}</p>
+              </div>
+            ))}
+          </div>
+        </Card>
       )}
 
       {/* Option Chain Table */}

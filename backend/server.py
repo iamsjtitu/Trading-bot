@@ -537,9 +537,14 @@ async def get_stats():
 
 @api_router.post("/auto-exit/check")
 async def check_auto_exits():
-    """Check and execute auto-exits for trades"""
+    """Check and execute auto-exits for trades (paper + live)"""
     try:
         result = await trading_engine.check_and_execute_exits()
+        
+        # Also check live exits if in LIVE mode
+        live_result = await trading_engine.check_and_execute_live_exits()
+        result['live_exits'] = live_result.get('exits', 0)
+        result['live_details'] = live_result.get('details', [])
         
         # If auto-entry is ON but no new trades generated, trigger news analysis
         if (trading_engine.auto_entry_enabled and 
@@ -555,9 +560,10 @@ async def check_auto_exits():
         
         return {
             "status": "success",
-            "exits_executed": result['exits'],
+            "exits_executed": result['exits'] + live_result.get('exits', 0),
             "new_trades_generated": result['new_trades'],
-            "details": result.get('details', [])
+            "live_exits": live_result.get('exits', 0),
+            "details": result.get('details', []) + live_result.get('details', [])
         }
     except Exception as e:
         logger.error(f"Auto-exit check error: {e}")
@@ -888,6 +894,10 @@ async def update_bot_settings(request: dict):
             trading_engine.custom_target_pct = risk.get('target_pct')
             trading_engine.custom_stoploss_pct = risk.get('stop_loss_pct')
         
+        if 'trading_mode' in request:
+            trading_engine.trading_mode = request['trading_mode']
+            logger.info(f"Trading mode updated: {request['trading_mode']}")
+        
         if 'auto_trading' in request:
             auto = request['auto_trading']
             trading_engine.auto_exit_enabled = auto.get('auto_exit', True)
@@ -1100,6 +1110,11 @@ async def calculate_iv(request: dict):
     result = option_chain_service.calculate_iv_from_price(price, spot, strike, days, opt_type)
     return {"status": "success", **result}
 
+@api_router.get("/option-chain/oi-buildup/{instrument}")
+async def get_oi_buildup_alerts(instrument: str, spot_price: float = 0, expiry_days: int = 7):
+    """Get OI buildup alerts and patterns for an instrument"""
+    return option_chain_service.detect_oi_buildup(instrument, spot_price, expiry_days)
+
 # ==================== Upstox Routes ====================
 
 @api_router.get("/upstox/auth-url")
@@ -1205,6 +1220,21 @@ async def stop_ws_streaming():
 
 # ==================== Combined Status (Paper + Live) ====================
 
+@api_router.get("/market-data/quick")
+async def get_market_data_quick():
+    """Ultra-fast lightweight endpoint - returns ONLY market prices. No auth checks, no portfolio."""
+    # First try WebSocket cache (instant)
+    if market_data_manager.latest_data:
+        return {"status": "success", "data": market_data_manager.latest_data, "source": "ws_cache", "ts": market_data_manager._last_update}
+    # Then try Upstox REST
+    try:
+        market = await upstox_service.get_live_market_data()
+        if market.get('status') == 'success' and market.get('data'):
+            return {"status": "success", "data": market['data'], "source": "rest", "ts": datetime.now(timezone.utc).isoformat()}
+    except Exception:
+        pass
+    return {"status": "success", "data": None, "source": "none"}
+
 @api_router.get("/combined-status")
 async def get_combined_status():
     """Get dashboard status - uses Upstox data when in LIVE mode"""
@@ -1304,12 +1334,17 @@ async def startup_event():
         logger.info("Portfolio initialized")
         # Load active broker
         await broker_manager.load_active_broker()
+        # Wire up broker to trading engine
+        trading_engine.broker_service = upstox_service
         # Load instrument from settings
         settings = await settings_manager.get_settings()
         inst = settings.get('trading_instrument', 'NIFTY50')
         if inst in trading_engine.instruments:
             trading_engine.active_instrument = inst
             logger.info(f"Active instrument: {inst}")
+        # Set trading mode
+        trading_engine.trading_mode = settings.get('trading_mode', 'PAPER')
+        logger.info(f"Trading mode: {trading_engine.trading_mode}")
         # Auto-start WebSocket if in LIVE mode with token
         if settings.get('trading_mode') == 'LIVE':
             token = await upstox_service._get_access_token()

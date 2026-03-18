@@ -1,0 +1,140 @@
+{
+  "summary": "Iteration 14 Testing Complete - All 14 backend tests passed, Frontend verification complete. New features: Market data ultra-fast refresh (500ms polling), OI Buildup alerts with support/resistance/PCR/buildup detection, Auto-exit now includes live_exits field.",
+  "backend_issues": {
+    "critical": [],
+    "minor": []
+  },
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": []
+  },
+  "test_report_links": [
+    "/app/test_reports/pytest/iteration14_results.xml",
+    "/app/backend/tests/test_iteration14_features.py"
+  ],
+  "action_items": [],
+  "critical_code_review_comments": [],
+  "updated_files": [
+    "/app/backend/tests/test_iteration14_features.py"
+  ],
+  "success_rate": {
+    "backend": "100% (14/14 tests passed)",
+    "frontend": "100% (All UI elements verified)"
+  },
+  "test_credentials": "None required - uses public preview URL",
+  "seed_data_creation": "None",
+  "retest_needed": false,
+  "main_agent_can_self_test": false,
+  "context_for_next_testing_agent": "Iteration 14 features fully tested. Market data quick endpoint works (returns source=none when Upstox not connected - expected). OI Buildup alerts panel shows support/resistance/PCR/buildup alerts with severity badges. Auto-exit endpoint includes live_exits field. OI data is SIMULATED using Black-Scholes model. Live trade execution requires real Upstox credentials.",
+  "tested_features": {
+    "market_data_quick": {
+      "status": "PASS",
+      "description": "Ultra-fast lightweight endpoint for 500ms polling",
+      "api_verified": {
+        "GET /api/market-data/quick": "200 OK - returns status, data, source, ts",
+        "source_values": "ws_cache, rest, or none (none when Upstox disconnected)",
+        "response_time": "Fast (<2s) for any state"
+      },
+      "notes": "Returns source=none when Upstox is not connected - this is expected behavior per design"
+    },
+    "oi_buildup_alerts": {
+      "status": "PASS",
+      "description": "OI buildup detection with support/resistance/PCR/buildup patterns",
+      "api_verified": {
+        "GET /api/option-chain/oi-buildup/NIFTY": "200 OK - returns alerts with type, severity, message",
+        "GET /api/option-chain/oi-buildup/BANKNIFTY": "200 OK - works for BANKNIFTY",
+        "GET /api/option-chain/oi-buildup/GOLD": "200 OK - works for MCX commodity",
+        "GET /api/option-chain/oi-buildup/INVALID": "200 OK - returns error status, empty alerts",
+        "all_index_instruments": "PASS - all 6 index instruments work",
+        "all_mcx_instruments": "PASS - all 3 MCX instruments work"
+      },
+      "alert_types_verified": [
+        "RESISTANCE (highest CE OI)",
+        "SUPPORT (highest PE OI)",
+        "BULLISH_PCR / BEARISH_PCR (based on PCR ratio)",
+        "CE_LONG_BUILDUP / CE_SHORT_BUILDUP",
+        "PE_LONG_BUILDUP / PE_SHORT_BUILDUP",
+        "MAX_PAIN_NEAR / MAX_PAIN_DRIFT"
+      ],
+      "severity_levels": ["high", "medium", "low"],
+      "frontend_verified": {
+        "oi_alerts_panel": "Visible with 17 alerts displayed",
+        "rescan_button": "Found and clickable",
+        "severity_badges": "HIGH, MEDIUM badges shown correctly"
+      }
+    },
+    "auto_exit_live_exits": {
+      "status": "PASS",
+      "description": "Auto-exit now includes live_exits field for monitoring live positions",
+      "api_verified": {
+        "POST /api/auto-exit/check": "200 OK - includes live_exits (integer), exits_executed, details"
+      },
+      "notes": "live_exits=0 when Upstox not connected or no live positions"
+    },
+    "regression_health": {
+      "status": "PASS",
+      "api_verified": {
+        "GET /api/health": "200 OK - services: news=active, sentiment=active, trading=active"
+      }
+    },
+    "regression_brokers": {
+      "status": "PASS",
+      "api_verified": {
+        "GET /api/brokers/list": "200 OK - returns 6 brokers"
+      }
+    },
+    "regression_option_chain": {
+      "status": "PASS",
+      "api_verified": {
+        "GET /api/option-chain/NIFTY": "200 OK - returns chain with greeks, summary"
+      }
+    }
+  },
+  "api_verification_summary": {
+    "total_endpoints_tested": 12,
+    "passed": 12,
+    "failed": 0,
+    "endpoints": [
+      "GET /api/market-data/quick",
+      "GET /api/option-chain/oi-buildup/NIFTY",
+      "GET /api/option-chain/oi-buildup/BANKNIFTY",
+      "GET /api/option-chain/oi-buildup/GOLD",
+      "GET /api/option-chain/oi-buildup/INVALID",
+      "POST /api/auto-exit/check",
+      "GET /api/health",
+      "GET /api/brokers/list",
+      "GET /api/option-chain/NIFTY",
+      "GET /api/option-chain/oi-buildup/{all 6 index}",
+      "GET /api/option-chain/oi-buildup/{all 3 MCX}"
+    ]
+  },
+  "ui_verification_summary": {
+    "dashboard": {
+      "app_title": "AI Trading Bot - visible",
+      "trading_mode_badge": "LIVE TRADING - visible",
+      "upstox_status": "Disconnected (expected without credentials)"
+    },
+    "option_chain_tab": {
+      "container": "✓ Visible",
+      "instrument_dropdown": "✓ Working with 9 instruments (6 index + 3 MCX)",
+      "summary_cards": "✓ All 5 cards visible (Spot=24,000, ATM=24,000, PCR=1, Max Pain=24,000, ATM IV=15%)",
+      "option_table": "✓ 31 rows visible with CE/PE columns, Greeks"
+    },
+    "oi_buildup_alerts_panel": {
+      "panel": "✓ Visible",
+      "alerts_count": "17 alerts displayed",
+      "rescan_button": "✓ Found and clickable",
+      "severity_badges": "✓ HIGH (red), MEDIUM (yellow) badges visible",
+      "alert_types_shown": [
+        "RESISTANCE - Highest CE OI at 24050",
+        "SUPPORT - Highest PE OI at 23950",
+        "MAX PAIN NEAR - Spot close to Max Pain",
+        "CE LONG BUILDUP",
+        "PE SHORT BUILDUP"
+      ]
+    }
+  },
+  "mocked_apis_note": "OI buildup data is SIMULATED using Black-Scholes model. Live trade execution requires real Upstox credentials. Market data quick returns source=none when Upstox not connected.",
+  "console_errors": "404 errors for static resources (favicon) - not affecting functionality"
+}
