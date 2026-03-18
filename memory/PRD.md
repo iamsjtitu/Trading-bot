@@ -1,7 +1,7 @@
 # AI Trading Bot - Product Requirements Document
 
 ## Original Problem Statement
-Build an AI-powered automated options trading bot that connects to world news, uses AI (GPT-4o) for sentiment analysis (Bullish/Bearish), and automatically executes options (Call/Put) trades on Upstox. Final form: standalone desktop app (.exe/.dmg) with auto-update.
+Build an AI-powered automated options trading bot that connects to world news, uses AI (GPT-4o) for sentiment analysis (Bullish/Bearish), and automatically executes options (Call/Put) trades on multiple brokers. Desktop app (.exe/.dmg) with auto-update.
 
 ## Architecture
 - **Frontend:** React + Tailwind + Shadcn/UI + Chart.js
@@ -10,66 +10,68 @@ Build an AI-powered automated options trading bot that connects to world news, u
 - **Desktop:** Electron + electron-builder + electron-updater
 - **AI:** OpenAI GPT-4o via Emergent LLM Key
 
-## What's Implemented (v2.0.0)
+## What's Implemented (v2.2.0)
 
-### Core Trading
-- AI Decision Engine + Auto-Entry + Auto-Exit (signal-based trading)
-- 500ms ultra-fast market data polling
-- Auto-entry/exit settings persist across restarts
-- 9 News sources, AI sentiment analysis, signal generation
+### Multi-Broker Architecture (6 Brokers - FULLY IMPLEMENTED)
+- **Upstox** (Primary, Active) - OAuth, Orders, Portfolio, Market Data, WebSocket
+- **Zerodha** (Kite Connect) - OAuth, Orders, Portfolio, Market Data
+- **Angel One** (SmartAPI) - Login, Orders, Portfolio, Market Data
+- **5paisa** - Login, Orders, Portfolio
+- **Paytm Money** - OAuth, Orders, Portfolio
+- **IIFL Securities** - Login, Orders
+- Generic broker routing: all operations go through active broker
+- Broker switching updates trading engine in real-time
+- Desktop Node.js backend: full broker_router.js with all 6 brokers
 
-### Market Status Indicator
-- Real-time market open/close detection (IST timezone)
-- Indian public holidays (NSE/BSE) for 2025-2026 (34 holidays)
-- Live countdown timer to next open/close
-- Pre-open session detection (9:00-9:15 AM IST)
+### Auto-Trade (All Instruments including MCX)
+- AI Signal → Auto Entry on ANY selected instrument
+- Auto Exit with SL/Target monitoring
+- Correct exchange mapping: NSE→NFO, BSE→BFO, MCX→MCX
+- Settings persist across restarts
 
-### 9 Trading Instruments (with MCX Live Data)
+### 9 Trading Instruments
 - NSE: NIFTY50, BANKNIFTY, FINNIFTY, MIDCPNIFTY
 - BSE: SENSEX, BANKEX
 - MCX: CRUDEOIL, GOLD, SILVER
-- All instruments visible in Market Ticker, Option Chain, and WebSocket
+- All in Market Ticker, Option Chain, WebSocket, Auto-Trade
 
-### Option Chain + Greeks
-- 1-second auto-refresh
-- Black-Scholes greeks calculation
-- 9 instruments with 2 groups (Index Options + MCX Commodities)
-- OI Buildup Alerts (Support/Resistance, Long/Short Buildup, Max Pain)
+### Market Status (Dual Indicator)
+- NSE/BSE: 9:15 AM - 3:30 PM IST
+- MCX: 9:00 AM - 11:30 PM IST
+- Indian public holidays (34 for 2025-2026)
+- Live countdown timers
 
-### 6 Broker Integrations
-- Upstox (active), Zerodha, Angel One, 5paisa, Paytm Money, IIFL
-- Broker switching with connection re-check
-
-### Desktop Backend Sync
-- All missing API endpoints ported to Node.js desktop backend
-- market-status, market-data/quick, instruments, brokers, option-chain, auto-entry/status
+### Option Chain + Greeks (1s Refresh)
+- 9 instruments in 2 groups (Index + MCX)
+- Black-Scholes simulation fallback
+- OI Buildup Alerts
 
 ### CI/CD
 - NSIS PATH fix for Windows build
 - 3x retry + SourceForge fallback
 
-## Bug Fixes (v2.0.0)
-- Option Chain instruments dropdown was empty (API format mismatch: array vs object)
-- Python backend instrument key changed: NIFTY → NIFTY50 (consistent across all systems)
-- Auto-refresh changed from 2s to 1s
-- Broker descriptions added for Settings UI
-- MCX commodity data added to market ticker, WebSocket, and all data endpoints
-- Auto-entry/exit settings now persist in desktop backend
+## Key API Endpoints
+- `/api/brokers/list` - All 6 brokers
+- `/api/brokers/set-active` - Switch broker
+- `/api/brokers/auth-url` - Active broker's OAuth URL
+- `/api/brokers/callback` - Exchange token
+- `/api/brokers/connection` - Check connection
+- `/api/broker/profile` - Active broker profile
+- `/api/broker/portfolio` - Active broker portfolio
+- `/api/broker/order` - Place order via active broker
+- `/api/broker/orders` - Order book
+- `/api/market-status` - NSE + MCX status
+- `/api/option-chain/:instrument` - Option chain data
 
 ## Pending User Verification
-- Auto-Refresh fix (market data updating in real-time in LIVE mode)
-- Auto-Entry/Exit fix (live trades being placed when enabled)
+- Auto-Refresh fix in LIVE mode
+- Auto-Entry/Exit with live broker
 
 ## Upcoming Tasks
-- P1: Rebuild Desktop App (.exe/.dmg) - push to GitHub, tag v2.0.0
-- P2: Stock Options trading support
-- P2: Trade analytics enhancement
-- P3: Telegram notifications integration
+- P1: Desktop App Rebuild (.exe/.dmg) - push to GitHub, tag v2.2.0
+- P2: Stock Options trading
+- P2: Trade analytics
+- P3: Telegram notifications
 - P3: App.js refactoring
 
-## Version: 2.1.0
-
-### MCX Market Hours Indicator
-- Separate MCX status (9:00 AM - 11:30 PM IST) alongside NSE/BSE (9:15 AM - 3:30 PM IST)
-- Both shown in dashboard banner with independent countdown timers
-- Desktop Node.js backend also has MCX status support
+## Version: 2.2.0
