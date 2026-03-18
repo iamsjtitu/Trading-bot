@@ -88,6 +88,33 @@ class NewsService:
                 except Exception as e:
                     logger.error(f"Alpha Vantage fetch error: {e}")
 
+        # Try NDTV Profit
+        if 'ndtv_profit' in sources:
+            try:
+                articles = self._fetch_from_ndtv_profit(max_articles)
+                all_news.extend(articles)
+                logger.info(f"Fetched {len(articles)} articles from NDTV Profit")
+            except Exception as e:
+                logger.error(f"NDTV Profit fetch error: {e}")
+
+        # Try CNBC TV18
+        if 'cnbc_tv18' in sources:
+            try:
+                articles = self._fetch_from_cnbc_tv18(max_articles)
+                all_news.extend(articles)
+                logger.info(f"Fetched {len(articles)} articles from CNBC TV18")
+            except Exception as e:
+                logger.error(f"CNBC TV18 fetch error: {e}")
+
+        # Try Livemint
+        if 'livemint' in sources:
+            try:
+                articles = self._fetch_from_livemint(max_articles)
+                all_news.extend(articles)
+                logger.info(f"Fetched {len(articles)} articles from Livemint")
+            except Exception as e:
+                logger.error(f"Livemint fetch error: {e}")
+
         # Fallback to demo news
         if len(all_news) == 0:
             all_news = self._get_demo_news()
@@ -245,6 +272,89 @@ class NewsService:
             })
 
         return articles
+
+    def _fetch_from_ndtv_profit(self, max_articles: int) -> List[Dict]:
+        """Fetch from NDTV Profit RSS feed"""
+        import xml.etree.ElementTree as ET
+        feeds = [
+            'https://feeds.feedburner.com/ndtvprofit-latest',
+        ]
+        articles = []
+        for url in feeds:
+            try:
+                resp = requests.get(url, timeout=10, headers={'User-Agent': 'Mozilla/5.0'})
+                resp.raise_for_status()
+                root = ET.fromstring(resp.text)
+                for item in root.findall('.//item')[:max_articles]:
+                    title = strip_html(item.findtext('title', ''))
+                    desc = strip_html(item.findtext('description', ''))
+                    link = item.findtext('link', '').strip()
+                    pub = item.findtext('pubDate', '')
+                    # Filter for market/finance relevant articles
+                    text_lower = (title + ' ' + desc).lower()
+                    market_keywords = ['market', 'nifty', 'sensex', 'stock', 'share', 'trade', 'rbi', 'bank', 'invest', 'rupee', 'gdp', 'inflation', 'earnings', 'ipo', 'fund', 'economy', 'fiscal', 'budget', 'profit', 'revenue', 'sector', 'fii', 'dii']
+                    if any(kw in text_lower for kw in market_keywords):
+                        articles.append({
+                            'title': title, 'description': desc, 'content': desc,
+                            'source': 'NDTV Profit', 'url': link,
+                            'published_at': pub, 'fetched_at': datetime.now(timezone.utc).isoformat(),
+                        })
+            except Exception as e:
+                logger.error(f"NDTV Profit RSS error for {url}: {e}")
+        return articles[:max_articles]
+
+    def _fetch_from_cnbc_tv18(self, max_articles: int) -> List[Dict]:
+        """Fetch from CNBC TV18 RSS feeds"""
+        import xml.etree.ElementTree as ET
+        feeds = [
+            'https://www.cnbctv18.com/commonfeeds/v1/cne/rss/market.xml',
+            'https://www.cnbctv18.com/commonfeeds/v1/cne/rss/economy.xml',
+        ]
+        articles = []
+        for url in feeds:
+            try:
+                resp = requests.get(url, timeout=10, headers={'User-Agent': 'Mozilla/5.0'})
+                resp.raise_for_status()
+                root = ET.fromstring(resp.text)
+                for item in root.findall('.//item')[:max_articles // len(feeds)]:
+                    title = strip_html(item.findtext('title', ''))
+                    desc = strip_html(item.findtext('description', ''))
+                    link = item.findtext('link', '').strip()
+                    pub = item.findtext('pubDate', '')
+                    articles.append({
+                        'title': title, 'description': desc, 'content': desc,
+                        'source': 'CNBC TV18', 'url': link,
+                        'published_at': pub, 'fetched_at': datetime.now(timezone.utc).isoformat(),
+                    })
+            except Exception as e:
+                logger.error(f"CNBC TV18 RSS error for {url}: {e}")
+        return articles[:max_articles]
+
+    def _fetch_from_livemint(self, max_articles: int) -> List[Dict]:
+        """Fetch from Livemint RSS feed"""
+        import xml.etree.ElementTree as ET
+        feeds = [
+            'https://www.livemint.com/rss/markets',
+        ]
+        articles = []
+        for url in feeds:
+            try:
+                resp = requests.get(url, timeout=10, headers={'User-Agent': 'Mozilla/5.0'})
+                resp.raise_for_status()
+                root = ET.fromstring(resp.text)
+                for item in root.findall('.//item')[:max_articles]:
+                    title = strip_html(item.findtext('title', ''))
+                    desc = strip_html(item.findtext('description', ''))
+                    link = item.findtext('link', '').strip()
+                    pub = item.findtext('pubDate', '')
+                    articles.append({
+                        'title': title, 'description': desc, 'content': desc,
+                        'source': 'Livemint', 'url': link,
+                        'published_at': pub, 'fetched_at': datetime.now(timezone.utc).isoformat(),
+                    })
+            except Exception as e:
+                logger.error(f"Livemint RSS error for {url}: {e}")
+        return articles[:max_articles]
 
     def _get_demo_news(self) -> List[Dict]:
         """Demo news for paper trading when no API key"""

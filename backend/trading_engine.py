@@ -21,6 +21,43 @@ class TradingEngine:
             'high': {'stop_loss_pct': 35, 'target_pct': 70, 'max_position_size': 0.07}
         }
         
+        # Instrument configurations
+        self.instruments = {
+            'NIFTY50': {
+                'label': 'NIFTY 50',
+                'lot_size': 25,
+                'base_price': 24000,
+                'strike_step': 50,
+                'option_premium': 150,
+                'exchange': 'NSE',
+            },
+            'BANKNIFTY': {
+                'label': 'BANK NIFTY',
+                'lot_size': 15,
+                'base_price': 52000,
+                'strike_step': 100,
+                'option_premium': 300,
+                'exchange': 'NSE',
+            },
+            'FINNIFTY': {
+                'label': 'FIN NIFTY',
+                'lot_size': 25,
+                'base_price': 23800,
+                'strike_step': 50,
+                'option_premium': 120,
+                'exchange': 'NSE',
+            },
+            'MIDCPNIFTY': {
+                'label': 'MIDCAP NIFTY',
+                'lot_size': 50,
+                'base_price': 12000,
+                'strike_step': 25,
+                'option_premium': 80,
+                'exchange': 'NSE',
+            },
+        }
+        self.active_instrument = 'NIFTY50'
+        
         # Auto-trading settings
         self.auto_exit_enabled = True
         self.auto_entry_enabled = False
@@ -93,16 +130,21 @@ class TradingEngine:
                 logger.info(f"Position size ₹{position_size} too small")
                 return None
             
-            # For paper trading, assume Nifty 50 options
-            # In real trading, this would come from broker API
-            base_price = 24000  # Demo Nifty level
-            option_premium = 150  # Demo option price
+            # Get instrument config
+            inst = self.instruments.get(self.active_instrument, self.instruments['NIFTY50'])
+            base_price = inst['base_price']
+            option_premium = inst['option_premium']
+            strike_step = inst['strike_step']
             
-            quantity = int(position_size / option_premium)
+            quantity = max(inst['lot_size'], int(position_size / option_premium))
+            # Round to lot size
+            quantity = (quantity // inst['lot_size']) * inst['lot_size']
             if quantity == 0:
-                return None
+                quantity = inst['lot_size']
             
             actual_amount = quantity * option_premium
+            if actual_amount > position_size:
+                return None
             
             # Calculate targets
             stop_loss_price = option_premium * (1 - risk_params['stop_loss_pct'] / 100)
@@ -111,8 +153,9 @@ class TradingEngine:
             signal = {
                 'id': str(uuid.uuid4()),
                 'signal_type': signal_type,
-                'symbol': 'NIFTY50',
-                'strike_price': base_price + (500 if signal_type == 'CALL' else -500),
+                'symbol': self.active_instrument,
+                'instrument': self.active_instrument,
+                'strike_price': base_price + (strike_step * 5 if signal_type == 'CALL' else -strike_step * 5),
                 'option_premium': option_premium,
                 'quantity': quantity,
                 'investment_amount': actual_amount,

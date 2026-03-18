@@ -21,11 +21,37 @@ export default function SettingsPanel({ onClose, onSave }) {
   const [authCode, setAuthCode] = useState('');
   const [connectingUpstox, setConnectingUpstox] = useState(false);
   const [sendingSummary, setSendingSummary] = useState(false);
+  const [instruments, setInstruments] = useState({});
+  const [activeInstrument, setActiveInstrument] = useState('NIFTY50');
 
   useEffect(() => {
     loadSettings();
     checkUpstoxConnection();
+    loadInstruments();
   }, []);
+
+  const loadInstruments = async () => {
+    try {
+      const res = await axios.get(`${API}/instruments`);
+      if (res.data.status === 'success') {
+        setInstruments(res.data.details || {});
+        setActiveInstrument(res.data.active || 'NIFTY50');
+      }
+    } catch (e) {
+      console.error('Load instruments error:', e);
+    }
+  };
+
+  const handleInstrumentChange = async (instrument) => {
+    try {
+      const res = await axios.post(`${API}/instruments/set`, { instrument });
+      if (res.data.status === 'success') {
+        setActiveInstrument(instrument);
+      }
+    } catch (e) {
+      console.error('Set instrument error:', e);
+    }
+  };
 
   const loadSettings = async () => {
     try {
@@ -142,8 +168,9 @@ export default function SettingsPanel({ onClose, onSave }) {
           </div>
 
           <Tabs value={activeTab} onValueChange={setActiveTab}>
-            <TabsList className="grid grid-cols-4 gap-2 mb-6">
+            <TabsList className="grid grid-cols-5 gap-2 mb-6">
               <TabsTrigger value="broker" data-testid="broker-tab">Broker</TabsTrigger>
+              <TabsTrigger value="trading" data-testid="trading-tab">Trading</TabsTrigger>
               <TabsTrigger value="risk" data-testid="risk-tab">Risk</TabsTrigger>
               <TabsTrigger value="schedule" data-testid="schedule-tab">Schedule</TabsTrigger>
               <TabsTrigger value="advanced" data-testid="advanced-tab">Advanced</TabsTrigger>
@@ -239,6 +266,40 @@ export default function SettingsPanel({ onClose, onSave }) {
             </TabsContent>
 
             {/* ===== Risk Tab ===== */}
+            <TabsContent value="risk" className="space-y-4">
+
+            {/* ===== Trading Instrument Tab ===== */}
+            </TabsContent>
+            <TabsContent value="trading" className="space-y-4">
+              <div className="bg-gradient-to-r from-indigo-50 to-blue-50 p-4 rounded-lg border border-indigo-200">
+                <h3 className="font-bold text-gray-800 mb-3">Trading Instrument</h3>
+                <p className="text-sm text-gray-600 mb-4">Select which index options to trade. All signals and trades will use this instrument.</p>
+                <div className="grid grid-cols-2 gap-3">
+                  {Object.entries(instruments).map(([key, inst]) => (
+                    <div key={key}
+                      className={`p-4 rounded-lg border-2 cursor-pointer transition-all ${activeInstrument === key ? 'border-indigo-500 bg-indigo-50 shadow-md' : 'border-gray-200 bg-white hover:border-gray-300'}`}
+                      onClick={() => handleInstrumentChange(key)}
+                      data-testid={`instrument-${key}`}
+                    >
+                      <div className="flex items-center justify-between">
+                        <div>
+                          <p className="font-bold text-gray-800">{inst.label}</p>
+                          <p className="text-xs text-gray-500 mt-1">Lot: {inst.lot_size} | Step: {inst.strike_step} | Premium: ~{inst.option_premium}</p>
+                        </div>
+                        <div className={`w-5 h-5 rounded-full border-2 flex items-center justify-center ${activeInstrument === key ? 'bg-indigo-600 border-indigo-600' : 'border-gray-300'}`}>
+                          {activeInstrument === key && <span className="text-white text-xs font-bold">&#10003;</span>}
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+                <div className="mt-3 p-3 bg-yellow-50 border border-yellow-200 rounded text-xs text-gray-700">
+                  <p className="font-semibold">Current: <Badge className="bg-indigo-600">{instruments[activeInstrument]?.label || activeInstrument}</Badge></p>
+                  <p className="mt-1">Instrument change applies to new signals only. Existing trades remain on their original instrument.</p>
+                </div>
+              </div>
+            </TabsContent>
+
             <TabsContent value="risk" className="space-y-4">
               <div className="grid md:grid-cols-2 gap-4">
                 <div className="bg-white p-4 rounded-lg border border-gray-200">
@@ -340,6 +401,9 @@ export default function SettingsPanel({ onClose, onSave }) {
                         { value: 'moneycontrol', label: 'Moneycontrol (Free)', desc: 'Live scraping from Moneycontrol RSS' },
                         { value: 'economictimes', label: 'Economic Times (Free)', desc: 'Live scraping from ET Markets RSS' },
                         { value: 'nse_india', label: 'NSE India (Free)', desc: 'Corporate announcements from NSE' },
+                        { value: 'ndtv_profit', label: 'NDTV Profit (Free)', desc: 'Business & market news from NDTV Profit' },
+                        { value: 'cnbc_tv18', label: 'CNBC TV18 (Free)', desc: 'Market & economy news from CNBC TV18' },
+                        { value: 'livemint', label: 'Livemint (Free)', desc: 'Markets news from Livemint' },
                         { value: 'newsapi', label: 'NewsAPI.org (API Key)', desc: 'Global news API - requires key' },
                         { value: 'alphavantage', label: 'Alpha Vantage (API Key)', desc: 'Financial news with sentiment - requires key' },
                       ].map(src => {

@@ -70,52 +70,6 @@ function App() {
     setTimeout(() => setNotifications(prev => prev.filter(n => n.id !== id)), 5000);
   }, []);
 
-  const loadData = useCallback(async () => {
-    setLoading(true);
-    try {
-      const [portfolioRes, newsRes, signalsRes, tradesRes, statsRes, todayRes, settingsRes] = await Promise.all([
-        axios.get(`${API}/portfolio`),
-        axios.get(`${API}/news/latest?limit=10`),
-        axios.get(`${API}/signals/latest?limit=10`),
-        axios.get(`${API}/trades/active`),
-        axios.get(`${API}/stats`),
-        axios.get(`${API}/trades/today`),
-        axios.get(`${API}/settings`)
-      ]);
-      setPortfolio(portfolioRes.data);
-      setNews(newsRes.data.news || []);
-      setSignals(signalsRes.data.signals || []);
-      setTrades(tradesRes.data.trades || []);
-      setStats(statsRes.data.stats || {});
-
-      const mode = settingsRes.data?.settings?.trading_mode || 'PAPER';
-      setTradingMode(mode);
-
-      // Only set risk metrics from paper data if NOT in LIVE mode
-      // In LIVE mode, loadUpstoxData() will set live risk metrics
-      if (mode !== 'LIVE') {
-        const todayData = todayRes.data;
-        setRiskMetrics({
-          dailyUsed: todayData.today_invested || 0,
-          dailyLimit: 100000,
-          maxPerTrade: 20000,
-          todayTrades: todayData.total_trades_today || 0,
-          todayPnL: todayData.today_pnl || 0,
-          isLive: false,
-        });
-      }
-
-      // If LIVE mode, fetch Upstox data (this will set live risk metrics)
-      if (mode === 'LIVE') {
-        await loadUpstoxData();
-      }
-    } catch (error) {
-      console.error('Load data error:', error);
-    } finally {
-      setLoading(false);
-    }
-  }, [loadUpstoxData]);
-
   const loadUpstoxData = useCallback(async () => {
     try {
       const res = await axios.get(`${API}/combined-status`);
@@ -161,6 +115,52 @@ function App() {
       console.error('Upstox data error:', e);
     }
   }, []);
+
+  const loadData = useCallback(async () => {
+    setLoading(true);
+    try {
+      const [portfolioRes, newsRes, signalsRes, tradesRes, statsRes, todayRes, settingsRes] = await Promise.all([
+        axios.get(`${API}/portfolio`),
+        axios.get(`${API}/news/latest?limit=10`),
+        axios.get(`${API}/signals/latest?limit=10`),
+        axios.get(`${API}/trades/active`),
+        axios.get(`${API}/stats`),
+        axios.get(`${API}/trades/today`),
+        axios.get(`${API}/settings`)
+      ]);
+      setPortfolio(portfolioRes.data);
+      setNews(newsRes.data.news || []);
+      setSignals(signalsRes.data.signals || []);
+      setTrades(tradesRes.data.trades || []);
+      setStats(statsRes.data.stats || {});
+
+      const mode = settingsRes.data?.settings?.trading_mode || 'PAPER';
+      setTradingMode(mode);
+
+      // Only set risk metrics from paper data if NOT in LIVE mode
+      // In LIVE mode, loadUpstoxData() will set live risk metrics
+      if (mode !== 'LIVE') {
+        const todayData = todayRes.data;
+        setRiskMetrics({
+          dailyUsed: todayData.today_invested || 0,
+          dailyLimit: 100000,
+          maxPerTrade: 20000,
+          todayTrades: todayData.total_trades_today || 0,
+          todayPnL: todayData.today_pnl || 0,
+          isLive: false,
+        });
+      }
+
+      // If LIVE mode, fetch Upstox data (this will set live risk metrics)
+      if (mode === 'LIVE') {
+        await loadUpstoxData();
+      }
+    } catch (error) {
+      console.error('Load data error:', error);
+    } finally {
+      setLoading(false);
+    }
+  }, [loadUpstoxData]);
 
   const loadAutoSettings = async () => {
     try {

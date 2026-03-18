@@ -55,6 +55,9 @@ class SettingsManager:
             # Trading Mode
             'trading_mode': 'PAPER',  # PAPER or LIVE
             
+            # Active Trading Instrument
+            'trading_instrument': 'NIFTY50',
+            
             # AI Model Settings
             'ai': {
                 'emergent_llm_key': os.getenv('EMERGENT_LLM_KEY', 'sk-emergent-754BdB27f511c159cC'),

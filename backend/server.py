@@ -888,6 +888,12 @@ async def update_bot_settings(request: dict):
             trading_engine.auto_exit_enabled = auto.get('auto_exit', True)
             trading_engine.auto_entry_enabled = auto.get('auto_entry', False)
         
+        if 'trading_instrument' in request:
+            inst = request['trading_instrument']
+            if inst in trading_engine.instruments:
+                trading_engine.active_instrument = inst
+                logger.info(f"Active instrument set to: {inst}")
+        
         return result
     except Exception as e:
         logger.error(f"Update bot settings error: {e}")
@@ -1072,6 +1078,31 @@ async def get_upstox_pnl(segment: str = "EQ"):
     """Get P&L from Upstox"""
     return await upstox_service.get_trade_pnl(segment=segment)
 
+@api_router.get("/instruments")
+async def get_instruments():
+    """Get available trading instruments and the active one"""
+    return {
+        "status": "success",
+        "instruments": {k: v['label'] for k, v in trading_engine.instruments.items()},
+        "active": trading_engine.active_instrument,
+        "details": trading_engine.instruments,
+    }
+
+@api_router.post("/instruments/set")
+async def set_active_instrument(request: dict):
+    """Set the active trading instrument"""
+    instrument = request.get('instrument', '')
+    if instrument not in trading_engine.instruments:
+        return {"status": "error", "message": f"Unknown instrument: {instrument}. Available: {list(trading_engine.instruments.keys())}"}
+    trading_engine.active_instrument = instrument
+    # Also persist in settings
+    await settings_manager.update_settings({'trading_instrument': instrument})
+    return {
+        "status": "success",
+        "active": instrument,
+        "details": trading_engine.instruments[instrument],
+    }
+
 # ==================== Combined Status (Paper + Live) ====================
 
 @api_router.get("/combined-status")
@@ -1133,10 +1164,16 @@ app.add_middleware(
 @app.on_event("startup")
 async def startup_event():
     """Initialize on startup"""
-    logger.info("🚀 Trading Bot API Starting...")
+    logger.info("Trading Bot API Starting...")
     try:
         await trading_engine.initialize_portfolio()
-        logger.info("✅ Portfolio initialized")
+        logger.info("Portfolio initialized")
+        # Load instrument from settings
+        settings = await settings_manager.get_settings()
+        inst = settings.get('trading_instrument', 'NIFTY50')
+        if inst in trading_engine.instruments:
+            trading_engine.active_instrument = inst
+            logger.info(f"Active instrument: {inst}")
     except Exception as e:
         logger.error(f"Startup error: {e}")
 
