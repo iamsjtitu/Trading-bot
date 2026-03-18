@@ -148,6 +148,7 @@ export default function OptionChain() {
             {chain?.source === 'market_closed' && <Badge className="bg-amber-600 ml-2" data-testid="source-badge">MARKET CLOSED</Badge>}
             {chain?.source === 'broker_disconnected' && <Badge className="bg-red-600 ml-2" data-testid="source-badge">BROKER OFFLINE</Badge>}
             {chain?.source === 'broker_error' && <Badge className="bg-orange-600 ml-2" data-testid="source-badge">DATA ERROR</Badge>}
+            {chain?.source === 'not_supported' && <Badge className="bg-gray-600 ml-2" data-testid="source-badge">NOT SUPPORTED</Badge>}
           </div>
         </div>
       </Card>
@@ -188,6 +189,16 @@ export default function OptionChain() {
                 <Button onClick={() => { loadChain(); }} size="sm" className="mt-2 bg-blue-600 hover:bg-blue-700 text-white" data-testid="retry-btn">
                   <RefreshCw className="w-3 h-3 mr-1" />Retry
                 </Button>
+              </>
+            )}
+            {chain.source === 'not_supported' && (
+              <>
+                <div className="w-16 h-16 rounded-full bg-gray-100 flex items-center justify-center">
+                  <AlertCircle className="w-8 h-8 text-gray-500" />
+                </div>
+                <h3 className="text-lg font-bold text-gray-800">Not Supported</h3>
+                <p className="text-sm text-gray-500">{chain.market_message || 'Option chain is not available for this instrument.'}</p>
+                <p className="text-xs text-gray-400 max-w-md">Select an NSE or BSE instrument (Nifty 50, Bank Nifty, Sensex, etc.) to view the option chain.</p>
               </>
             )}
           </div>

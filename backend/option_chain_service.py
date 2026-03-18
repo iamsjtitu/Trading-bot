@@ -185,11 +185,24 @@ class OptionChainService:
                     'timestamp': datetime.now(timezone.utc).isoformat(),
                 }
 
+            # MCX option chain is NOT supported by Upstox API
+            exchange = config.get('exchange', 'NSE')
+            if exchange == 'MCX':
+                return {
+                    'status': 'success',
+                    'source': 'not_supported',
+                    'instrument': instrument,
+                    'config': config,
+                    'market_message': 'MCX Option Chain is not supported by Upstox API. Use NSE/BSE instruments for Option Chain.',
+                    'chain': [],
+                    'summary': None,
+                    'timestamp': datetime.now(timezone.utc).isoformat(),
+                }
+
             inst_map = {
                 'NIFTY50': 'Nifty 50', 'BANKNIFTY': 'Nifty Bank',
                 'FINNIFTY': 'Nifty Fin Service', 'MIDCPNIFTY': 'NIFTY MID SELECT',
                 'SENSEX': 'SENSEX', 'BANKEX': 'BANKEX',
-                'CRUDEOIL': 'CRUDEOIL', 'GOLD': 'GOLD', 'SILVER': 'SILVER',
             }
             broker_key = inst_map.get(instrument, instrument)
             result = await self.broker_service.get_option_chain(broker_key)

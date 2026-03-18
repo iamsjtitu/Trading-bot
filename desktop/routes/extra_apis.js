@@ -226,16 +226,32 @@ module.exports = function (db) {
       });
     }
 
-    // Try fetching live option chain from Upstox
+    // MCX option chain is NOT supported by Upstox API
+    if (exchange === 'MCX') {
+      return res.json({
+        status: 'success',
+        source: 'not_supported',
+        instrument,
+        config: instConfig,
+        market_message: 'MCX Option Chain is not supported by Upstox API. Use NSE/BSE instruments for Option Chain.',
+        chain: [],
+        summary: null,
+        timestamp: new Date().toISOString(),
+      });
+    }
+
+    // Try fetching live option chain from Upstox (NSE/BSE only)
     try {
       const axios = require('axios');
       const instKeyMap = {
         'NIFTY50': 'NSE_INDEX|Nifty 50', 'BANKNIFTY': 'NSE_INDEX|Nifty Bank',
         'FINNIFTY': 'NSE_INDEX|Nifty Fin Service', 'MIDCPNIFTY': 'NSE_INDEX|NIFTY MID SELECT',
         'SENSEX': 'BSE_INDEX|SENSEX', 'BANKEX': 'BSE_INDEX|BANKEX',
-        'CRUDEOIL': 'MCX_FO|CRUDEOIL', 'GOLD': 'MCX_FO|GOLD', 'SILVER': 'MCX_FO|SILVER',
       };
-      const instKey = instKeyMap[instrument] || `NSE_INDEX|${instrument}`;
+      const instKey = instKeyMap[instrument];
+      if (!instKey) {
+        return res.json({ status: 'success', source: 'not_supported', instrument, config: instConfig, market_message: 'Option chain not supported for this instrument', chain: [], summary: null, timestamp: new Date().toISOString() });
+      }
       const ocResp = await axios.get('https://api.upstox.com/v2/option/chain', {
         headers: { Authorization: `Bearer ${brokerToken}`, 'Api-Version': '2.0', Accept: 'application/json' },
         params: { instrument_key: instKey },

@@ -354,7 +354,7 @@ class UpstoxService(BrokerBase):
             return {'status': 'error', 'message': str(e), 'data': {}}
 
     async def get_option_chain(self, instrument: str, expiry: str = '') -> Dict:
-        """Fetch option chain from Upstox API"""
+        """Fetch option chain from Upstox API (NSE/BSE only - MCX not supported)"""
         token = await self._get_access_token()
         if not token:
             return {'status': 'error', 'message': 'Not logged in'}
@@ -367,11 +367,10 @@ class UpstoxService(BrokerBase):
             'NIFTY MID SELECT': 'NSE_INDEX|NIFTY MID SELECT',
             'SENSEX': 'BSE_INDEX|SENSEX',
             'BANKEX': 'BSE_INDEX|BANKEX',
-            'CRUDEOIL': 'MCX_FO|CRUDEOIL',
-            'GOLD': 'MCX_FO|GOLD',
-            'SILVER': 'MCX_FO|SILVER',
         }
-        inst_key = instrument_key_map.get(instrument, f'NSE_INDEX|{instrument}')
+        inst_key = instrument_key_map.get(instrument)
+        if not inst_key:
+            return {'status': 'error', 'message': f'Option chain not supported for {instrument}'}
 
         url = f"{UPSTOX_API_BASE}/option/chain"
         params = {'instrument_key': inst_key}
