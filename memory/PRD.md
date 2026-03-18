@@ -10,7 +10,7 @@ Build an AI-powered automated options trading bot that connects to world news, u
 - **Desktop:** Electron + electron-builder + electron-updater
 - **AI:** OpenAI GPT-4o via Emergent LLM Key
 
-## What's Implemented (v1.8.0)
+## What's Implemented (v2.0.0)
 
 ### Core Trading
 - AI Decision Engine + Auto-Entry + Auto-Exit (signal-based trading)
@@ -18,59 +18,50 @@ Build an AI-powered automated options trading bot that connects to world news, u
 - Auto-entry/exit settings persist across restarts
 - 9 News sources, AI sentiment analysis, signal generation
 
-### Market Status Indicator (v1.8.0)
+### Market Status Indicator
 - Real-time market open/close detection (IST timezone)
 - Indian public holidays (NSE/BSE) for 2025-2026 (34 holidays)
 - Live countdown timer to next open/close
 - Pre-open session detection (9:00-9:15 AM IST)
-- Upcoming holidays API
 
-### Desktop Backend Sync (v1.8.0 CRITICAL FIX)
-- Added `/api/market-status` and `/api/market-holidays` to desktop Node.js backend
-- Added `/api/market-data/quick` for fast data polling
-- Added `/api/auto-entry/status` for auto-trade monitoring
-- Added `/api/instruments` and `/api/instruments/set` for instrument management
-- Added `/api/brokers/list`, `/api/brokers/set-active`, `/api/brokers/active`, `/api/brokers/connection`
-- Added `/api/option-chain/:instrument` with Black-Scholes simulation
-- Added `/api/oi-buildup-alerts` and `/api/ws/status`
-- Fixed auto-entry/exit settings loading from saved data on startup
-- Fixed auto-settings persistence when toggled
-
-### 9 Trading Instruments
+### 9 Trading Instruments (with MCX Live Data)
 - NSE: NIFTY50, BANKNIFTY, FINNIFTY, MIDCPNIFTY
 - BSE: SENSEX, BANKEX
 - MCX: CRUDEOIL, GOLD, SILVER
+- All instruments visible in Market Ticker, Option Chain, and WebSocket
+
+### Option Chain + Greeks
+- 1-second auto-refresh
+- Black-Scholes greeks calculation
+- 9 instruments with 2 groups (Index Options + MCX Commodities)
+- OI Buildup Alerts (Support/Resistance, Long/Short Buildup, Max Pain)
 
 ### 6 Broker Integrations
-- Upstox (active), Zerodha, Angel One, 5paisa, Paytm Money, IIFL (coming soon)
+- Upstox (active), Zerodha, Angel One, 5paisa, Paytm Money, IIFL
+- Broker switching with connection re-check
 
-### Option Chain + Greeks + OI Buildup Alerts
-- Black-Scholes greeks, live broker data with simulated fallback
+### Desktop Backend Sync
+- All missing API endpoints ported to Node.js desktop backend
+- market-status, market-data/quick, instruments, brokers, option-chain, auto-entry/status
 
-### CI/CD Fix (v1.8.0)
-- NSIS PATH fix: always scans 4 known install locations after install
-- Uses both `$env:PATH` and `GITHUB_PATH` for robust PATH resolution
+### CI/CD
+- NSIS PATH fix for Windows build
+- 3x retry + SourceForge fallback
 
-## Desktop App File Structure
-```
-desktop/routes/
-├── settings.js        # Settings CRUD
-├── portfolio.js       # Portfolio + combined-status  
-├── news.js            # News fetch + AI sentiment + signals + trades
-├── trading.js         # Trades, auto-exit/entry, tax reports
-├── upstox.js          # Upstox broker integration
-├── tax.js             # Tax reporting
-├── ai_engine.js       # AI Decision Engine
-├── market_status.js   # NEW: Market hours + holidays
-└── extra_apis.js      # NEW: Instruments, brokers, option chain, quick data
-```
+## Bug Fixes (v2.0.0)
+- Option Chain instruments dropdown was empty (API format mismatch: array vs object)
+- Python backend instrument key changed: NIFTY → NIFTY50 (consistent across all systems)
+- Auto-refresh changed from 2s to 1s
+- Broker descriptions added for Settings UI
+- MCX commodity data added to market ticker, WebSocket, and all data endpoints
+- Auto-entry/exit settings now persist in desktop backend
 
 ## Pending User Verification
-- Auto-Refresh fix in LIVE mode
-- Auto-Entry/Exit fix with live broker
+- Auto-Refresh fix (market data updating in real-time in LIVE mode)
+- Auto-Entry/Exit fix (live trades being placed when enabled)
 
 ## Upcoming Tasks
-- P1: Rebuild Desktop App (.exe/.dmg) - push to GitHub, tag v1.8.0
+- P1: Rebuild Desktop App (.exe/.dmg) - push to GitHub, tag v2.0.0
 - P2: Stock Options trading support
 - P2: Trade analytics enhancement
 - P3: Telegram notifications integration
