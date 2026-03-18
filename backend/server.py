@@ -21,6 +21,8 @@ from trading_engine import TradingEngine
 from settings_manager import SettingsManager
 from upstox_service import UpstoxService
 from ws_market_data import market_data_manager
+from broker_manager import BrokerManager, BROKER_INFO
+from option_chain_service import option_chain_service
 
 ROOT_DIR = Path(__file__).parent
 load_dotenv(ROOT_DIR / '.env')
@@ -43,6 +45,7 @@ sentiment_service = SentimentService()
 trading_engine = TradingEngine(db)
 settings_manager = SettingsManager(db)
 upstox_service = UpstoxService(db)
+broker_manager = BrokerManager(db)
 
 # Create the main app without a prefix
 app = FastAPI(title="AI Trading Bot API")
@@ -1025,6 +1028,78 @@ async def test_generate_trade():
         logger.error(f"Test generate trade error: {e}")
         return {"status": "error", "message": str(e)}
 
+# ==================== Broker Management ====================
+
+@api_router.get("/brokers/list")
+async def get_brokers_list():
+    """Get all supported brokers"""
+    return {"status": "success", "brokers": broker_manager.get_all_brokers(), "active": broker_manager.active_broker_id}
+
+@api_router.post("/brokers/set-active")
+async def set_active_broker(request: dict):
+    """Set the active broker"""
+    broker_id = request.get('broker_id', '')
+    result = await broker_manager.set_active_broker(broker_id)
+    return result
+
+@api_router.get("/brokers/active")
+async def get_active_broker():
+    """Get active broker info"""
+    return {"status": "success", **broker_manager.get_active_info()}
+
+@api_router.get("/brokers/auth-url")
+async def get_broker_auth_url():
+    """Get auth URL for the active broker"""
+    return await broker_manager.active_broker.get_auth_url()
+
+@api_router.post("/brokers/callback")
+async def broker_callback(request: dict):
+    """Exchange auth code for the active broker"""
+    code = request.get('code', '')
+    if not code:
+        return {"status": "error", "message": "Authorization code/credentials required"}
+    return await broker_manager.active_broker.exchange_code_for_token(code)
+
+@api_router.get("/brokers/connection")
+async def check_broker_connection():
+    """Check active broker connection"""
+    return await broker_manager.active_broker.check_connection()
+
+# ==================== Option Chain ====================
+
+@api_router.get("/option-chain/instruments")
+async def get_option_chain_instruments():
+    """Get all supported option chain instruments"""
+    return {"status": "success", "instruments": option_chain_service.get_instruments()}
+
+@api_router.get("/option-chain/{instrument}")
+async def get_option_chain(instrument: str, spot_price: float = 0, strikes: int = 15, expiry_days: int = 7):
+    """Get option chain with greeks for an instrument"""
+    result = option_chain_service.generate_option_chain(instrument, spot_price, strikes, expiry_days)
+    return result
+
+@api_router.post("/option-chain/greeks")
+async def calculate_greeks(request: dict):
+    """Calculate greeks for a single option"""
+    spot = request.get('spot', 0)
+    strike = request.get('strike', 0)
+    days = request.get('days_to_expiry', 7)
+    iv = request.get('iv', 20)
+    opt_type = request.get('option_type', 'CE')
+    result = option_chain_service.calculate_single_greeks(spot, strike, days, iv, opt_type)
+    return {"status": "success", **result}
+
+@api_router.post("/option-chain/iv")
+async def calculate_iv(request: dict):
+    """Calculate implied volatility from market price"""
+    price = request.get('market_price', 0)
+    spot = request.get('spot', 0)
+    strike = request.get('strike', 0)
+    days = request.get('days_to_expiry', 7)
+    opt_type = request.get('option_type', 'CE')
+    result = option_chain_service.calculate_iv_from_price(price, spot, strike, days, opt_type)
+    return {"status": "success", **result}
+
 # ==================== Upstox Routes ====================
 
 @api_router.get("/upstox/auth-url")
@@ -1227,6 +1302,8 @@ async def startup_event():
     try:
         await trading_engine.initialize_portfolio()
         logger.info("Portfolio initialized")
+        # Load active broker
+        await broker_manager.load_active_broker()
         # Load instrument from settings
         settings = await settings_manager.get_settings()
         inst = settings.get('trading_instrument', 'NIFTY50')

@@ -23,12 +23,38 @@ export default function SettingsPanel({ onClose, onSave }) {
   const [sendingSummary, setSendingSummary] = useState(false);
   const [instruments, setInstruments] = useState({});
   const [activeInstrument, setActiveInstrument] = useState('NIFTY50');
+  const [brokers, setBrokers] = useState([]);
+  const [activeBroker, setActiveBroker] = useState('upstox');
 
   useEffect(() => {
     loadSettings();
     checkUpstoxConnection();
     loadInstruments();
+    loadBrokers();
   }, []);
+
+  const loadBrokers = async () => {
+    try {
+      const res = await axios.get(`${API}/brokers/list`);
+      if (res.data.status === 'success') {
+        setBrokers(res.data.brokers || []);
+        setActiveBroker(res.data.active || 'upstox');
+      }
+    } catch (e) {
+      console.error('Load brokers error:', e);
+    }
+  };
+
+  const handleBrokerChange = async (brokerId) => {
+    try {
+      const res = await axios.post(`${API}/brokers/set-active`, { broker_id: brokerId });
+      if (res.data.status === 'success') {
+        setActiveBroker(brokerId);
+      }
+    } catch (e) {
+      console.error('Set broker error:', e);
+    }
+  };
 
   const loadInstruments = async () => {
     try {
@@ -188,11 +214,29 @@ export default function SettingsPanel({ onClose, onSave }) {
                 <div className="text-sm text-gray-600 mt-2 flex items-center gap-1">Current: <Badge className={settings.trading_mode === 'LIVE' ? 'bg-red-600' : 'bg-blue-600'}>{settings.trading_mode}</Badge></div>
               </div>
 
-              {/* Upstox Connection Status */}
+              {/* Broker Selector */}
+              <div className="bg-gradient-to-r from-slate-50 to-blue-50 p-4 rounded-lg border border-slate-200">
+                <h3 className="font-bold text-gray-800 mb-3">Select Broker</h3>
+                <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
+                  {brokers.map(b => (
+                    <div key={b.id}
+                      className={`p-3 rounded-lg border-2 cursor-pointer transition-all text-center ${activeBroker === b.id ? 'border-blue-500 bg-blue-50 shadow-md' : 'border-gray-200 bg-white hover:border-gray-300'}`}
+                      onClick={() => handleBrokerChange(b.id)}
+                      data-testid={`broker-${b.id}`}
+                    >
+                      <p className="font-bold text-sm text-gray-800">{b.name}</p>
+                      <p className="text-[10px] text-gray-500 mt-0.5">{b.description}</p>
+                      {activeBroker === b.id && <Badge className="bg-blue-600 mt-1 text-[10px]">Active</Badge>}
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              {/* Broker Connection Status */}
               <div className={`p-4 rounded-lg border-2 ${upstoxStatus.connected ? 'bg-green-50 border-green-400' : 'bg-yellow-50 border-yellow-400'}`}>
                 <div className="flex items-center justify-between">
                   <div>
-                    <h3 className="font-bold text-gray-800">Upstox Connection</h3>
+                    <h3 className="font-bold text-gray-800">{brokers.find(b => b.id === activeBroker)?.name || 'Broker'} Connection</h3>
                     <p className="text-sm text-gray-600 mt-1">{upstoxStatus.message || 'Not connected'}</p>
                   </div>
                   <Badge data-testid="upstox-connection-badge" className={upstoxStatus.connected ? 'bg-green-600' : 'bg-yellow-600'}>

@@ -18,6 +18,7 @@ import TradeHistory from '@/components/TradeHistory';
 import TradeAnalytics from '@/components/TradeAnalytics';
 import TaxReports from '@/components/TaxReports';
 import AIInsights from '@/components/AIInsights';
+import OptionChain from '@/components/OptionChain';
 import UpdateBanner from '@/components/UpdateBanner';
 
 // Detect if running in desktop (localhost) or web mode
@@ -624,6 +625,7 @@ function App() {
             <TabsTrigger value="analytics" data-testid="analytics-tab" className="data-[state=active]:bg-blue-100 data-[state=active]:text-blue-900">Trade Analytics</TabsTrigger>
             <TabsTrigger value="tax" data-testid="tax-tab" className="data-[state=active]:bg-blue-100 data-[state=active]:text-blue-900">Tax Reports</TabsTrigger>
             <TabsTrigger value="ai-insights" data-testid="ai-insights-tab" className="data-[state=active]:bg-blue-100 data-[state=active]:text-blue-900">AI Brain</TabsTrigger>
+            <TabsTrigger value="option-chain" data-testid="option-chain-tab" className="data-[state=active]:bg-blue-100 data-[state=active]:text-blue-900">Option Chain</TabsTrigger>
           </TabsList>
 
           <TabsContent value="news"><NewsFeed news={news} formatTime={formatTime} /></TabsContent>
@@ -634,6 +636,7 @@ function App() {
           <TabsContent value="analytics"><TradeAnalytics /></TabsContent>
           <TabsContent value="tax"><TaxReports formatCurrency={formatCurrency} /></TabsContent>
           <TabsContent value="ai-insights"><AIInsights /></TabsContent>
+          <TabsContent value="option-chain"><OptionChain /></TabsContent>
         </Tabs>
 
         {/* Live Positions from Upstox */}

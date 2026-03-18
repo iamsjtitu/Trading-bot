@@ -4,6 +4,7 @@ import logging
 from typing import Dict, Optional
 from datetime import datetime, timezone
 import urllib.parse
+from broker_base import BrokerBase
 
 logger = logging.getLogger(__name__)
 
@@ -21,9 +22,12 @@ INDEX_KEYS = {
 }
 
 
-class UpstoxService:
+class UpstoxService(BrokerBase):
+    BROKER_ID = 'upstox'
+    BROKER_NAME = 'Upstox'
+
     def __init__(self, db):
-        self.db = db
+        super().__init__(db)
 
     async def _get_broker_settings(self) -> Dict:
         settings = await self.db.bot_settings.find_one({'type': 'main'}, {'_id': 0})
@@ -344,6 +348,21 @@ class UpstoxService:
             return {'status': 'error', 'message': result.get('message', ''), 'data': {}}
         except Exception as e:
             return {'status': 'error', 'message': str(e), 'data': {}}
+
+    async def get_option_chain(self, instrument: str, expiry: str = '') -> Dict:
+        """Fetch option chain from Upstox API"""
+        token = await self._get_access_token()
+        if not token:
+            return {'status': 'error', 'message': 'Not logged in'}
+        url = f"{UPSTOX_API_BASE}/option/chain?instrument_key=NSE_INDEX|{instrument}&expiry_date={expiry}"
+        try:
+            resp = requests.get(url, headers=self._api_headers(token), timeout=15)
+            result = resp.json()
+            if result.get('status') == 'success':
+                return {'status': 'success', 'data': result.get('data', [])}
+            return {'status': 'error', 'message': result.get('message', 'Failed')}
+        except Exception as e:
+            return {'status': 'error', 'message': str(e)}
 
     async def check_connection(self) -> Dict:
         """Check if Upstox connection is active"""
