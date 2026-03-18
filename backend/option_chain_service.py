@@ -119,10 +119,147 @@ class OptionChainService:
     def __init__(self):
         self.cache = {}
         self.cache_time = {}
+        self.broker_service = None  # Set by server.py
 
     def get_instruments(self) -> Dict:
         """Return all supported option chain instruments"""
         return {k: {**v} for k, v in OPTION_INSTRUMENTS.items()}
+
+    async def get_live_option_chain(self, instrument: str, spot_price: float = 0, num_strikes: int = 15, expiry_days: int = 7) -> Dict:
+        """Try fetching live option chain from broker, fallback to simulated"""
+        if self.broker_service:
+            try:
+                # Map instrument name to broker-compatible key
+                inst_map = {
+                    'NIFTY': 'Nifty 50', 'BANKNIFTY': 'Nifty Bank',
+                    'FINNIFTY': 'Nifty Fin Service', 'MIDCPNIFTY': 'NIFTY MID SELECT',
+                    'SENSEX': 'SENSEX', 'BANKEX': 'BANKEX',
+                    'CRUDEOIL': 'CRUDEOIL', 'GOLD': 'GOLD', 'SILVER': 'SILVER',
+                }
+                broker_key = inst_map.get(instrument, instrument)
+                result = await self.broker_service.get_option_chain(broker_key)
+                
+                if result.get('status') == 'success' and result.get('data'):
+                    live_data = result['data']
+                    return self._parse_live_chain(instrument, live_data, spot_price, num_strikes, expiry_days)
+            except Exception as e:
+                logger.warning(f"Live option chain failed for {instrument}: {e}")
+
+        # Fallback to simulated
+        return self.generate_option_chain(instrument, spot_price, num_strikes, expiry_days)
+
+    def _parse_live_chain(self, instrument: str, live_data: list, spot_price: float, num_strikes: int, expiry_days: int) -> Dict:
+        """Parse live option chain data from broker into our format"""
+        config = OPTION_INSTRUMENTS.get(instrument)
+        if not config:
+            return {'status': 'error', 'message': f'Unknown instrument: {instrument}'}
+
+        T = max(expiry_days / 365, 1 / 365)
+        r = RISK_FREE_RATE
+        chain = []
+        total_ce_oi = 0
+        total_pe_oi = 0
+        max_pain_data = {}
+
+        # Extract spot from live data if available
+        S = spot_price if spot_price > 0 else config['base_price']
+
+        for item in live_data:
+            strike = item.get('strike_price', 0)
+            if not strike:
+                continue
+
+            ce_data = item.get('call_options', {}).get('market_data', {})
+            pe_data = item.get('put_options', {}).get('market_data', {})
+
+            ce_ltp = ce_data.get('ltp', 0) or 0
+            pe_ltp = pe_data.get('ltp', 0) or 0
+            ce_oi = ce_data.get('oi', 0) or 0
+            pe_oi = pe_data.get('oi', 0) or 0
+            ce_vol = ce_data.get('volume', 0) or 0
+            pe_vol = pe_data.get('volume', 0) or 0
+            ce_change = ce_data.get('net_change', 0) or 0
+            pe_change = pe_data.get('net_change', 0) or 0
+
+            total_ce_oi += ce_oi
+            total_pe_oi += pe_oi
+
+            # Calculate greeks from live prices
+            ce_iv_val = implied_volatility(ce_ltp, S, strike, T, r, 'CE') if ce_ltp > 0 else 20
+            pe_iv_val = implied_volatility(pe_ltp, S, strike, T, r, 'PE') if pe_ltp > 0 else 20
+
+            sigma_ce = max(ce_iv_val, 1) / 100
+            sigma_pe = max(pe_iv_val, 1) / 100
+
+            ce_greeks = calculate_greeks(S, strike, T, r, sigma_ce, 'CE')
+            pe_greeks = calculate_greeks(S, strike, T, r, sigma_pe, 'PE')
+
+            atm_strike = round(S / config['strike_step']) * config['strike_step']
+
+            row = {
+                'strike': strike,
+                'is_atm': abs(strike - atm_strike) < config['strike_step'] * 0.5,
+                'is_itm_ce': strike < S,
+                'is_itm_pe': strike > S,
+                'live': True,
+                'ce': {
+                    'ltp': ce_ltp, 'change': ce_change,
+                    'change_pct': round((ce_change / max(ce_ltp - ce_change, 0.01)) * 100, 2) if ce_ltp > 0 else 0,
+                    'oi': ce_oi, 'volume': ce_vol, 'iv': ce_iv_val,
+                    'bid': ce_data.get('bid_price', 0) or round(ce_ltp * 0.98, 2),
+                    'ask': ce_data.get('ask_price', 0) or round(ce_ltp * 1.02, 2),
+                    **ce_greeks,
+                },
+                'pe': {
+                    'ltp': pe_ltp, 'change': pe_change,
+                    'change_pct': round((pe_change / max(pe_ltp - pe_change, 0.01)) * 100, 2) if pe_ltp > 0 else 0,
+                    'oi': pe_oi, 'volume': pe_vol, 'iv': pe_iv_val,
+                    'bid': pe_data.get('bid_price', 0) or round(pe_ltp * 0.98, 2),
+                    'ask': pe_data.get('ask_price', 0) or round(pe_ltp * 1.02, 2),
+                    **pe_greeks,
+                },
+            }
+            chain.append(row)
+            max_pain_data[strike] = {'ce_oi': ce_oi, 'pe_oi': pe_oi}
+
+        # Sort by strike
+        chain.sort(key=lambda r: r['strike'])
+
+        # Trim to num_strikes around ATM
+        if len(chain) > num_strikes * 2 + 1:
+            atm_idx = len(chain) // 2
+            for i, row in enumerate(chain):
+                if row.get('is_atm'):
+                    atm_idx = i
+                    break
+            start = max(0, atm_idx - num_strikes)
+            end = min(len(chain), atm_idx + num_strikes + 1)
+            chain = chain[start:end]
+
+        strikes_list = [r['strike'] for r in chain]
+        max_pain = self._calculate_max_pain(max_pain_data, strikes_list) if max_pain_data else 0
+        pcr = round(total_pe_oi / max(total_ce_oi, 1), 2)
+
+        atm_row = next((r for r in chain if r.get('is_atm')), chain[len(chain) // 2] if chain else None)
+
+        return {
+            'status': 'success',
+            'instrument': instrument,
+            'config': config,
+            'spot_price': round(S, 2),
+            'atm_strike': atm_row['strike'] if atm_row else 0,
+            'expiry_days': expiry_days,
+            'chain': chain,
+            'source': 'live',
+            'summary': {
+                'total_ce_oi': total_ce_oi,
+                'total_pe_oi': total_pe_oi,
+                'pcr': pcr,
+                'max_pain': max_pain,
+                'iv_atm': atm_row['ce']['iv'] if atm_row else 0,
+            },
+            'timestamp': datetime.now(timezone.utc).isoformat(),
+        }
 
     def generate_option_chain(self, instrument: str, spot_price: float = 0, num_strikes: int = 15, expiry_days: int = 7) -> Dict:
         """Generate option chain with greeks for an instrument"""

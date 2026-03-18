@@ -1084,8 +1084,8 @@ async def get_option_chain_instruments():
 
 @api_router.get("/option-chain/{instrument}")
 async def get_option_chain(instrument: str, spot_price: float = 0, strikes: int = 15, expiry_days: int = 7):
-    """Get option chain with greeks for an instrument"""
-    result = option_chain_service.generate_option_chain(instrument, spot_price, strikes, expiry_days)
+    """Get option chain with greeks - tries live broker data first, falls back to simulated"""
+    result = await option_chain_service.get_live_option_chain(instrument, spot_price, strikes, expiry_days)
     return result
 
 @api_router.post("/option-chain/greeks")
@@ -1334,8 +1334,9 @@ async def startup_event():
         logger.info("Portfolio initialized")
         # Load active broker
         await broker_manager.load_active_broker()
-        # Wire up broker to trading engine
+        # Wire up broker to trading engine and option chain
         trading_engine.broker_service = upstox_service
+        option_chain_service.broker_service = upstox_service
         # Load instrument from settings
         settings = await settings_manager.get_settings()
         inst = settings.get('trading_instrument', 'NIFTY50')

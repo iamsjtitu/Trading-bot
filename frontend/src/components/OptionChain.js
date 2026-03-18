@@ -1,9 +1,10 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import axios from 'axios';
 import { Card } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Switch } from '@/components/ui/switch';
 
 const API = `${process.env.REACT_APP_BACKEND_URL}/api`;
 
@@ -17,6 +18,8 @@ export default function OptionChain() {
   const [showGreeks, setShowGreeks] = useState(true);
   const [alerts, setAlerts] = useState([]);
   const [alertsLoading, setAlertsLoading] = useState(false);
+  const [autoRefresh, setAutoRefresh] = useState(false);
+  const refreshRef = useRef(null);
 
   useEffect(() => {
     axios.get(`${API}/option-chain/instruments`).then(r => {
@@ -43,6 +46,18 @@ export default function OptionChain() {
   }, [selected, expiryDays]);
 
   useEffect(() => { loadChain(); loadAlerts(); }, [loadChain, loadAlerts]);
+
+  // Auto-refresh every 2s when enabled
+  useEffect(() => {
+    if (autoRefresh) {
+      refreshRef.current = setInterval(() => {
+        loadChain();
+      }, 2000);
+    }
+    return () => {
+      if (refreshRef.current) clearInterval(refreshRef.current);
+    };
+  }, [autoRefresh, loadChain]);
 
   const fmt = (v, d = 2) => typeof v === 'number' ? v.toFixed(d) : '--';
   const fmtInt = (v) => typeof v === 'number' ? v.toLocaleString('en-IN') : '--';
@@ -117,13 +132,19 @@ export default function OptionChain() {
           </div>
 
           <div className="flex items-end gap-2 pt-4">
-            <Button onClick={loadChain} size="sm" disabled={loading} data-testid="refresh-chain-btn"
+            <Button onClick={() => { loadChain(); loadAlerts(); }} size="sm" disabled={loading} data-testid="refresh-chain-btn"
               className="bg-blue-600 hover:bg-blue-700 text-white">
               {loading ? 'Loading...' : 'Refresh'}
             </Button>
             <Button onClick={() => setShowGreeks(!showGreeks)} size="sm" variant="outline" data-testid="toggle-greeks-btn">
               {showGreeks ? 'Hide Greeks' : 'Show Greeks'}
             </Button>
+            <div className="flex items-center gap-2 ml-2">
+              <Switch checked={autoRefresh} onCheckedChange={setAutoRefresh} data-testid="auto-refresh-toggle" />
+              <label className="text-xs text-gray-600 whitespace-nowrap">Auto Refresh</label>
+            </div>
+            {chain?.source === 'live' && <Badge className="bg-green-600 ml-2">LIVE DATA</Badge>}
+            {chain?.source !== 'live' && <Badge className="bg-gray-500 ml-2">SIMULATED</Badge>}
           </div>
         </div>
       </Card>

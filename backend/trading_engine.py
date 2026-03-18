@@ -57,6 +57,46 @@ class TradingEngine:
                 'option_premium': 80,
                 'exchange': 'NSE',
             },
+            'SENSEX': {
+                'label': 'SENSEX',
+                'lot_size': 10,
+                'base_price': 79800,
+                'strike_step': 100,
+                'option_premium': 250,
+                'exchange': 'BSE',
+            },
+            'BANKEX': {
+                'label': 'BANKEX',
+                'lot_size': 15,
+                'base_price': 55000,
+                'strike_step': 100,
+                'option_premium': 200,
+                'exchange': 'BSE',
+            },
+            'CRUDEOIL': {
+                'label': 'Crude Oil',
+                'lot_size': 100,
+                'base_price': 5800,
+                'strike_step': 50,
+                'option_premium': 40,
+                'exchange': 'MCX',
+            },
+            'GOLD': {
+                'label': 'Gold',
+                'lot_size': 100,
+                'base_price': 72000,
+                'strike_step': 100,
+                'option_premium': 200,
+                'exchange': 'MCX',
+            },
+            'SILVER': {
+                'label': 'Silver',
+                'lot_size': 30,
+                'base_price': 88000,
+                'strike_step': 500,
+                'option_premium': 300,
+                'exchange': 'MCX',
+            },
         }
         self.active_instrument = 'NIFTY50'
         
@@ -247,10 +287,15 @@ class TradingEngine:
                 return {'status': 'error', 'message': 'No broker connected'}
 
             inst = self.instruments.get(self.active_instrument, self.instruments['NIFTY50'])
+            exchange = inst.get('exchange', 'NSE')
+            # Map exchange to broker exchange segment
+            exchange_map = {'NSE': 'NFO', 'BSE': 'BFO', 'MCX': 'MCX'}
+            broker_exchange = exchange_map.get(exchange, 'NFO')
+            
             # Build order params for broker
             order_params = {
                 'instrument_token': f"{signal.get('symbol', self.active_instrument)}{signal['strike_price']}{signal['signal_type'][:2]}",
-                'exchange': inst.get('exchange', 'NFO'),
+                'exchange': broker_exchange,
                 'transaction_type': 'BUY',
                 'order_type': 'MARKET',
                 'quantity': signal['quantity'],

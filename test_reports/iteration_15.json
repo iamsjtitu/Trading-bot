@@ -1,0 +1,142 @@
+{
+  "summary": "Iteration 15 Testing Complete - All 22 backend tests passed, All frontend tests passed. MCX commodities (CRUDEOIL, GOLD, SILVER) added to trading instruments with correct exchange mapping. Option chain works for all 9 instruments (6 index + 3 MCX). Auto Refresh toggle and SIMULATED/LIVE badge working correctly.",
+  "backend_issues": {
+    "critical": [],
+    "minor": []
+  },
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": []
+  },
+  "test_report_links": [
+    "/app/test_reports/pytest/iteration15_results.xml",
+    "/app/backend/tests/test_iteration15_mcx_optionchain.py"
+  ],
+  "action_items": [],
+  "critical_code_review_comments": [],
+  "updated_files": [
+    "/app/backend/tests/test_iteration15_mcx_optionchain.py"
+  ],
+  "success_rate": {
+    "backend": "100% (22/22 tests passed)",
+    "frontend": "100% (All UI elements verified)"
+  },
+  "test_credentials": "None required - uses public preview URL",
+  "seed_data_creation": "None",
+  "retest_needed": false,
+  "main_agent_can_self_test": false,
+  "context_for_next_testing_agent": "Iteration 15 features fully tested. MCX commodities (CRUDEOIL, GOLD, SILVER) work correctly with exchange=MCX mapping. Option chain supports all 9 instruments. Auto refresh toggle in UI works. SIMULATED badge shows when Upstox not connected (expected). OI buildup alerts work for all instruments. Exchange mapping: NSE→NFO, BSE→BFO, MCX→MCX for order placement.",
+  "tested_features": {
+    "mcx_instruments": {
+      "status": "PASS",
+      "description": "MCX commodities added to trading instruments",
+      "api_verified": {
+        "GET /api/instruments": "200 OK - returns 9 instruments",
+        "POST /api/instruments/set GOLD": "200 OK - sets active instrument",
+        "POST /api/instruments/set CRUDEOIL": "200 OK - works for MCX",
+        "exchange_mapping": "CRUDEOIL=MCX, GOLD=MCX, SILVER=MCX"
+      }
+    },
+    "option_chain_mcx": {
+      "status": "PASS",
+      "description": "Option chain works for MCX commodities",
+      "api_verified": {
+        "GET /api/option-chain/GOLD": "200 OK - returns chain with exchange=MCX, type=commodity",
+        "GET /api/option-chain/SILVER": "200 OK - works for silver",
+        "GET /api/option-chain/CRUDEOIL": "200 OK - works for crude oil"
+      }
+    },
+    "option_chain_bse": {
+      "status": "PASS",
+      "description": "Option chain works for BSE indices",
+      "api_verified": {
+        "GET /api/option-chain/SENSEX": "200 OK - returns chain with exchange=BSE",
+        "GET /api/option-chain/BANKEX": "200 OK - works for BANKEX"
+      }
+    },
+    "oi_buildup_alerts": {
+      "status": "PASS",
+      "description": "OI buildup alerts work for all instruments",
+      "api_verified": {
+        "GET /api/option-chain/oi-buildup/GOLD": "200 OK - returns alerts",
+        "GET /api/option-chain/oi-buildup/SILVER": "200 OK - works",
+        "GET /api/option-chain/oi-buildup/CRUDEOIL": "200 OK - works",
+        "alert_structure": "type, severity, message fields present"
+      }
+    },
+    "auto_refresh_toggle": {
+      "status": "PASS",
+      "description": "Auto refresh toggle in Option Chain UI",
+      "frontend_verified": {
+        "toggle_visible": true,
+        "default_state": "OFF",
+        "2s_interval_implemented": true
+      }
+    },
+    "simulated_live_badge": {
+      "status": "PASS",
+      "description": "SIMULATED/LIVE DATA badge in Option Chain",
+      "frontend_verified": {
+        "badge_visible": true,
+        "shows_simulated_when_disconnected": true
+      }
+    },
+    "regression_health": {
+      "status": "PASS",
+      "api_verified": {
+        "GET /api/health": "200 OK - healthy"
+      }
+    },
+    "regression_brokers": {
+      "status": "PASS",
+      "api_verified": {
+        "GET /api/brokers/list": "200 OK - returns 6 brokers"
+      }
+    }
+  },
+  "api_verification_summary": {
+    "total_endpoints_tested": 22,
+    "passed": 22,
+    "failed": 0,
+    "endpoints": [
+      "GET /api/instruments (9 instruments)",
+      "POST /api/instruments/set GOLD",
+      "POST /api/instruments/set CRUDEOIL",
+      "POST /api/instruments/set INVALID (error handled)",
+      "GET /api/option-chain/GOLD",
+      "GET /api/option-chain/SILVER",
+      "GET /api/option-chain/CRUDEOIL",
+      "GET /api/option-chain/SENSEX",
+      "GET /api/option-chain/BANKEX",
+      "GET /api/option-chain/NIFTY",
+      "GET /api/option-chain/instruments",
+      "GET /api/option-chain/oi-buildup/GOLD",
+      "GET /api/option-chain/oi-buildup/SILVER",
+      "GET /api/option-chain/oi-buildup/CRUDEOIL",
+      "GET /api/option-chain/oi-buildup/NIFTY",
+      "GET /api/option-chain/oi-buildup/INVALID",
+      "GET /api/health",
+      "GET /api/brokers/list"
+    ]
+  },
+  "ui_verification_summary": {
+    "option_chain_tab": {
+      "container": "✓ Visible",
+      "instrument_dropdown": "✓ Working with 9 instruments grouped (6 Index + 3 MCX Commodities)",
+      "mcx_commodities_group": "✓ Visible in dropdown - Crude Oil (MCX), Gold (MCX), Silver (MCX)",
+      "auto_refresh_toggle": "✓ Present and functional",
+      "simulated_badge": "✓ Shows SIMULATED when Upstox disconnected"
+    },
+    "instruments_tested": {
+      "GOLD_MCX": "✓ Spot=72,000, ATM=72,000, Max Pain=72,000, OI Alerts=17",
+      "CRUDEOIL_MCX": "✓ Spot=5,800, ATM=5,800, Max Pain=5,800",
+      "SILVER_MCX": "✓ Spot=88,000",
+      "SENSEX_BSE": "✓ Spot=79,800, ATM=79,800",
+      "BANKEX_BSE": "✓ Spot=55,000, ATM=55,000"
+    },
+    "option_table": "✓ 31 strikes visible with Greeks"
+  },
+  "mocked_apis_note": "Option chain data is SIMULATED using Black-Scholes model when broker not connected. Live data parsing is ready but needs real Upstox/broker connection. Exchange mapping (NSE→NFO, BSE→BFO, MCX→MCX) implemented for live order placement.",
+  "console_errors": "404 for favicon - not affecting functionality"
+}
