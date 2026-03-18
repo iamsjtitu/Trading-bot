@@ -527,9 +527,22 @@ module.exports = function (db) {
   router.get('/api/ai/insights', (req, res) => {
     const insights = aiEngine.getAIInsights();
 
-    // Add recent signal performance
-    const signals = (db.data.signals || []).slice(-20);
-    const trades = (db.data.trades || []).filter(t => t.status === 'CLOSED').slice(-20);
+    // Add market status
+    const ist = new Date(new Date().getTime() + 5.5 * 60 * 60 * 1000);
+    const weekday = ist.getUTCDay();
+    const h = ist.getUTCHours();
+    const m = ist.getUTCMinutes();
+    const totalMin = h * 60 + m;
+    const marketOpen = weekday >= 1 && weekday <= 5 && totalMin >= 555 && totalMin < 930;
+    insights.market_status = {
+      is_open: marketOpen,
+      message: marketOpen ? 'Market Open' : 'Market Closed',
+    };
+
+    // Filter performance by current trading mode
+    const currentMode = db.data.settings?.trading_mode || 'PAPER';
+    const signals = (db.data.signals || []).filter(s => (s.mode || 'PAPER') === currentMode).slice(-20);
+    const trades = (db.data.trades || []).filter(t => t.status === 'CLOSED' && (t.mode || 'PAPER') === currentMode).slice(-20);
     const winRate = trades.length > 0 ? Math.round((trades.filter(t => t.pnl > 0).length / trades.length) * 100) : 0;
     const totalPnl = trades.reduce((s, t) => s + (t.pnl || 0), 0);
 
@@ -539,6 +552,7 @@ module.exports = function (db) {
       win_rate: winRate,
       total_pnl: Math.round(totalPnl * 100) / 100,
       avg_confidence: signals.length > 0 ? Math.round(signals.reduce((s, sig) => s + (sig.confidence || 0), 0) / signals.length) : 0,
+      mode: currentMode,
     };
 
     res.json({ status: 'success', insights });

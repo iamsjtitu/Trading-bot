@@ -129,8 +129,20 @@ class TradingEngine:
             logger.info(f"Portfolio initialized with capital: ₹{self.initial_capital}")
     
     async def generate_trading_signal(self, news_with_sentiment: Dict) -> Optional[Dict]:
-        """Generate trading signal from news sentiment"""
+        """Generate trading signal from news sentiment - only during market hours"""
         try:
+            # Check market hours first
+            from market_hours_service import get_market_status, get_mcx_status
+            inst = self.instruments.get(self.active_instrument, self.instruments['NIFTY50'])
+            exchange = inst.get('exchange', 'NSE')
+            if exchange == 'MCX':
+                mkt = get_mcx_status()
+            else:
+                mkt = get_market_status()
+            if not mkt.get('is_open'):
+                logger.info(f"Signal SKIP: Market closed ({mkt.get('message', '')})")
+                return None
+
             sentiment = news_with_sentiment.get('sentiment_analysis', {})
             
             # Check if confidence is high enough

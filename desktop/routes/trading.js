@@ -9,6 +9,14 @@ function uuid() { return crypto.randomUUID(); }
 module.exports = function (db) {
   const router = Router();
 
+  // Instrument exchange mapping for market hours check
+  const INSTRUMENTS = {
+    NIFTY50: { exchange: 'NSE' }, BANKNIFTY: { exchange: 'NSE' },
+    FINNIFTY: { exchange: 'NSE' }, MIDCPNIFTY: { exchange: 'NSE' },
+    SENSEX: { exchange: 'BSE' }, BANKEX: { exchange: 'BSE' },
+    CRUDEOIL: { exchange: 'MCX' }, GOLD: { exchange: 'MCX' }, SILVER: { exchange: 'MCX' },
+  };
+
   // Internal state for auto-trading settings - LOAD from saved settings
   const savedAutoTrading = db.data.settings?.auto_trading || {};
   let autoExitEnabled = savedAutoTrading.auto_exit !== false;
@@ -30,7 +38,9 @@ module.exports = function (db) {
   // GET /api/signals/latest
   router.get('/api/signals/latest', (req, res) => {
     const limit = parseInt(req.query.limit) || 10;
+    const currentMode = db.data.settings?.trading_mode || 'PAPER';
     const signals = (db.data.signals || [])
+      .filter(s => (s.mode || 'PAPER') === currentMode)
       .slice()
       .sort((a, b) => (b.created_at || '').localeCompare(a.created_at || ''))
       .slice(0, limit);
@@ -39,7 +49,8 @@ module.exports = function (db) {
 
   // GET /api/signals/active
   router.get('/api/signals/active', (req, res) => {
-    const signals = (db.data.signals || []).filter(s => s.status === 'ACTIVE');
+    const currentMode = db.data.settings?.trading_mode || 'PAPER';
+    const signals = (db.data.signals || []).filter(s => s.status === 'ACTIVE' && (s.mode || 'PAPER') === currentMode);
     res.json({ status: 'success', count: signals.length, signals });
   });
 
@@ -113,8 +124,9 @@ module.exports = function (db) {
     const todayStart = new Date();
     todayStart.setHours(0, 0, 0, 0);
     const todayISO = todayStart.toISOString();
+    const currentMode = db.data.settings?.trading_mode || 'PAPER';
 
-    const allTrades = (db.data.trades || []).filter(t => (t.entry_time || '') >= todayISO);
+    const allTrades = (db.data.trades || []).filter(t => (t.entry_time || '') >= todayISO && (t.mode || 'PAPER') === currentMode);
     const closed = allTrades.filter(t => t.status === 'CLOSED');
     const open = allTrades.filter(t => t.status === 'OPEN');
     const todayPnl = closed.reduce((s, t) => s + (t.pnl || 0), 0);
@@ -133,9 +145,16 @@ module.exports = function (db) {
   // GET /api/trades/history (enhanced with filters)
   router.get('/api/trades/history', (req, res) => {
     const limit = parseInt(req.query.limit) || 200;
-    const { trade_type, status, date_from, date_to, sort_by, sort_order } = req.query;
+    const { trade_type, status, date_from, date_to, sort_by, sort_order, mode } = req.query;
 
     let trades = (db.data.trades || []).slice();
+
+    // Filter by trading mode (PAPER/LIVE) - default to current mode
+    const currentMode = db.data.settings?.trading_mode || 'PAPER';
+    const filterMode = mode || currentMode;
+    if (filterMode !== 'all') {
+      trades = trades.filter(t => (t.mode || 'PAPER') === filterMode);
+    }
 
     // Apply filters
     if (trade_type && trade_type !== 'all') {
@@ -529,9 +548,31 @@ _Sent automatically by AI Trading Bot_`;
   });
 
   // ============ Helpers ============
+  function _isMarketOpen(instrument) {
+    const ist = new Date(new Date().getTime() + 5.5 * 60 * 60 * 1000);
+    const weekday = ist.getUTCDay();
+    const h = ist.getUTCHours();
+    const m = ist.getUTCMinutes();
+    const totalMin = h * 60 + m;
+    if (weekday < 1 || weekday > 5) return false;
+
+    const inst = INSTRUMENTS[instrument] || {};
+    if (inst.exchange === 'MCX') {
+      return totalMin >= 540 && totalMin < 1410; // 9:00 AM - 11:30 PM IST
+    }
+    return totalMin >= 555 && totalMin < 930; // 9:15 AM - 3:30 PM IST
+  }
+
   function _generateSignal(newsDoc) {
     const sentiment = newsDoc.sentiment_analysis || {};
     if (sentiment.confidence < 60 || sentiment.trading_signal === 'HOLD') return null;
+
+    // Check market hours
+    const activeInstrument = db.data?.settings?.active_instrument || 'NIFTY50';
+    if (!_isMarketOpen(activeInstrument)) {
+      console.log('[Signal] Market closed, skipping signal generation');
+      return null;
+    }
 
     const signalType = sentiment.trading_signal === 'BUY_CALL' ? 'CALL' : 'PUT';
     const portfolio = db.data.portfolio || {};
@@ -555,10 +596,13 @@ _Sent automatically by AI Trading Bot_`;
     const quantity = Math.floor(positionSize / optionPremium);
     if (quantity === 0) return null;
 
+    const settings = db.data?.settings || {};
+    const tradingMode = settings.trading_mode || 'PAPER';
+
     return {
       id: uuid(),
       signal_type: signalType,
-      symbol: 'NIFTY50',
+      symbol: activeInstrument,
       strike_price: 24000 + (signalType === 'CALL' ? 500 : -500),
       option_premium: optionPremium,
       quantity,
@@ -571,6 +615,7 @@ _Sent automatically by AI Trading Bot_`;
       reason: sentiment.reason,
       news_id: newsDoc.id,
       status: 'ACTIVE',
+      mode: tradingMode,
       created_at: new Date().toISOString(),
       expires_at: new Date(Date.now() + 7 * 86400000).toISOString(),
     };
@@ -578,6 +623,8 @@ _Sent automatically by AI Trading Bot_`;
 
   function _executePaperTrade(signal) {
     if (!db.data.trades) db.data.trades = [];
+    const settings = db.data.settings || {};
+    const tradingMode = settings.trading_mode || 'PAPER';
     const trade = {
       id: uuid(),
       signal_id: signal.id,
@@ -590,6 +637,7 @@ _Sent automatically by AI Trading Bot_`;
       stop_loss: signal.stop_loss,
       target: signal.target,
       status: 'OPEN',
+      mode: tradingMode,
       exit_time: null,
       exit_price: null,
       pnl: 0,
@@ -765,10 +813,12 @@ _Sent by AI Trading Bot_`;
   }
 
   function calculateTaxReport(trades, fyYear) {
+    // Only use LIVE trades for tax calculation
+    const liveTrades = trades.filter(t => (t.mode || 'PAPER') === 'LIVE' && t.status === 'CLOSED');
     const { start, end } = getFYRange(fyYear);
-    const fyTrades = trades.filter(t => t.status === 'CLOSED' && (t.exit_time || t.entry_time || '') >= start && (t.exit_time || t.entry_time || '') <= end);
+    const fyTrades = liveTrades.filter(t => (t.exit_time || t.entry_time || '') >= start && (t.exit_time || t.entry_time || '') <= end);
 
-    if (!fyTrades.length) return { fy_year: fyYear, total_trades: 0, net_pnl: 0, total_tax_liability: 0, monthly_breakdown: {}, trade_count: 0 };
+    if (!fyTrades.length) return { fy_year: fyYear, total_trades: 0, net_pnl: 0, total_tax_liability: 0, monthly_breakdown: {}, trade_count: 0, message: 'No LIVE trades found for this period. Tax report is based on real broker trades only.' };
 
     const totalBuy = fyTrades.reduce((s, t) => s + (t.investment || 0), 0);
     const totalSell = fyTrades.reduce((s, t) => s + ((t.exit_price || 0) * (t.quantity || 0)), 0);
@@ -848,6 +898,19 @@ _Sent by AI Trading Bot_`;
     const fyYear = req.query.fy_year || '2025-26';
     const report = calculateTaxReport(db.data.trades || [], fyYear);
     res.json({ status: 'success', message: 'PDF export available via web app. Download CSV for desktop.', report });
+  });
+
+  // DELETE /api/trades/clear-paper - Clear all paper/demo trades
+  router.delete('/api/trades/clear-paper', (req, res) => {
+    const before = (db.data.trades || []).length;
+    db.data.trades = (db.data.trades || []).filter(t => (t.mode || 'PAPER') === 'LIVE');
+    const after = db.data.trades.length;
+    // Also clear paper signals
+    const sigBefore = (db.data.signals || []).length;
+    db.data.signals = (db.data.signals || []).filter(s => (s.mode || 'PAPER') === 'LIVE');
+    db.save();
+    console.log(`[Trading] Cleared ${before - after} paper trades, ${sigBefore - (db.data.signals || []).length} paper signals`);
+    res.json({ status: 'success', message: `Cleared ${before - after} paper trades`, trades_removed: before - after });
   });
 
   return router;

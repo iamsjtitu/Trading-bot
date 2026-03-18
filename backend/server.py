@@ -747,10 +747,24 @@ async def get_ai_insights():
     """Get AI Decision Engine insights - market regime, sector rotation, multi-timeframe data"""
     try:
         from sentiment_service import ai_engine
+        from market_hours_service import get_market_status
         insights = ai_engine.get_ai_insights()
 
-        # Add trade performance data
-        trades = await db.paper_trades.find({"status": "CLOSED"}, {"_id": 0}).sort("exit_time", -1).to_list(20)
+        # Add market status
+        mkt = get_market_status()
+        insights['market_status'] = {
+            'is_open': mkt.get('is_open', False),
+            'message': mkt.get('message', ''),
+        }
+
+        # Add trade performance data (only from current mode trades)
+        settings = await db.settings.find_one({}, {"_id": 0}) or {}
+        current_mode = settings.get('trading_mode', 'PAPER')
+        mode_filter = {"status": "CLOSED"}
+        if current_mode == 'LIVE':
+            mode_filter["mode"] = "LIVE"
+
+        trades = await db.paper_trades.find(mode_filter, {"_id": 0}).sort("exit_time", -1).to_list(20)
         wins = sum(1 for t in trades if t.get('pnl', 0) > 0)
         total_pnl = sum(t.get('pnl', 0) for t in trades)
         insights['performance'] = {
@@ -1000,8 +1014,15 @@ async def export_tax_pdf(fy_year: str = "2025-26"):
 
 @api_router.post("/test/generate-trade")
 async def test_generate_trade():
-    """Test endpoint to manually trigger trade generation"""
+    """Test endpoint to manually trigger trade generation - checks market hours"""
     try:
+        from market_hours_service import get_market_status
+        mkt = get_market_status()
+        if not mkt.get('is_open'):
+            return {
+                "status": "failed",
+                "message": f"Market is closed. {mkt.get('message', '')}. Signals are only generated during market hours."
+            }
         # Get or create demo news
         latest_news = await db.news_articles.find(
             {},
