@@ -46,10 +46,10 @@ export default function TaxReports({ formatCurrency }) {
       if (taxRes.data?.status === 'success') {
         const rep = taxRes.data.report;
         // Override with broker P&L when available (more accurate for LIVE trades)
-        if (statusRes.data?.total_pnl != null) {
-          rep.broker_pnl = statusRes.data.total_pnl;
-          rep.net_pnl = statusRes.data.total_pnl;
-          rep.tax_liability = Math.max(0, Math.round(statusRes.data.total_pnl * 0.156 * 100) / 100);
+        if (statusRes.data?.portfolio?.total_pnl != null) {
+          rep.broker_pnl = statusRes.data.portfolio.total_pnl;
+          rep.net_pnl = statusRes.data.portfolio.total_pnl;
+          rep.tax_liability = Math.max(0, Math.round(statusRes.data.portfolio.total_pnl * 0.156 * 100) / 100);
         }
         setReport(rep);
       }

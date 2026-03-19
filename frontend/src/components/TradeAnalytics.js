@@ -23,8 +23,8 @@ export default function TradeAnalytics() {
     axios.get(`${API}/trades/history?limit=200`).then(r => setTrades(r.data?.trades || [])).catch(() => {});
     // Fetch actual P&L from broker for LIVE mode
     axios.get(`${API}/combined-status`).then(r => {
-      if (r.data?.status === 'success' && r.data.total_pnl != null) {
-        setBrokerPnl(r.data.total_pnl);
+      if (r.data?.status === 'success' && r.data.portfolio?.total_pnl != null) {
+        setBrokerPnl(r.data.portfolio.total_pnl);
       }
     }).catch(() => {});
   }, []);

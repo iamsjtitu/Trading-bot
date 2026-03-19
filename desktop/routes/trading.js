@@ -1028,7 +1028,7 @@ _Sent automatically by AI Trading Bot_`;
     });
 
     const allOk = steps.every(s => s.ok);
-    res.json({ status: 'success', all_ok: allOk, version: '3.2.6', steps });
+    res.json({ status: 'success', all_ok: allOk, version: '3.2.7', steps });
   });
 
   // POST /api/test/generate-trade
