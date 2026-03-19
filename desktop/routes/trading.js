@@ -16,6 +16,13 @@ module.exports = function (db) {
     SENSEX: { exchange: 'BSE' }, BANKEX: { exchange: 'BSE' },
   };
 
+  // Helper to get active broker token
+  function getActiveBrokerToken() {
+    const s = db.data?.settings || {};
+    const activeBroker = s.active_broker || s.broker?.name || 'upstox';
+    return s.broker?.[activeBroker + '_token'] || s.broker?.access_token || '';
+  }
+
   // Internal state for auto-trading settings - LOAD from saved settings
   const savedAutoTrading = db.data.settings?.auto_trading || {};
   let autoExitEnabled = savedAutoTrading.auto_exit !== false;
@@ -59,7 +66,7 @@ module.exports = function (db) {
 
     if (mode === 'LIVE') {
       // In LIVE mode, fetch real positions from Upstox instead of paper trades
-      const token = db.data.settings?.broker?.access_token;
+      const token = getActiveBrokerToken();
       if (!token) {
         return res.json({ status: 'success', count: 0, trades: [], message: 'Upstox not connected' });
       }
@@ -311,7 +318,7 @@ _Sent automatically by AI Trading Bot_`;
     const stoplossPct = customStoplossPct != null ? customStoplossPct : rp.stop_loss_pct;
 
     const mode = db.data.settings?.trading_mode || 'PAPER';
-    const accessToken = db.data.settings?.broker?.access_token;
+    const accessToken = getActiveBrokerToken();
 
     for (const trade of openTrades) {
       let currentPrice;

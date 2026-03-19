@@ -660,9 +660,11 @@ module.exports = function (db) {
 
             // LIVE mode → place real Upstox order, PAPER mode → paper trade
             const mode = db.data.settings?.trading_mode || 'PAPER';
-            const token = db.data.settings?.broker?.access_token;
+            const activeBroker = db.data.settings?.active_broker || db.data.settings?.broker?.name || 'upstox';
+            const token = db.data.settings?.broker?.[`${activeBroker}_token`] || db.data.settings?.broker?.access_token;
 
             if (mode === 'LIVE' && token) {
+              console.log(`[AutoTrade] LIVE mode, executing trade for ${signal.symbol} ${signal.signal_type}`);
               const result = await executeLiveTrade(signal, token);
               if (db.notify) db.notify('entry', `LIVE ${signal.signal_type} Entry`, `${signal.symbol} | Qty: ${signal.quantity} | ${result.success ? 'Order ID: ' + result.order_id : 'FAILED: ' + (result.error || '')}`);
             } else {
