@@ -679,24 +679,31 @@ module.exports = function (db) {
             signal.mode = mode;
 
             if (mode === 'LIVE' && token) {
-              console.log(`[AutoTrade] LIVE mode, executing trade for ${signal.symbol} ${signal.signal_type}`);
-              try {
-                const result = await executeLiveTrade(signal, token);
-                const msg = result.success ? `Order: ${result.order_id}` : `FAILED: ${result.error || 'Unknown'}`;
-                console.log(`[AutoTrade] Result: ${msg}`);
-                if (db.notify) db.notify('entry', `LIVE ${signal.signal_type} Entry`, `${signal.symbol} | Qty: ${signal.quantity} | ${msg}`);
-              } catch (tradeErr) {
-                console.error(`[AutoTrade] LIVE trade error: ${tradeErr.message}`);
-                // Save failed trade record
-                if (!db.data.trades) db.data.trades = [];
-                db.data.trades.push({
-                  id: uuid(), signal_id: signal.id, trade_type: signal.signal_type,
-                  symbol: signal.symbol, entry_time: new Date().toISOString(),
-                  entry_price: signal.entry_price, quantity: signal.quantity,
-                  investment: signal.investment_amount, status: 'FAILED',
-                  mode: 'LIVE', error: tradeErr.message,
-                });
-                if (db.notify) db.notify('error', 'Trade Failed', `${signal.symbol} ${signal.signal_type}: ${tradeErr.message}`);
+              // DUPLICATE TRADE PROTECTION before placing order
+              const openSameType = (db.data.trades || []).find(t =>
+                t.status === 'OPEN' && t.trade_type === signal.signal_type && t.symbol === signal.symbol
+              );
+              if (openSameType) {
+                console.log(`[AutoTrade] Skipping ${signal.signal_type} ${signal.symbol} - already have OPEN position`);
+              } else {
+                console.log(`[AutoTrade] LIVE mode, executing trade for ${signal.symbol} ${signal.signal_type}`);
+                try {
+                  const result = await executeLiveTrade(signal, token);
+                  const msg = result.success ? `Order: ${result.order_id}` : `FAILED: ${result.error || 'Unknown'}`;
+                  console.log(`[AutoTrade] Result: ${msg}`);
+                  if (db.notify) db.notify('entry', `LIVE ${signal.signal_type} Entry`, `${signal.symbol} | Qty: ${signal.quantity} | ${msg}`);
+                } catch (tradeErr) {
+                  console.error(`[AutoTrade] LIVE trade error: ${tradeErr.message}`);
+                  if (!db.data.trades) db.data.trades = [];
+                  db.data.trades.push({
+                    id: uuid(), signal_id: signal.id, trade_type: signal.signal_type,
+                    symbol: signal.symbol, entry_time: new Date().toISOString(),
+                    entry_price: signal.entry_price, quantity: signal.quantity,
+                    investment: signal.investment_amount, status: 'FAILED',
+                    mode: 'LIVE', error: tradeErr.message,
+                  });
+                  if (db.notify) db.notify('error', 'Trade Failed', `${signal.symbol} ${signal.signal_type}: ${tradeErr.message}`);
+                }
               }
             } else {
               signal.mode = 'PAPER';
@@ -912,6 +919,17 @@ module.exports = function (db) {
   function generateSignal(newsDoc) {
     const sentiment = newsDoc.sentiment_analysis || {};
     const signalType = sentiment.trading_signal === 'BUY_CALL' ? 'CALL' : 'PUT';
+    const activeInst = db.data?.settings?.trading_instrument || db.data?.settings?.active_instrument || 'NIFTY50';
+
+    // DUPLICATE TRADE PROTECTION: Skip if same type OPEN trade exists for this instrument
+    const existingOpen = (db.data.trades || []).find(t =>
+      t.status === 'OPEN' && t.trade_type === signalType && t.symbol === activeInst
+    );
+    if (existingOpen) {
+      console.log(`[Signal] Skipping ${signalType} ${activeInst} - already have OPEN position (${existingOpen.id?.substring(0, 8)})`);
+      return null;
+    }
+
     const portfolio = db.data.portfolio || {};
     const available = portfolio.available_capital || 500000;
 
@@ -1041,10 +1059,19 @@ module.exports = function (db) {
     const headers = { Accept: 'application/json', Authorization: `Bearer ${accessToken}`, 'Api-Version': '2.0', 'Content-Type': 'application/json' };
 
     try {
+      // DUPLICATE TRADE PROTECTION: Skip if same type OPEN trade exists
+      const activeInst = signal.symbol || 'NIFTY50';
+      const existingOpen = (db.data.trades || []).find(t =>
+        t.status === 'OPEN' && t.trade_type === signal.signal_type && t.symbol === activeInst
+      );
+      if (existingOpen) {
+        console.log(`[LiveTrade] Skipping ${signal.signal_type} ${activeInst} - already have OPEN position`);
+        return { success: false, error: 'Duplicate position blocked' };
+      }
+
       // Step 1: Find the nearest weekly expiry option instrument
       const optionType = signal.signal_type === 'CALL' ? 'CE' : 'PE';
       const strikePrice = signal.strike_price;
-      const activeInst = signal.symbol || 'NIFTY50';
 
       // Map instrument to Upstox key
       const instKeyMap = {
