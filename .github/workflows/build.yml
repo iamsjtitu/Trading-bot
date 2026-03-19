@@ -1,0 +1,139 @@
+name: Build & Release Desktop App
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+permissions:
+  contents: write
+
+jobs:
+  build-windows:
+    runs-on: windows-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 18
+
+      - name: Install frontend dependencies
+        working-directory: frontend
+        run: npm install --legacy-peer-deps
+
+      - name: Build frontend
+        working-directory: frontend
+        run: npx craco build
+        env:
+          REACT_APP_BACKEND_URL: ''
+          CI: false
+
+      - name: Copy frontend build to desktop
+        run: |
+          xcopy /E /I frontend\build desktop\frontend-build
+
+      - name: Install desktop dependencies
+        working-directory: desktop
+        run: npm install
+
+      - name: Install NSIS
+        run: |
+          $retries = 3
+          $success = $false
+          for ($i = 1; $i -le $retries; $i++) {
+            Write-Host "Attempt $i of $retries..."
+            choco install nsis -y --no-progress 2>$null
+            if ($LASTEXITCODE -eq 0) {
+              $success = $true
+              break
+            }
+            Write-Host "Attempt $i failed, waiting 30s..."
+            Start-Sleep -Seconds 30
+          }
+          if (-not $success) {
+            Write-Host "Chocolatey failed. Installing NSIS directly from SourceForge..."
+            $url = "https://sourceforge.net/projects/nsis/files/NSIS%203/3.10/nsis-3.10-setup.exe/download"
+            Invoke-WebRequest -Uri $url -OutFile "$env:TEMP\nsis-setup.exe" -MaximumRedirection 5
+            Start-Process -FilePath "$env:TEMP\nsis-setup.exe" -Args "/S" -Wait
+          }
+          # Always add NSIS paths - Chocolatey doesn't refresh PATH in current session
+          $nsisLocations = @(
+            "C:\Program Files (x86)\NSIS",
+            "C:\Program Files\NSIS",
+            "C:\ProgramData\chocolatey\lib\nsis\tools",
+            "C:\ProgramData\chocolatey\bin"
+          )
+          foreach ($loc in $nsisLocations) {
+            if (Test-Path "$loc\makensis.exe") {
+              Write-Host "Found makensis at: $loc"
+              $env:PATH = "$loc;$env:PATH"
+              echo "$loc" >> $env:GITHUB_PATH
+              break
+            }
+          }
+          # Verify
+          makensis /VERSION
+        shell: pwsh
+
+      - name: Build Windows .exe
+        working-directory: desktop
+        run: npx electron-builder --win
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Upload to Release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: |
+            desktop/dist/*.exe
+            desktop/dist/latest.yml
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+  build-mac:
+    runs-on: macos-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 18
+
+      - name: Install frontend dependencies
+        working-directory: frontend
+        run: npm install --legacy-peer-deps
+
+      - name: Build frontend
+        working-directory: frontend
+        run: npx craco build
+        env:
+          REACT_APP_BACKEND_URL: ''
+          CI: false
+
+      - name: Copy frontend build to desktop
+        run: cp -r frontend/build desktop/frontend-build
+
+      - name: Install desktop dependencies
+        working-directory: desktop
+        run: npm install
+
+      - name: Build Mac .dmg
+        working-directory: desktop
+        run: npx electron-builder --mac
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Upload to Release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: |
+            desktop/dist/*.dmg
+            desktop/dist/*.zip
+            desktop/dist/latest-mac.yml
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

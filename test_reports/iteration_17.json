@@ -1,0 +1,113 @@
+{
+  "summary": "Iteration 17 - Market Status Feature Testing Complete. All 14 backend tests passed. All frontend tests passed. New feature: MarketStatusBanner shows 'Market Closed - After Trading Hours' with countdown (17h 18m) and next open time (Thursday, 19 Mar 2026 at 09:15 AM IST). Version bumped to 1.8.0.",
+  "backend_issues": {
+    "critical": [],
+    "minor": []
+  },
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": [
+      {"screen": "Console", "issues": ["404 error for favicon - not affecting functionality"]}
+    ]
+  },
+  "test_report_links": [
+    "/app/test_reports/pytest/iteration17_results.xml",
+    "/app/backend/tests/test_iteration17_market_status.py"
+  ],
+  "action_items": [],
+  "critical_code_review_comments": [
+    "market_hours_service.py correctly handles IST timezone with timezone(timedelta(hours=5, minutes=30))",
+    "NSE_HOLIDAYS dict covers 2025-2026 holidays with proper date format",
+    "_next_trading_day() correctly skips weekends AND holidays",
+    "MarketStatusBanner.jsx has proper data-testid attributes for testing",
+    "Countdown timer updates every second with proper cleanup in useEffect"
+  ],
+  "updated_files": [
+    "/app/backend/tests/test_iteration17_market_status.py"
+  ],
+  "success_rate": {
+    "backend": "100% (14/14 tests passed)",
+    "frontend": "100% (9 UI tests passed)"
+  },
+  "test_credentials": "None required - uses public preview URL",
+  "seed_data_creation": "None",
+  "retest_needed": false,
+  "main_agent_can_self_test": false,
+  "context_for_next_testing_agent": "Iteration 17 Market Status feature verified. MarketStatusBanner shows market open/close status with countdown. GET /api/market-status and GET /api/market-holidays endpoints work correctly. Version is 1.8.0. All regression tests pass (health, settings, portfolio, instruments, option-chain).",
+  "tested_features": {
+    "market_status_api": {
+      "status": "PASS",
+      "description": "GET /api/market-status returns market open/close status",
+      "api_verified": {
+        "endpoint": "GET /api/market-status",
+        "fields": ["is_open", "reason", "message", "next_open", "next_open_label", "holiday_name"],
+        "sample_response": {
+          "is_open": false,
+          "reason": "after_hours",
+          "message": "Market Closed - After Trading Hours",
+          "next_open": "2026-03-19T09:15:00+05:30",
+          "next_open_label": "Thursday, 19 Mar 2026 at 09:15 AM IST"
+        }
+      }
+    },
+    "market_holidays_api": {
+      "status": "PASS",
+      "description": "GET /api/market-holidays returns upcoming NSE holidays",
+      "api_verified": {
+        "endpoint": "GET /api/market-holidays",
+        "fields": ["date", "day", "name"],
+        "count": 5,
+        "next_holiday": "2026-03-20 - Id-Ul-Fitr (Ramadan)"
+      }
+    },
+    "version_bump": {
+      "status": "PASS",
+      "description": "Version bumped to 1.8.0 in /api/ root endpoint",
+      "api_verified": {
+        "endpoint": "GET /api/",
+        "app_version": "1.8.0"
+      }
+    },
+    "market_status_banner_ui": {
+      "status": "PASS",
+      "description": "MarketStatusBanner component renders correctly",
+      "ui_verified": {
+        "data_testid_banner": "market-status-banner - visible",
+        "data_testid_text": "market-status-text - shows 'Market Closed - After Trading Hours'",
+        "data_testid_countdown": "market-countdown - shows 'Opens in 17h 18m 56s'",
+        "data_testid_next_open": "market-next-open - shows 'Next: Thursday, 19 Mar 2026 at 09:15 AM IST'",
+        "styling": "Gray background/border for after_hours reason, countdown badge in slate color"
+      }
+    },
+    "regression_tests": {
+      "status": "PASS",
+      "endpoints_verified": [
+        "GET /api/health",
+        "GET /api/settings",
+        "GET /api/portfolio",
+        "GET /api/instruments",
+        "GET /api/option-chain/NIFTY"
+      ]
+    }
+  },
+  "api_verification_summary": {
+    "total_endpoints_tested": 14,
+    "passed": 14,
+    "failed": 0,
+    "new_endpoints": [
+      "GET /api/market-status",
+      "GET /api/market-holidays",
+      "GET /api/ (version check)"
+    ],
+    "regression_endpoints": [
+      "GET /api/health",
+      "GET /api/settings",
+      "GET /api/portfolio",
+      "GET /api/instruments",
+      "GET /api/option-chain/NIFTY"
+    ]
+  },
+  "mocked_apis_note": "Market data returns source=none (no Upstox token in preview). Option chain data is SIMULATED. This is expected behavior.",
+  "console_errors": "404 for favicon - not affecting functionality"
+}

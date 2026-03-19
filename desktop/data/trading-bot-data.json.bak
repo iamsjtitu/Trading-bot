@@ -1,0 +1,186 @@
+{
+  "settings": {
+    "type": "main",
+    "trading_mode": "PAPER",
+    "ai": {
+      "emergent_llm_key": "sk-emergent-754BdB27f511c159cC",
+      "model": "gpt-4.1-mini",
+      "provider": "openai"
+    },
+    "broker": {
+      "name": "upstox",
+      "api_key": "",
+      "api_secret": "",
+      "redirect_uri": "",
+      "access_token": "",
+      "token_timestamp": ""
+    },
+    "risk": {
+      "initial_capital": 500000,
+      "daily_limit": 100000,
+      "max_per_trade": 20000,
+      "stop_loss_pct": 25,
+      "target_pct": 50,
+      "risk_tolerance": "medium"
+    },
+    "auto_trading": {
+      "auto_exit": true,
+      "auto_entry": false,
+      "auto_analysis": true,
+      "analysis_interval_minutes": 5
+    },
+    "schedule": {
+      "enabled": true,
+      "trading_days": [
+        "Monday",
+        "Tuesday",
+        "Wednesday",
+        "Thursday",
+        "Friday"
+      ],
+      "start_time": "09:15",
+      "end_time": "15:30",
+      "timezone": "Asia/Kolkata"
+    },
+    "news": {
+      "sources": [
+        "demo"
+      ],
+      "newsapi_key": "",
+      "alphavantage_key": "",
+      "min_confidence": 60
+    },
+    "notifications": {
+      "enabled": true,
+      "trade_execution": true,
+      "high_confidence_signals": true,
+      "risk_warnings": true,
+      "daily_summary": true
+    },
+    "trading_instrument": "BANKNIFTY"
+  },
+  "portfolio": {
+    "type": "paper",
+    "initial_capital": 500000,
+    "current_capital": 500000,
+    "invested_amount": 17400,
+    "available_capital": 482600,
+    "total_pnl": 0,
+    "daily_pnl": 0,
+    "total_trades": 0,
+    "winning_trades": 0,
+    "losing_trades": 0,
+    "active_positions": [
+      "8e9dd30d-28d2-4ffb-a444-89be1caedb6e"
+    ],
+    "created_at": "2026-03-19T16:54:46.498Z",
+    "last_updated": "2026-03-19T17:26:47.639Z"
+  },
+  "trades": [
+    {
+      "id": "8e9dd30d-28d2-4ffb-a444-89be1caedb6e",
+      "signal_id": "3ed094c7-0268-4bea-88ca-83d85ed04418",
+      "trade_type": "CALL",
+      "symbol": "BANKNIFTY",
+      "entry_time": "2026-03-19T17:26:47.639Z",
+      "entry_price": 150,
+      "quantity": 116,
+      "investment": 17400,
+      "stop_loss": 112.5,
+      "target": 225,
+      "status": "OPEN",
+      "mode": "PAPER",
+      "exit_time": null,
+      "exit_price": null,
+      "pnl": 0,
+      "pnl_percentage": 0
+    }
+  ],
+  "signals": [
+    {
+      "id": "3ed094c7-0268-4bea-88ca-83d85ed04418",
+      "signal_type": "CALL",
+      "symbol": "BANKNIFTY",
+      "strike_price": 52200,
+      "option_premium": 150,
+      "quantity": 116,
+      "investment_amount": 17400,
+      "entry_price": 150,
+      "stop_loss": 112.5,
+      "target": 225,
+      "confidence": 90,
+      "composite_score": 90,
+      "correlation_score": 50,
+      "confluence_score": 0,
+      "market_regime": "UNKNOWN",
+      "sentiment": "BULLISH",
+      "sector": "BANKING",
+      "secondary_sector": "NONE",
+      "volatility": "STABLE",
+      "time_horizon": "SHORT_TERM",
+      "risk_level": "MEDIUM",
+      "freshness_score": 89,
+      "position_sizing": {
+        "confidence": 1.25,
+        "winRate": 1,
+        "regime": 0.7,
+        "sector": 1,
+        "drawdown": 1
+      },
+      "reason": "Bullish signals [BANKING]: rally, surge, positive, inflows (keyword analysis) | Correlation: 50%",
+      "news_id": "ddf04d97-f21e-4e28-9b8f-baf1741b54be",
+      "status": "ACTIVE",
+      "mode": "PAPER",
+      "created_at": "2026-03-19T17:26:47.639Z",
+      "expires_at": "2026-03-26T17:26:47.639Z"
+    }
+  ],
+  "news_articles": [
+    {
+      "id": "ddf04d97-f21e-4e28-9b8f-baf1741b54be",
+      "title": "Nifty 50 rallies 2% as global markets surge on positive economic data",
+      "description": "Indian benchmark index Nifty 50 closed at fresh highs today, driven by strong FII inflows and positive global cues. Banking and IT stocks led the rally.",
+      "content": "Market experts suggest bullish trend may continue",
+      "source": "Demo Market News",
+      "url": "#",
+      "published_at": "2026-03-19T17:16:47.491Z",
+      "sentiment_analysis": {
+        "sentiment": "BULLISH",
+        "confidence": 90,
+        "impact": "HIGH",
+        "sector": "BANKING",
+        "reason": "Bullish signals [BANKING]: rally, surge, positive, inflows (keyword analysis)",
+        "trading_signal": "BUY_CALL",
+        "freshness_score": 89,
+        "correlation_score": 50,
+        "confluence_score": 0,
+        "market_regime": "UNKNOWN"
+      },
+      "created_at": "2026-03-19T17:26:47.639Z"
+    },
+    {
+      "id": "c6041180-60cb-4833-9686-a7a2fa295b71",
+      "title": "RBI maintains repo rate, signals cautious stance on inflation",
+      "description": "Reserve Bank of India kept interest rates unchanged in its latest policy meeting, citing concerns over persistent inflation despite growth moderation.",
+      "content": "Markets react mixed to RBI decision",
+      "source": "Demo Financial Times",
+      "url": "#",
+      "published_at": "2026-03-19T16:56:47.491Z",
+      "sentiment_analysis": {
+        "sentiment": "NEUTRAL",
+        "confidence": 50,
+        "impact": "LOW",
+        "sector": "BANKING",
+        "reason": "Mixed signals [BANKING] (keyword analysis)",
+        "trading_signal": "HOLD",
+        "freshness_score": 71,
+        "correlation_score": 80,
+        "confluence_score": 0,
+        "market_regime": "UNKNOWN"
+      },
+      "created_at": "2026-03-19T17:26:47.698Z"
+    }
+  ],
+  "journal_entries": [],
+  "journal_insights": []
+}

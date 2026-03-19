@@ -1,0 +1,88 @@
+{
+  "summary": "Iteration 11 - Multi-Instrument Trading & New News Sources Testing Complete. All 15 backend tests passed. All 4 instrument cards visible in Settings > Trading tab. All 9 news source options visible in Settings > Advanced tab, including the 3 new free sources (NDTV Profit, CNBC TV18, Livemint).",
+  "backend_issues": {
+    "critical": [],
+    "minor": []
+  },
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": [
+      {
+        "screen": "Settings Panel",
+        "issues": ["Minor: HTML hydration warning - Badge inside <p> tag on Trading tab (cosmetic only, doesn't affect functionality)"]
+      }
+    ]
+  },
+  "test_report_links": [
+    "/app/test_reports/pytest/iteration11_results.xml",
+    "/app/backend/tests/test_iteration11_new_features.py"
+  ],
+  "action_items": [],
+  "critical_code_review_comments": [],
+  "updated_files": [
+    "/app/backend/tests/test_iteration11_new_features.py"
+  ],
+  "success_rate": {
+    "backend": "100% (15/15 tests passed)",
+    "frontend": "100% (all instrument cards and news source options verified)"
+  },
+  "test_credentials": "None required - uses public preview URL",
+  "seed_data_creation": "Using existing news data from previous iterations",
+  "retest_needed": false,
+  "main_agent_can_self_test": false,
+  "context_for_next_testing_agent": "Multi-instrument trading and 3 new news sources fully tested and working. App is in LIVE TRADING mode with Upstox disconnected. News sources CNBC TV18 (7 articles) and NDTV Profit (2 articles) are already fetching data. Livemint is configured but may need time to accumulate articles due to deduplication.",
+  "tested_features": {
+    "multi_instrument_trading": {
+      "status": "PASS",
+      "description": "4 instruments available: NIFTY50, BANKNIFTY, FINNIFTY, MIDCPNIFTY",
+      "api_verified": {
+        "GET /api/instruments": "Returns all 4 instruments with correct details (lot_size, strike_step, option_premium, base_price, exchange)",
+        "POST /api/instruments/set": "Correctly changes active instrument and persists to settings",
+        "POST /api/instruments/set (invalid)": "Returns error with list of available instruments"
+      },
+      "ui_verified": "Settings > Trading tab shows 4 instrument cards with selection checkmarks"
+    },
+    "new_news_sources": {
+      "status": "PASS",
+      "description": "3 new free news sources added: NDTV Profit, CNBC TV18, Livemint",
+      "api_verified": {
+        "GET /api/settings": "Shows news sources configuration including new sources",
+        "POST /api/settings/update": "Can update news sources including new ones",
+        "GET /api/news/latest": "Returns articles from configured sources (CNBC TV18: 7, NDTV Profit: 2 in DB)"
+      },
+      "ui_verified": "Settings > Advanced tab shows all 9 news source options with checkboxes, new sources (ndtv_profit, cnbc_tv18, livemint) are selected"
+    },
+    "instrument_persistence": {
+      "status": "PASS",
+      "description": "Instrument selection persists via /api/instruments/set and is stored in settings_manager"
+    }
+  },
+  "api_verification": {
+    "GET /api/health": "200 OK - healthy, all services active",
+    "GET /api/instruments": "200 OK - returns 4 instruments with details (NIFTY50, BANKNIFTY, FINNIFTY, MIDCPNIFTY)",
+    "POST /api/instruments/set (BANKNIFTY)": "200 OK - changes active to BANKNIFTY",
+    "POST /api/instruments/set (FINNIFTY)": "200 OK - changes active to FINNIFTY",
+    "POST /api/instruments/set (MIDCPNIFTY)": "200 OK - changes active to MIDCPNIFTY",
+    "POST /api/instruments/set (INVALID)": "200 OK - returns error with available instruments list",
+    "GET /api/settings": "200 OK - shows trading_instrument and news.sources config",
+    "GET /api/news/latest": "200 OK - returns articles from CNBC TV18, NDTV Profit, Economic Times, Moneycontrol"
+  },
+  "ui_verification": {
+    "settings_trading_tab": "4 instrument cards visible (NIFTY 50, BANK NIFTY, FIN NIFTY, MIDCAP NIFTY) with lot size, step, and premium info",
+    "settings_advanced_tab": "9 news source options visible with descriptions and checkboxes. 3 new sources (NDTV Profit, CNBC TV18, Livemint) marked as 'Free' with check marks",
+    "instrument_selection": "Clicking instrument card updates selection and shows 'Current: <INSTRUMENT>' badge"
+  },
+  "instrument_details_verified": {
+    "NIFTY50": {"label": "NIFTY 50", "lot_size": 25, "strike_step": 50, "option_premium": 150, "exchange": "NSE"},
+    "BANKNIFTY": {"label": "BANK NIFTY", "lot_size": 15, "strike_step": 100, "option_premium": 300, "exchange": "NSE"},
+    "FINNIFTY": {"label": "FIN NIFTY", "lot_size": 25, "strike_step": 50, "option_premium": 120, "exchange": "NSE"},
+    "MIDCPNIFTY": {"label": "MIDCAP NIFTY", "lot_size": 50, "strike_step": 25, "option_premium": 80, "exchange": "NSE"}
+  },
+  "news_sources_in_db": {
+    "CNBC TV18": 7,
+    "NDTV Profit": 2,
+    "Economic Times": 59,
+    "Moneycontrol": 32
+  }
+}

@@ -1,0 +1,65 @@
+{
+  "summary": "Iteration 7 complete - Testing 5 new features: Market Closed status, News deduplication, Square-off check API, Historical patterns API, Telegram not-configured error. All 14 backend tests passed. All UI features verified working via Playwright.",
+  "backend_issues": {
+    "critical": [],
+    "minor": []
+  },
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": [
+      {
+        "screen": "Trade History - Exit Price column",
+        "issues": ["Minor cosmetic: Exit price shows raw float numbers (e.g., 171.23) - carried from previous iteration"]
+      }
+    ]
+  },
+  "test_report_links": [
+    "/app/test_reports/pytest/iteration7_results.xml",
+    "/app/backend/tests/test_iteration7_features.py"
+  ],
+  "action_items": [],
+  "critical_code_review_comments": [],
+  "updated_files": [
+    "/app/backend/tests/test_iteration7_features.py"
+  ],
+  "success_rate": {
+    "backend": "100% (14/14 tests passed)",
+    "frontend": "100% (all features verified)"
+  },
+  "test_credentials": "None required - uses public preview URL",
+  "seed_data_creation": "Existing: 5 closed trades with +12,853 P&L, 100% win rate",
+  "retest_needed": false,
+  "main_agent_can_self_test": false,
+  "context_for_next_testing_agent": "All 5 new features working correctly. Market ticker shows MARKET CLOSED badge (grey) outside market hours 9:15 AM - 3:30 PM IST. News deduplication works - second fetch returns 0 articles. Historical patterns collection is empty (new collection). Risk Panel issue from iteration 6 appears fixed - now showing paper data correctly even in LIVE mode with Upstox disconnected.",
+  "tested_features": {
+    "1_market_closed_badge": "PASS - Shows 'MARKET CLOSED' badge (grey) when outside 9:15 AM - 3:30 PM IST",
+    "2_market_hours_text": "PASS - Shows 'Market hours: 9:15 AM - 3:30 PM IST' instead of 'Updating every 1 sec'",
+    "3_news_deduplication": "PASS - Second fetch returns 0 articles (same news already in DB)",
+    "4_square_off_check_api": "PASS - POST /api/market/square-off-check returns {open_count: 0, message: 'No open positions'}",
+    "5_historical_patterns_api": "PASS - GET /api/historical-patterns returns {total_patterns, sector_stats, sentiment_stats}",
+    "6_dashboard_loads": "PASS - All portfolio cards visible with correct data",
+    "7_risk_panel": "PASS - Shows Daily Used, Today's Trades, Today's P&L correctly (₹99,750, 5, ₹12,853)",
+    "8_trade_history_tab": "PASS - Filters (OPEN/CLOSED/CALL/PUT) and summary stats working",
+    "9_trade_analytics_tab": "PASS - Charts (P&L Performance, Win/Loss, CALL/PUT) visible",
+    "10_settings_panel": "PASS - All tabs (Broker, Risk, Schedule, Advanced) working",
+    "11_notifications_telegram": "PASS - Telegram section visible with Enable, Bot Token, Chat ID fields",
+    "12_news_sector_field": "PASS - /api/news/latest returns articles with 'sector' field in sentiment_analysis",
+    "13_daily_summary_api": "PASS - /api/daily-summary returns today's summary with trades, P&L, win_rate",
+    "14_telegram_not_configured": "PASS - /api/telegram/send-daily-summary returns proper error message"
+  },
+  "api_verification": {
+    "GET /api/health": "200 OK - healthy",
+    "GET /api/portfolio": "200 OK - current_value, total_pnl present",
+    "POST /api/market/square-off-check": "200 OK - {status: success, open_count: 0, message: 'No open positions'}",
+    "GET /api/historical-patterns": "200 OK - {total_patterns: 0, sector_stats: {}, sentiment_stats: {}}",
+    "GET /api/news/fetch": "200 OK - {articles_processed: 0} (deduplication working)",
+    "GET /api/news/latest": "200 OK - articles have sector field in sentiment_analysis",
+    "GET /api/daily-summary": "200 OK - complete summary structure",
+    "POST /api/telegram/send-daily-summary": "200 OK - proper 'not configured' error",
+    "GET /api/trades/today": "200 OK - 5 trades, ₹12,853 P&L",
+    "GET /api/trades/history": "200 OK - with filters and summary",
+    "GET /api/combined-status": "200 OK - mode=LIVE, upstox_connected=false"
+  },
+  "note_on_risk_panel_fix": "The Risk Panel issue from iteration 6 (showing zeros when LIVE mode + Upstox disconnected) appears to be fixed. Risk Panel now correctly shows paper trading data: Daily Used ₹99,750, Today's Trades 5, Today's P&L ₹12,853"
+}
