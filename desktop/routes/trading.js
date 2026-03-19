@@ -77,26 +77,63 @@ module.exports = function (db) {
 
         if (posResp.data?.status === 'success') {
           const positions = (posResp.data.data || []).filter(p => p.quantity !== 0);
-          const tradesFromPositions = positions.map(pos => ({
-            trade_type: pos.quantity > 0 ? 'BUY' : 'SELL',
-            symbol: pos.trading_symbol || 'N/A',
-            quantity: Math.abs(pos.quantity),
-            status: 'OPEN',
-            entry_price: pos.average_price || 0,
-            current_price: pos.last_price || 0,
-            current_value: (pos.last_price || 0) * Math.abs(pos.quantity),
-            investment: (pos.average_price || 0) * Math.abs(pos.quantity),
-            live_pnl: Math.round((pos.pnl || 0) * 100) / 100,
-            pnl_percentage: pos.average_price > 0
-              ? Math.round(((pos.last_price - pos.average_price) / pos.average_price) * 10000) / 100
-              : 0,
-            stop_loss: 0,
-            target: 0,
-            entry_time: new Date().toISOString(),
-            isLive: true,
-            instrument_token: pos.instrument_token || '',
-            product: pos.product || '',
-          }));
+
+          // Build a lookup of stored trades by instrument_token for SL/target/entry_time
+          const storedTradesMap = {};
+          for (const t of (db.data.trades || [])) {
+            if (t.mode === 'LIVE' && t.status === 'OPEN' && t.instrument_token) {
+              storedTradesMap[t.instrument_token] = t;
+            }
+          }
+
+          const tradesFromPositions = positions.map(pos => {
+            // Use buy_price as fallback when average_price is 0
+            const entryPrice = pos.average_price || pos.buy_price || (pos.buy_quantity > 0 ? pos.buy_value / pos.buy_quantity : 0);
+            const qty = Math.abs(pos.quantity);
+            const investment = entryPrice * qty;
+            const currentPrice = pos.last_price || 0;
+            const currentValue = currentPrice * qty;
+            const livePnl = pos.pnl || (currentValue - investment);
+
+            // Merge with stored trade for SL, target, entry_time
+            const stored = storedTradesMap[pos.instrument_token] || {};
+
+            // Update stored trade's entry_price with real fill price if it was 0 or a placeholder
+            if (stored.id && entryPrice > 0 && (stored.entry_price === 0 || stored.entry_price === 150)) {
+              stored.entry_price = entryPrice;
+              stored.investment = investment;
+              // Recalculate SL/target based on actual entry price
+              const rp2 = riskParams[getRiskTolerance()] || riskParams.medium;
+              const slPct = customStoplossPct != null ? customStoplossPct : rp2.stop_loss_pct;
+              const tgtPct = customTargetPct != null ? customTargetPct : rp2.target_pct;
+              stored.stop_loss = Math.round(entryPrice * (1 - slPct / 100) * 100) / 100;
+              stored.target = Math.round(entryPrice * (1 + tgtPct / 100) * 100) / 100;
+              db.save();
+            }
+
+            return {
+              id: stored.id || pos.instrument_token,
+              trade_type: pos.quantity > 0 ? 'BUY' : 'SELL',
+              symbol: pos.trading_symbol || stored.symbol || 'N/A',
+              quantity: qty,
+              status: 'OPEN',
+              entry_price: Math.round(entryPrice * 100) / 100,
+              current_price: currentPrice,
+              current_value: Math.round(currentValue * 100) / 100,
+              investment: Math.round(investment * 100) / 100,
+              live_pnl: Math.round(livePnl * 100) / 100,
+              pnl_percentage: entryPrice > 0
+                ? Math.round(((currentPrice - entryPrice) / entryPrice) * 10000) / 100
+                : 0,
+              stop_loss: stored.stop_loss || 0,
+              target: stored.target || 0,
+              entry_time: stored.entry_time || new Date().toISOString(),
+              isLive: true,
+              instrument_token: pos.instrument_token || '',
+              product: pos.product || '',
+              signal_id: stored.signal_id || '',
+            };
+          });
           return res.json({ status: 'success', count: tradesFromPositions.length, trades: tradesFromPositions, isLive: true });
         }
       } catch (err) {
@@ -319,6 +356,36 @@ _Sent automatically by AI Trading Bot_`;
 
     const mode = db.data.settings?.trading_mode || 'PAPER';
     const accessToken = getActiveBrokerToken();
+
+    // LIVE mode: sync entry prices from Upstox positions before checking exit conditions
+    if (mode === 'LIVE' && accessToken) {
+      try {
+        const headers = { Accept: 'application/json', Authorization: `Bearer ${accessToken}`, 'Api-Version': '2.0' };
+        const posResp = await axios.get('https://api.upstox.com/v2/portfolio/short-term-positions', { headers, timeout: 10000 });
+        if (posResp.data?.status === 'success') {
+          const posMap = {};
+          for (const p of (posResp.data.data || [])) {
+            if (p.instrument_token) posMap[p.instrument_token] = p;
+          }
+          for (const trade of openTrades) {
+            if (trade.mode === 'LIVE' && trade.instrument_token && posMap[trade.instrument_token]) {
+              const pos = posMap[trade.instrument_token];
+              const realEntry = pos.average_price || pos.buy_price || (pos.buy_quantity > 0 ? pos.buy_value / pos.buy_quantity : 0);
+              if (realEntry > 0 && (trade.entry_price === 0 || trade.entry_price === 150 || Math.abs(trade.entry_price - realEntry) > realEntry * 0.5)) {
+                console.log(`[AutoExit] Updating entry price for ${trade.symbol}: ${trade.entry_price} -> ${realEntry}`);
+                trade.entry_price = realEntry;
+                trade.investment = realEntry * trade.quantity;
+                trade.stop_loss = Math.round(realEntry * (1 - stoplossPct / 100) * 100) / 100;
+                trade.target = Math.round(realEntry * (1 + targetPct / 100) * 100) / 100;
+              }
+            }
+          }
+          db.save();
+        }
+      } catch (err) {
+        console.error('[AutoExit] Positions sync error:', err.message);
+      }
+    }
 
     for (const trade of openTrades) {
       let currentPrice;
@@ -711,7 +778,7 @@ _Sent automatically by AI Trading Bot_`;
     });
 
     const allOk = steps.every(s => s.ok);
-    res.json({ status: 'success', all_ok: allOk, version: '3.1.4', steps });
+    res.json({ status: 'success', all_ok: allOk, version: '3.1.5', steps });
   });
 
   // POST /api/test/generate-trade
