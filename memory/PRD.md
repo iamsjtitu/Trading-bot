@@ -10,7 +10,7 @@ Build an AI-powered automated options trading bot with multi-broker support, AI 
 - **Desktop:** Electron + electron-builder + electron-updater
 - **AI:** OpenAI GPT-4o via Emergent LLM Key
 
-## What's Implemented (v2.5.0)
+## What's Implemented (v3.0.4)
 
 ### Multi-Broker Architecture (6 Brokers - FULLY ISOLATED)
 - **Upstox** (Active) - OAuth, Orders, Portfolio, Market Data, WebSocket
@@ -19,58 +19,61 @@ Build an AI-powered automated options trading bot with multi-broker support, AI 
 - **5paisa** - Login, Orders, Portfolio
 - **Paytm Money** - OAuth, Orders, Portfolio
 - **IIFL Securities** - Login, Orders
-- **Per-broker credential storage**: Each broker has its own api_key, api_secret, token
-- Generic broker routing through broker_manager
+- Per-broker credential storage with isolated tokens
 
-### Auto-Trade (All Instruments including MCX)
+### Auto-Trade (NSE/BSE Instruments)
 - AI Signal -> Auto Entry/Exit on ANY selected instrument
-- Correct exchange mapping: NSE->NFO, BSE->BFO, MCX->MCX
+- Correct exchange mapping: NSE->NFO, BSE->BFO
 - Settings persist across restarts
 
-### 9 Trading Instruments
+### 6 Trading Instruments
 - NSE: NIFTY50, BANKNIFTY, FINNIFTY, MIDCPNIFTY
 - BSE: SENSEX, BANKEX
-- MCX: CRUDEOIL, GOLD, SILVER
+- MCX: REMOVED (v3.0.0+)
 
-### Market Status (Dual Indicator)
-- NSE/BSE: 9:15 AM - 3:30 PM IST + 34 holidays (2025-2026)
-- MCX: 9:00 AM - 11:30 PM IST
+### Market Status
+- NSE/BSE: 9:15 AM - 3:30 PM IST + holidays
 - Live countdown timers
 
-### Option Chain - LIVE DATA ONLY (v2.5.0)
-- 9 instruments in 2 groups (Index + MCX Commodities)
-- **No more Black-Scholes simulation fallback**
+### Option Chain - LIVE DATA ONLY
+- 6 instruments (NSE/BSE only)
 - 3-step check: (1) Market status, (2) Broker connection, (3) Live data fetch
-- source='market_closed' when market is closed with next opening time
-- source='broker_disconnected' when broker not connected with instructions
-- source='broker_error' when broker returns error with retry option
-- source='live' only when live data is successfully fetched
-- OI Buildup Alerts also respect market status
-- Upstox option chain API fixed for MCX (MCX_FO) and BSE (BSE_INDEX) instruments
+- Desktop backend now parses Upstox data into frontend format with full Greeks
+- No simulation fallback - shows market status when data unavailable
 
 ### Desktop App
 - Electron with auto-updates
 - Node.js backend synced with Python backend
 - CI/CD via GitHub Actions
 
-## Key Bug Fixes (v2.5.0)
-- P0: Option Chain no longer shows simulated data - shows market status messages instead
-- P0: Upstox option chain instrument key fixed for MCX and BSE exchanges  
-- P0: OI Buildup Alerts respect market hours
-- Desktop option chain route updated to check market status (no more simulation)
+### News Sources (11 sources)
+- Moneycontrol, Economic Times, NDTV Profit, CNBC TV18, Livemint
+- Business Today, The Hindu Business Line, Reuters, Bloomberg
+- Additional RSS feeds
 
-## Key Bug Fixes (v2.4.0)
-- CRITICAL: Per-broker credential isolation
-- CRITICAL: Desktop backend synchronized with Python backend
-- MCX live data via dynamic instrument key resolution
-- CI/CD build fix for Windows (makensis PATH)
+## Key Bug Fixes (v3.0.4)
+- P0: Trading instrument persistence - fixed key mismatch (trading_instrument used consistently)
+- P0: Option Chain desktop backend - added parseLiveChain() to convert raw Upstox data to frontend format with Greeks
+- P0: Option Chain error handling - now extracts actual Upstox API error details
+- Cleanup: Removed MCX Commodities group from frontend OptionChain.js
+- Added MIDCPNIFTY to INDEX_KEYS for quick market data
+- Added base_price to all instruments in desktop backend
+
+## Key Bug Fixes (v3.0.3)
+- CRITICAL: Fixed JS crash from duplicate variable in extra_apis.js
+- CRITICAL: Fixed auto-trade LIVE mode token path
+- CRITICAL: Ported 3 missing news scrapers to desktop backend
+- Added 2 new news sources (Business Today, Hindu Business Line)
+- Removed all MCX functionality
+- Separated PAPER/LIVE data in analytics/tax/AI brain
+- Prevented AI signals during market closed hours
 
 ## Pending Tasks
-- P1: User verification of all fixes in live environment
-- P2: Desktop app rebuild (.exe/.dmg) after user confirmation
+- P0: User to create new GitHub release for v3.0.4 desktop build
+- P1: Full end-to-end user verification on desktop app
 
 ## Future/Backlog
 - Stock Options trading support
 - Enhanced trade analytics and tax reporting
 - Telegram notifications integration
-- App.js component refactoring
+- App.js, news.js, trading.js refactoring
