@@ -137,6 +137,25 @@ export default function AutoTradingSettings({ autoSettings, showAutoSettings, se
           )}
         </div>
       )}
+
+      {/* Fix Trade Data Button */}
+      <div className="mt-4 pt-4 border-t border-gray-200">
+        <button
+          onClick={async () => {
+            try {
+              const r = await axios.post(`${API}/trades/cleanup`);
+              alert(r.data.message || 'Cleanup complete');
+            } catch (e) {
+              alert('Cleanup failed: ' + e.message);
+            }
+          }}
+          className="w-full px-4 py-2 bg-yellow-600 hover:bg-yellow-700 text-white rounded-lg font-medium text-sm"
+          data-testid="fix-trade-data-btn"
+        >
+          Fix Trade Data (Sync with Upstox)
+        </button>
+        <p className="text-xs text-gray-500 mt-1">Fixes entry prices and P&L using actual Upstox order data</p>
+      </div>
     </Card>
   );
 }

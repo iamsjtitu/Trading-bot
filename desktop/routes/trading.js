@@ -609,6 +609,69 @@ _Sent automatically by AI Trading Bot_`;
     });
   });
 
+  // POST /api/trades/cleanup - Fix trades with wrong entry_price using Upstox order book
+  router.post('/api/trades/cleanup', async (req, res) => {
+    const accessToken = getActiveBrokerToken();
+    if (!accessToken) {
+      return res.json({ status: 'error', message: 'Broker not connected' });
+    }
+
+    try {
+      // Fetch all orders from Upstox
+      const headers = { Accept: 'application/json', Authorization: `Bearer ${accessToken}`, 'Api-Version': '2.0' };
+      const orderResp = await axios.get('https://api.upstox.com/v2/order/retrieve-all', { headers, timeout: 15000 });
+
+      if (orderResp.data?.status !== 'success') {
+        return res.json({ status: 'error', message: 'Failed to fetch orders from Upstox' });
+      }
+
+      const orders = orderResp.data.data || [];
+      const orderMap = {};
+      for (const o of orders) {
+        if (o.order_id) orderMap[o.order_id] = o;
+      }
+
+      let fixed = 0;
+      const liveTrades = (db.data.trades || []).filter(t => t.mode === 'LIVE');
+
+      for (const trade of liveTrades) {
+        if (trade.order_id && orderMap[trade.order_id]) {
+          const order = orderMap[trade.order_id];
+          const fillPrice = order.average_price || order.price || 0;
+          const fillQty = order.filled_quantity || order.quantity || trade.quantity;
+
+          if (fillPrice > 0 && trade.entry_price !== fillPrice) {
+            console.log(`[Cleanup] Fixing trade ${trade.id?.substring(0,8)}: entry ${trade.entry_price} -> ${fillPrice}`);
+            trade.entry_price = fillPrice;
+            trade.quantity = fillQty;
+            trade.investment = fillPrice * fillQty;
+
+            // Recalculate SL/target
+            const rp = riskParams[getRiskTolerance()] || riskParams.medium;
+            const slP = customStoplossPct != null ? customStoplossPct : rp.stop_loss_pct;
+            const tgP = customTargetPct != null ? customTargetPct : rp.target_pct;
+            trade.stop_loss = Math.round(fillPrice * (1 - slP / 100) * 100) / 100;
+            trade.target = Math.round(fillPrice * (1 + tgP / 100) * 100) / 100;
+
+            // Recalculate P&L for closed trades
+            if (trade.status === 'CLOSED' && trade.exit_price > 0) {
+              trade.pnl = Math.round((trade.exit_price - fillPrice) * fillQty * 100) / 100;
+              trade.pnl_percentage = fillPrice > 0 ? Math.round(((trade.exit_price - fillPrice) / fillPrice) * 10000) / 100 : 0;
+            }
+            fixed++;
+          }
+        }
+      }
+
+      db.save();
+      res.json({ status: 'success', fixed, total_live_trades: liveTrades.length, message: `Fixed ${fixed} trades with actual Upstox prices` });
+    } catch (err) {
+      console.error('[Cleanup] Error:', err.message);
+      res.json({ status: 'error', message: err.message });
+    }
+  });
+
+
 
   // POST /api/trades/manual-exit - Manually exit/close a position
   router.post('/api/trades/manual-exit', async (req, res) => {
@@ -933,7 +996,7 @@ _Sent automatically by AI Trading Bot_`;
     });
 
     const allOk = steps.every(s => s.ok);
-    res.json({ status: 'success', all_ok: allOk, version: '3.2.3', steps });
+    res.json({ status: 'success', all_ok: allOk, version: '3.2.4', steps });
   });
 
   // POST /api/test/generate-trade
@@ -1206,13 +1269,35 @@ _Sent automatically by AI Trading Bot_`;
       const orderId = orderResp.data?.data?.order_id || '';
       const success = orderResp.data?.status === 'success';
 
+      // Fetch actual fill price from Upstox order details (wait 2 sec for order to execute)
+      let actualEntryPrice = signal.entry_price;
+      if (success && orderId) {
+        try {
+          await new Promise(r => setTimeout(r, 2000));
+          const orderDetail = await axios.get(`https://api.upstox.com/v2/order/details?order_id=${orderId}`, {
+            headers: { Accept: 'application/json', Authorization: `Bearer ${accessToken}`, 'Api-Version': '2.0' },
+            timeout: 10000,
+          });
+          const fillPrice = orderDetail.data?.data?.average_price || orderDetail.data?.data?.price || 0;
+          if (fillPrice > 0) {
+            actualEntryPrice = fillPrice;
+            console.log(`[AutoEntry] Got actual fill price: ${fillPrice} (was ${signal.entry_price})`);
+          }
+        } catch (e) { console.log(`[AutoEntry] Could not fetch fill price: ${e.message}`); }
+      }
+
       if (!db.data.trades) db.data.trades = [];
+      const rp3 = riskParams[getRiskTolerance()] || riskParams.medium;
+      const slP = customStoplossPct != null ? customStoplossPct : rp3.stop_loss_pct;
+      const tgP = customTargetPct != null ? customTargetPct : rp3.target_pct;
       const trade = {
         id: crypto.randomUUID(), signal_id: signal.id, trade_type: signal.signal_type,
         symbol: signal.symbol, entry_time: new Date().toISOString(),
-        entry_price: signal.entry_price, quantity: qty,
-        investment: qty * signal.entry_price, stop_loss: signal.stop_loss,
-        target: signal.target, status: success ? 'OPEN' : 'FAILED',
+        entry_price: actualEntryPrice, quantity: qty,
+        investment: qty * actualEntryPrice,
+        stop_loss: Math.round(actualEntryPrice * (1 - slP / 100) * 100) / 100,
+        target: Math.round(actualEntryPrice * (1 + tgP / 100) * 100) / 100,
+        status: success ? 'OPEN' : 'FAILED',
         mode: 'LIVE', order_id: orderId, instrument_token: instrumentToken,
         exit_time: null, exit_price: null, pnl: 0, pnl_percentage: 0,
       };

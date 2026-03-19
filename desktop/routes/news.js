@@ -1196,14 +1196,34 @@ module.exports = function (db) {
       const orderId = orderResp.data?.data?.order_id || '';
       const orderSuccess = orderResp.data?.status === 'success';
 
-      // Step 3: Track trade
+      // Fetch actual fill price from Upstox (wait 2 sec for MARKET order to execute)
+      let actualEntryPrice = signal.entry_price;
+      if (orderSuccess && orderId) {
+        try {
+          await new Promise(r => setTimeout(r, 2000));
+          const orderDetail = await axios.get(`https://api.upstox.com/v2/order/details?order_id=${orderId}`, {
+            headers: { Accept: 'application/json', Authorization: `Bearer ${accessToken}`, 'Api-Version': '2.0' },
+            timeout: 10000,
+          });
+          const fillPrice = orderDetail.data?.data?.average_price || orderDetail.data?.data?.price || 0;
+          if (fillPrice > 0) {
+            actualEntryPrice = fillPrice;
+            console.log(`[LiveTrade] Got actual fill price: ${fillPrice} (was ${signal.entry_price})`);
+          }
+        } catch (e) { console.log(`[LiveTrade] Could not fetch fill price: ${e.message}`); }
+      }
+
+      // Step 3: Track trade with REAL entry price
       if (!db.data.trades) db.data.trades = [];
+      const riskP = { target_pct: 50, stop_loss_pct: 25, ...(db.data?.settings?.auto_trading || {}) };
       const trade = {
         id: uuid(), signal_id: signal.id, trade_type: signal.signal_type,
         symbol: signal.symbol, entry_time: new Date().toISOString(),
-        entry_price: signal.entry_price, quantity: qty,
-        investment: qty * signal.entry_price, stop_loss: signal.stop_loss,
-        target: signal.target, status: orderSuccess ? 'OPEN' : 'FAILED',
+        entry_price: actualEntryPrice, quantity: qty,
+        investment: qty * actualEntryPrice,
+        stop_loss: Math.round(actualEntryPrice * (1 - (riskP.stoploss_pct || riskP.stop_loss_pct || 25) / 100) * 100) / 100,
+        target: Math.round(actualEntryPrice * (1 + (riskP.target_pct || 50) / 100) * 100) / 100,
+        status: orderSuccess ? 'OPEN' : 'FAILED',
         mode: 'LIVE', order_id: orderId, instrument_token: instrumentToken,
         exit_time: null, exit_price: null, pnl: 0, pnl_percentage: 0,
         upstox_status: orderResp.data?.status || 'unknown',
