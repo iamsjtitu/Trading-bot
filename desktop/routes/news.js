@@ -907,7 +907,7 @@ module.exports = function (db) {
     if (sentiment.market_regime && sentiment.market_regime !== 'UNKNOWN') enhancedReason += ` | Regime: ${sentiment.market_regime}`;
     if (historicalAdj !== 0) enhancedReason += ` | Historical: ${historicalAdj > 0 ? '+' : ''}${historicalAdj}`;
 
-    const activeInst = db.data?.settings?.active_instrument || 'NIFTY50';
+    const activeInst = db.data?.settings?.trading_instrument || db.data?.settings?.active_instrument || 'NIFTY50';
     return {
       id: uuid(), signal_type: signalType, symbol: activeInst,
       strike_price: 24000 + (signalType === 'CALL' ? 500 : -500),

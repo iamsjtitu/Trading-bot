@@ -13,7 +13,7 @@ import os
 import re
 from datetime import datetime, timezone, timedelta
 
-BASE_URL = os.environ.get('REACT_APP_BACKEND_URL', 'https://sentiment-trade-bot-1.preview.emergentagent.com')
+BASE_URL = os.environ.get('REACT_APP_BACKEND_URL', 'https://market-sentinel-68.preview.emergentagent.com')
 
 class TestHealthAndBasicAPIs:
     """Basic API health tests"""

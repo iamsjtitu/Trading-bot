@@ -574,7 +574,7 @@ _Sent automatically by AI Trading Bot_`;
     if (sentiment.confidence < 60 || sentiment.trading_signal === 'HOLD') return null;
 
     // Check market hours
-    const activeInstrument = db.data?.settings?.active_instrument || 'NIFTY50';
+    const activeInstrument = db.data?.settings?.trading_instrument || db.data?.settings?.active_instrument || 'NIFTY50';
     if (!_isMarketOpen(activeInstrument)) {
       console.log('[Signal] Market closed, skipping signal generation');
       return null;
