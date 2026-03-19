@@ -39,8 +39,20 @@ export default function TaxReports({ formatCurrency }) {
   const fetchReport = useCallback(async () => {
     setLoading(true);
     try {
-      const res = await axios.get(`${API}/tax/report?fy_year=${fyYear}`);
-      if (res.data?.status === 'success') setReport(res.data.report);
+      const [taxRes, statusRes] = await Promise.all([
+        axios.get(`${API}/tax/report?fy_year=${fyYear}`),
+        axios.get(`${API}/combined-status`).catch(() => ({ data: {} })),
+      ]);
+      if (taxRes.data?.status === 'success') {
+        const rep = taxRes.data.report;
+        // Override with broker P&L when available (more accurate for LIVE trades)
+        if (statusRes.data?.total_pnl != null) {
+          rep.broker_pnl = statusRes.data.total_pnl;
+          rep.net_pnl = statusRes.data.total_pnl;
+          rep.tax_liability = Math.max(0, Math.round(statusRes.data.total_pnl * 0.156 * 100) / 100);
+        }
+        setReport(rep);
+      }
     } catch (e) {
       console.error('Tax report error:', e);
     } finally {

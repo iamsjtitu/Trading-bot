@@ -609,7 +609,7 @@ _Sent automatically by AI Trading Bot_`;
     });
   });
 
-  // POST /api/trades/cleanup - Fix trades with wrong entry_price using Upstox order book
+  // POST /api/trades/cleanup - Fix trades with wrong entry_price using Upstox order book + trade book
   router.post('/api/trades/cleanup', async (req, res) => {
     const accessToken = getActiveBrokerToken();
     if (!accessToken) {
@@ -617,49 +617,81 @@ _Sent automatically by AI Trading Bot_`;
     }
 
     try {
-      // Fetch all orders from Upstox
       const headers = { Accept: 'application/json', Authorization: `Bearer ${accessToken}`, 'Api-Version': '2.0' };
-      const orderResp = await axios.get('https://api.upstox.com/v2/order/retrieve-all', { headers, timeout: 15000 });
+
+      // Fetch both orders and trade book from Upstox
+      const [orderResp, tradeBookResp] = await Promise.all([
+        axios.get('https://api.upstox.com/v2/order/retrieve-all', { headers, timeout: 15000 }),
+        axios.get('https://api.upstox.com/v2/order/trades/get-trades-for-day', { headers, timeout: 15000 }).catch(() => ({ data: {} })),
+      ]);
 
       if (orderResp.data?.status !== 'success') {
         return res.json({ status: 'error', message: 'Failed to fetch orders from Upstox' });
       }
 
+      // Build order map by order_id
       const orders = orderResp.data.data || [];
       const orderMap = {};
       for (const o of orders) {
         if (o.order_id) orderMap[o.order_id] = o;
       }
 
+      // Build trade book map by instrument_token (actual executed fills)
+      const tradeBook = tradeBookResp.data?.data || [];
+      const sellPriceByInstrument = {};
+      for (const tb of tradeBook) {
+        if (tb.transaction_type === 'SELL' && tb.instrument_token) {
+          if (!sellPriceByInstrument[tb.instrument_token]) {
+            sellPriceByInstrument[tb.instrument_token] = { total_value: 0, total_qty: 0 };
+          }
+          sellPriceByInstrument[tb.instrument_token].total_value += (tb.average_price || 0) * (tb.filled_quantity || tb.quantity || 0);
+          sellPriceByInstrument[tb.instrument_token].total_qty += (tb.filled_quantity || tb.quantity || 0);
+        }
+      }
+
       let fixed = 0;
       const liveTrades = (db.data.trades || []).filter(t => t.mode === 'LIVE');
 
       for (const trade of liveTrades) {
+        let changed = false;
+
+        // Fix entry_price from order book
         if (trade.order_id && orderMap[trade.order_id]) {
           const order = orderMap[trade.order_id];
           const fillPrice = order.average_price || order.price || 0;
           const fillQty = order.filled_quantity || order.quantity || trade.quantity;
 
-          if (fillPrice > 0 && trade.entry_price !== fillPrice) {
-            console.log(`[Cleanup] Fixing trade ${trade.id?.substring(0,8)}: entry ${trade.entry_price} -> ${fillPrice}`);
+          if (fillPrice > 0 && Math.abs(trade.entry_price - fillPrice) > 1) {
             trade.entry_price = fillPrice;
             trade.quantity = fillQty;
             trade.investment = fillPrice * fillQty;
-
-            // Recalculate SL/target
-            const rp = riskParams[getRiskTolerance()] || riskParams.medium;
-            const slP = customStoplossPct != null ? customStoplossPct : rp.stop_loss_pct;
-            const tgP = customTargetPct != null ? customTargetPct : rp.target_pct;
-            trade.stop_loss = Math.round(fillPrice * (1 - slP / 100) * 100) / 100;
-            trade.target = Math.round(fillPrice * (1 + tgP / 100) * 100) / 100;
-
-            // Recalculate P&L for closed trades
-            if (trade.status === 'CLOSED' && trade.exit_price > 0) {
-              trade.pnl = Math.round((trade.exit_price - fillPrice) * fillQty * 100) / 100;
-              trade.pnl_percentage = fillPrice > 0 ? Math.round(((trade.exit_price - fillPrice) / fillPrice) * 10000) / 100 : 0;
-            }
-            fixed++;
+            changed = true;
           }
+        }
+
+        // Fix exit_price from trade book (for CLOSED trades with no exit_price)
+        if (trade.status === 'CLOSED' && (!trade.exit_price || trade.exit_price === 0) && trade.instrument_token) {
+          const sellData = sellPriceByInstrument[trade.instrument_token];
+          if (sellData && sellData.total_qty > 0) {
+            trade.exit_price = Math.round(sellData.total_value / sellData.total_qty * 100) / 100;
+            changed = true;
+          }
+        }
+
+        // Recalculate P&L and SL/target
+        if (changed) {
+          const rp = riskParams[getRiskTolerance()] || riskParams.medium;
+          const slP = customStoplossPct != null ? customStoplossPct : rp.stop_loss_pct;
+          const tgP = customTargetPct != null ? customTargetPct : rp.target_pct;
+          trade.stop_loss = Math.round(trade.entry_price * (1 - slP / 100) * 100) / 100;
+          trade.target = Math.round(trade.entry_price * (1 + tgP / 100) * 100) / 100;
+
+          if (trade.status === 'CLOSED' && trade.exit_price > 0 && trade.entry_price > 0) {
+            trade.pnl = Math.round((trade.exit_price - trade.entry_price) * trade.quantity * 100) / 100;
+            trade.pnl_percentage = Math.round(((trade.exit_price - trade.entry_price) / trade.entry_price) * 10000) / 100;
+          }
+          fixed++;
+          console.log(`[Cleanup] Fixed trade ${trade.id?.substring(0,8)}: entry=${trade.entry_price} exit=${trade.exit_price} pnl=${trade.pnl}`);
         }
       }
 
@@ -996,7 +1028,7 @@ _Sent automatically by AI Trading Bot_`;
     });
 
     const allOk = steps.every(s => s.ok);
-    res.json({ status: 'success', all_ok: allOk, version: '3.2.5', steps });
+    res.json({ status: 'success', all_ok: allOk, version: '3.2.6', steps });
   });
 
   // POST /api/test/generate-trade

@@ -17,9 +17,16 @@ const API = `${BACKEND_URL}/api`;
 export default function TradeAnalytics() {
   const [trades, setTrades] = useState([]);
   const [filter, setFilter] = useState('all');
+  const [brokerPnl, setBrokerPnl] = useState(null);
 
   useEffect(() => {
     axios.get(`${API}/trades/history?limit=200`).then(r => setTrades(r.data?.trades || [])).catch(() => {});
+    // Fetch actual P&L from broker for LIVE mode
+    axios.get(`${API}/combined-status`).then(r => {
+      if (r.data?.status === 'success' && r.data.total_pnl != null) {
+        setBrokerPnl(r.data.total_pnl);
+      }
+    }).catch(() => {});
   }, []);
 
   const closedTrades = useMemo(() => trades.filter(t => t.status === 'CLOSED'), [trades]);
@@ -45,15 +52,18 @@ export default function TradeAnalytics() {
     return sorted.map(([date, pnl]) => { cumulative += pnl; return { date, pnl: Math.round(pnl), cumulative: Math.round(cumulative) }; });
   }, [closedTrades]);
 
-  // Win/Loss stats
+  // Win/Loss stats - use broker P&L for total when available (more accurate for LIVE trades)
   const stats = useMemo(() => {
     const wins = closedTrades.filter(t => t.pnl > 0);
-    const losses = closedTrades.filter(t => t.pnl <= 0);
-    const totalPnl = closedTrades.reduce((s, t) => s + (t.pnl || 0), 0);
+    const losses = closedTrades.filter(t => t.pnl <= 0 && t.pnl !== 0);
+    const zeroOrNull = closedTrades.filter(t => !t.pnl || t.pnl === 0);
+    const storedPnl = closedTrades.reduce((s, t) => s + (t.pnl || 0), 0);
+    // Use broker P&L as source of truth when available
+    const totalPnl = brokerPnl != null ? brokerPnl : storedPnl;
     const avgWin = wins.length ? wins.reduce((s, t) => s + t.pnl, 0) / wins.length : 0;
     const avgLoss = losses.length ? losses.reduce((s, t) => s + t.pnl, 0) / losses.length : 0;
-    return { wins: wins.length, losses: losses.length, totalPnl, avgWin, avgLoss, total: closedTrades.length, winRate: closedTrades.length ? (wins.length / closedTrades.length * 100) : 0 };
-  }, [closedTrades]);
+    return { wins: wins.length, losses: losses.length, totalPnl, avgWin, avgLoss, total: closedTrades.length, winRate: closedTrades.length ? (wins.length / closedTrades.length * 100) : 0, isFromBroker: brokerPnl != null };
+  }, [closedTrades, brokerPnl]);
 
   // Trade type distribution
   const typeDist = useMemo(() => {
