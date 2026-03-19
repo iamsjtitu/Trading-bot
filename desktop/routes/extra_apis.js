@@ -33,6 +33,43 @@ const BROKER_INFO = {
   iifl: { id: 'iifl', name: 'IIFL Securities', description: 'Coming soon - IIFL Markets API', status: 'coming_soon', features: ['options', 'futures'] },
 };
 
+// Weekly expiry day mapping: 0=Sun, 1=Mon, 2=Tue, 3=Wed, 4=Thu, 5=Fri, 6=Sat
+const EXPIRY_DAY = {
+  NIFTY50: 4, BANKNIFTY: 3, FINNIFTY: 2, MIDCPNIFTY: 1, SENSEX: 5, BANKEX: 1,
+};
+
+// Instrument key mapping for Upstox API
+const INST_KEY_MAP = {
+  'NIFTY50': 'NSE_INDEX|Nifty 50', 'BANKNIFTY': 'NSE_INDEX|Nifty Bank',
+  'FINNIFTY': 'NSE_INDEX|Nifty Fin Service', 'MIDCPNIFTY': 'NSE_INDEX|NIFTY MID SELECT',
+  'SENSEX': 'BSE_INDEX|SENSEX', 'BANKEX': 'BSE_INDEX|BANKEX',
+};
+
+/**
+ * Calculate the next weekly expiry date for an instrument (IST)
+ * Returns YYYY-MM-DD string
+ */
+function getNextExpiry(instrument) {
+  const targetDay = EXPIRY_DAY[instrument] || 4; // default Thursday
+  const now = new Date();
+  const istOffset = 5.5 * 60 * 60 * 1000;
+  const ist = new Date(now.getTime() + istOffset);
+  const currentDay = ist.getUTCDay();
+  const currentH = ist.getUTCHours();
+  const currentMin = ist.getUTCMinutes();
+
+  let daysToAdd = targetDay - currentDay;
+  if (daysToAdd < 0) daysToAdd += 7;
+  // If today is expiry day but market is closed (after 3:30 PM), move to next week
+  if (daysToAdd === 0 && (currentH * 60 + currentMin) > 930) daysToAdd = 7;
+
+  const expiryDate = new Date(ist.getTime() + daysToAdd * 86400000);
+  const yyyy = expiryDate.getUTCFullYear();
+  const mm = String(expiryDate.getUTCMonth() + 1).padStart(2, '0');
+  const dd = String(expiryDate.getUTCDate()).padStart(2, '0');
+  return `${yyyy}-${mm}-${dd}`;
+}
+
 module.exports = function (db) {
   const router = Router();
 
@@ -418,9 +455,12 @@ module.exports = function (db) {
 
       console.log(`[OptionChain] Fetching ${instrument} key=${instKey}`);
 
+      const expiryDate = getNextExpiry(instrument);
+      console.log(`[OptionChain] Using expiry_date=${expiryDate}`);
+
       const ocResp = await axios.get('https://api.upstox.com/v2/option/chain', {
         headers: { Authorization: `Bearer ${brokerToken}`, 'Api-Version': '2.0', Accept: 'application/json' },
-        params: { instrument_key: instKey },
+        params: { instrument_key: instKey, expiry_date: expiryDate },
         timeout: 15000,
       });
 

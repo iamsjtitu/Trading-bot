@@ -968,11 +968,39 @@ module.exports = function (db) {
       // Step 1: Find the nearest weekly expiry option instrument
       const optionType = signal.signal_type === 'CALL' ? 'CE' : 'PE';
       const strikePrice = signal.strike_price;
+      const activeInst = signal.symbol || 'NIFTY50';
 
-      // Search for NIFTY option instrument
-      const searchResp = await axios.get(`https://api.upstox.com/v2/option/chain?instrument_key=NSE_INDEX|Nifty 50&expiry_date=`, {
-        headers, timeout: 15000,
-      }).catch(() => null);
+      // Map instrument to Upstox key
+      const instKeyMap = {
+        'NIFTY50': 'NSE_INDEX|Nifty 50', 'BANKNIFTY': 'NSE_INDEX|Nifty Bank',
+        'FINNIFTY': 'NSE_INDEX|Nifty Fin Service', 'MIDCPNIFTY': 'NSE_INDEX|NIFTY MID SELECT',
+        'SENSEX': 'BSE_INDEX|SENSEX', 'BANKEX': 'BSE_INDEX|BANKEX',
+      };
+      const instKey = instKeyMap[activeInst] || 'NSE_INDEX|Nifty 50';
+
+      // Calculate next expiry date
+      const expiryDayMap = { NIFTY50: 4, BANKNIFTY: 3, FINNIFTY: 2, MIDCPNIFTY: 1, SENSEX: 5, BANKEX: 1 };
+      const targetDay = expiryDayMap[activeInst] || 4;
+      const now = new Date();
+      const istOffset = 5.5 * 60 * 60 * 1000;
+      const ist = new Date(now.getTime() + istOffset);
+      let daysToAdd = targetDay - ist.getUTCDay();
+      if (daysToAdd < 0) daysToAdd += 7;
+      if (daysToAdd === 0 && (ist.getUTCHours() * 60 + ist.getUTCMinutes()) > 930) daysToAdd = 7;
+      const expiryDate = new Date(ist.getTime() + daysToAdd * 86400000);
+      const expiryStr = `${expiryDate.getUTCFullYear()}-${String(expiryDate.getUTCMonth() + 1).padStart(2, '0')}-${String(expiryDate.getUTCDate()).padStart(2, '0')}`;
+
+      console.log(`[LiveTrade] Looking up option chain: ${instKey} expiry=${expiryStr} strike=${strikePrice} ${optionType}`);
+
+      // Search for option instrument in chain
+      const searchResp = await axios.get('https://api.upstox.com/v2/option/chain', {
+        headers: { Accept: 'application/json', Authorization: `Bearer ${accessToken}`, 'Api-Version': '2.0' },
+        params: { instrument_key: instKey, expiry_date: expiryStr },
+        timeout: 15000,
+      }).catch(err => {
+        console.error(`[LiveTrade] Option chain lookup failed: ${err.response?.data?.message || err.message}`);
+        return null;
+      });
 
       let instrumentToken = null;
 
@@ -996,12 +1024,16 @@ module.exports = function (db) {
       }
 
       if (!instrumentToken) {
-        // Fallback: construct instrument token manually
-        const now = new Date();
-        const year = String(now.getFullYear()).slice(2);
-        const month = String(now.getMonth() + 1).padStart(2, '0');
-        const day = String(now.getDate()).padStart(2, '0');
-        instrumentToken = `NSE_FO|NIFTY${year}${month}${day}${strikePrice}${optionType}`;
+        // Fallback: construct instrument token using expiry date
+        const expiryY = String(expiryDate.getUTCFullYear()).slice(2);
+        const expiryM = String(expiryDate.getUTCMonth() + 1).padStart(2, '0');
+        const expiryD = String(expiryDate.getUTCDate()).padStart(2, '0');
+        // Map instrument to its option exchange symbol
+        const optSymbolMap = { NIFTY50: 'NIFTY', BANKNIFTY: 'BANKNIFTY', FINNIFTY: 'FINNIFTY', MIDCPNIFTY: 'MIDCPNIFTY', SENSEX: 'SENSEX', BANKEX: 'BANKEX' };
+        const exchangeMap = { NIFTY50: 'NSE_FO', BANKNIFTY: 'NSE_FO', FINNIFTY: 'NSE_FO', MIDCPNIFTY: 'NSE_FO', SENSEX: 'BFO', BANKEX: 'BFO' };
+        const optSymbol = optSymbolMap[activeInst] || 'NIFTY';
+        const exchange = exchangeMap[activeInst] || 'NSE_FO';
+        instrumentToken = `${exchange}|${optSymbol}${expiryY}${expiryM}${expiryD}${strikePrice}${optionType}`;
         console.log(`[LiveTrade] Using constructed instrument: ${instrumentToken}`);
       }
 

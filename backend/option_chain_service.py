@@ -133,6 +133,29 @@ class OptionChainService:
             return get_mcx_status()
         return get_market_status()
 
+    def _get_next_expiry(self, instrument: str) -> str:
+        """Calculate next weekly expiry date for an instrument (YYYY-MM-DD format)"""
+        # Weekly expiry day: Mon=0, Tue=1, ... Sun=6
+        expiry_weekday = {
+            'NIFTY50': 3,      # Thursday
+            'BANKNIFTY': 2,    # Wednesday
+            'FINNIFTY': 1,     # Tuesday
+            'MIDCPNIFTY': 0,   # Monday
+            'SENSEX': 4,       # Friday
+            'BANKEX': 0,       # Monday
+        }
+        target = expiry_weekday.get(instrument, 3)  # Default Thursday
+        ist = datetime.now(timezone(timedelta(hours=5, minutes=30)))
+        current_weekday = ist.weekday()  # Mon=0, Sun=6
+        days_ahead = target - current_weekday
+        if days_ahead < 0:
+            days_ahead += 7
+        # If today is expiry day but after market close (3:30 PM), use next week
+        if days_ahead == 0 and (ist.hour * 60 + ist.minute) > 930:
+            days_ahead = 7
+        expiry = ist + timedelta(days=days_ahead)
+        return expiry.strftime('%Y-%m-%d')
+
     async def get_live_option_chain(self, instrument: str, spot_price: float = 0, num_strikes: int = 15, expiry_days: int = 7) -> Dict:
         """Fetch live option chain from broker. No simulation fallback."""
         config = OPTION_INSTRUMENTS.get(instrument)
@@ -202,7 +225,12 @@ class OptionChainService:
                 'SENSEX': 'SENSEX', 'BANKEX': 'BANKEX',
             }
             broker_key = inst_map.get(instrument, instrument)
-            result = await self.broker_service.get_option_chain(broker_key)
+
+            # Calculate next weekly expiry date
+            expiry_str = self._get_next_expiry(instrument)
+            logger.info(f"Option chain for {instrument}: using expiry_date={expiry_str}")
+
+            result = await self.broker_service.get_option_chain(broker_key, expiry=expiry_str)
 
             if result.get('status') == 'success' and result.get('data'):
                 live_data = result['data']
