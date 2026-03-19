@@ -672,7 +672,7 @@ async def debug_auto_trade_test():
         steps.append({"step": 8, "name": "Recent Trades", "value": "Web preview - use desktop app for full test", "ok": False})
 
         all_ok = all(s["ok"] for s in steps)
-        return {"status": "success", "all_ok": all_ok, "version": "3.0.8", "steps": steps}
+        return {"status": "success", "all_ok": all_ok, "version": "3.1.0", "steps": steps}
     except Exception as e:
         logger.error(f"Debug test error: {e}")
         return {"status": "error", "message": str(e), "steps": steps}
