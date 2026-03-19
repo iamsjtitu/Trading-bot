@@ -10,20 +10,14 @@ Build an AI-powered automated options trading bot with multi-broker support, AI 
 - **Desktop:** Electron + electron-builder + electron-updater
 - **AI:** OpenAI GPT-4o via Emergent LLM Key
 
-## Current Version: v3.1.2
+## Current Version: v3.1.6
 
-### Critical Bug Fix v3.1.2 (Feb 2026)
-- **ROOT CAUSE**: All Upstox order placements were using `product: 'D'` (Delivery) which is INVALID for F&O options trading. Correct value is `product: 'I'` (Intraday).
-- **Fixed across ALL files**:
-  - `desktop/routes/trading.js` - `executeLiveAutoEntry()` BUY orders
-  - `desktop/routes/trading.js` - Auto-exit SELL orders
-  - `desktop/routes/news.js` - `executeLiveTrade()` (fixed in v3.1.1)
-  - `desktop/routes/upstox.js` - Generic order placement endpoint
-  - `backend/upstox_service.py` - Python backend order placement
-- **Additional fixes in trading.js**:
-  - Added lot-size calculation (quantity must be multiple of lot size)
-  - Enhanced error logging with detailed Upstox error messages
-  - Failed trades now saved to DB with full error details
+### v3.1.6 Fixes
+- **CRITICAL FIX: Frontend `displayTrades` was OVERRIDING backend data** — LIVE mode mein frontend directly raw Upstox positions use kar raha tha (with `average_price: 0`) instead of backend se aaye merged data. Fixed to use backend `/api/trades/active` response which has proper `buy_price` fallback.
+- **Manual Exit Button** — Each active trade pe red "Exit" button. LIVE mode: places SELL MARKET order on Upstox. PAPER mode: closes trade locally.
+- **Live Positions table fixed** — Now shows proper Entry Price, P&L % from backend data instead of raw Upstox data.
+- **Portfolio P&L** — Header P&L now uses actual live_pnl from active trades.
+- **Footer version** updated to v3.1.6.
 
 ### Option Chain - LIVE DATA (FIXED v3.0.7)
 - NSE moved ALL derivatives expiry from Thursday to TUESDAY (Aug 2025)

@@ -474,10 +474,12 @@ function App() {
   const displayPortfolio = (() => {
     if (tradingMode === 'LIVE') {
       if (brokerConnected && livePortfolio) {
+        // Calculate real-time P&L from active trades (which have proper buy_price)
+        const livePnl = trades.reduce((sum, t) => sum + (t.live_pnl || 0), 0);
         return {
           current_value: (livePortfolio.funds?.total || 0),
-          total_pnl: livePortfolio.total_pnl || 0,
-          active_positions: livePortfolio.active_positions || 0,
+          total_pnl: livePnl || livePortfolio.total_pnl || 0,
+          active_positions: trades.length || livePortfolio.active_positions || 0,
           total_trades: brokerOrders.length,
           winning_trades: brokerOrders.filter(o => (o.status === 'complete' || o.status === 'traded')).length,
           isLive: true,
@@ -498,29 +500,13 @@ function App() {
   })();
 
   // Determine active trades based on mode
+  // In LIVE mode, use trades from /api/trades/active which merges Upstox data with stored trade data
+  // This includes proper entry_price (buy_price fallback), SL, target, etc.
   const displayTrades = (() => {
     if (tradingMode === 'LIVE') {
-      if (brokerConnected && livePortfolio?.positions?.length > 0) {
-        return livePortfolio.positions.map(pos => ({
-          trade_type: pos.quantity > 0 ? 'BUY' : 'SELL',
-          symbol: pos.symbol || pos.trading_symbol || 'N/A',
-          quantity: Math.abs(pos.quantity),
-          status: 'OPEN',
-          entry_price: pos.avg_price || pos.average_price || 0,
-          current_price: pos.ltp || pos.last_price || 0,
-          current_value: (pos.ltp || pos.last_price || 0) * Math.abs(pos.quantity),
-          investment: (pos.avg_price || pos.average_price || 0) * Math.abs(pos.quantity),
-          live_pnl: pos.pnl || 0,
-          pnl_percentage: (pos.avg_price || pos.average_price) > 0
-            ? (((pos.ltp || pos.last_price || 0) - (pos.avg_price || pos.average_price || 0)) / (pos.avg_price || pos.average_price || 1)) * 100
-            : 0,
-          stop_loss: 0,
-          target: 0,
-          entry_time: new Date().toISOString(),
-          isLive: true,
-        }));
-      }
-      // LIVE mode but Upstox not connected or no positions - show empty (not paper trades)
+      // If we have trades from the backend (which already merges Upstox + stored data), use them
+      if (trades.length > 0) return trades;
+      // Fallback to empty if no trades
       return [];
     }
     return trades;
@@ -706,7 +692,7 @@ function App() {
         </Tabs>
 
         {/* Live Positions from Upstox */}
-        {tradingMode === 'LIVE' && brokerConnected && livePortfolio?.positions?.length > 0 && (
+        {tradingMode === 'LIVE' && brokerConnected && trades.length > 0 && (
           <div className="mt-6">
             <h2 className="text-lg font-bold text-gray-800 mb-3" data-testid="live-positions-title">Live Positions</h2>
             <div className="bg-white border border-gray-200 rounded-lg overflow-hidden shadow-md">
@@ -715,20 +701,24 @@ function App() {
                   <tr>
                     <th className="px-4 py-3 text-left font-semibold text-gray-700">Symbol</th>
                     <th className="px-4 py-3 text-right font-semibold text-gray-700">Qty</th>
-                    <th className="px-4 py-3 text-right font-semibold text-gray-700">Avg Price</th>
+                    <th className="px-4 py-3 text-right font-semibold text-gray-700">Entry Price</th>
                     <th className="px-4 py-3 text-right font-semibold text-gray-700">LTP</th>
                     <th className="px-4 py-3 text-right font-semibold text-gray-700">P&L</th>
+                    <th className="px-4 py-3 text-right font-semibold text-gray-700">P&L %</th>
                   </tr>
                 </thead>
                 <tbody>
-                  {livePortfolio.positions.map((pos, idx) => (
+                  {trades.map((t, idx) => (
                     <tr key={idx} className="border-b border-gray-100 hover:bg-gray-50" data-testid={`live-position-${idx}`}>
-                      <td className="px-4 py-3 font-medium text-gray-900">{pos.symbol}</td>
-                      <td className="px-4 py-3 text-right text-gray-900">{pos.quantity}</td>
-                      <td className="px-4 py-3 text-right text-gray-900">{formatCurrency(pos.avg_price)}</td>
-                      <td className="px-4 py-3 text-right text-gray-900">{formatCurrency(pos.ltp)}</td>
-                      <td className={`px-4 py-3 text-right font-bold ${pos.pnl >= 0 ? 'text-green-600' : 'text-red-600'}`}>
-                        {formatCurrency(pos.pnl)}
+                      <td className="px-4 py-3 font-medium text-gray-900">{t.symbol}</td>
+                      <td className="px-4 py-3 text-right text-gray-900">{t.quantity}</td>
+                      <td className="px-4 py-3 text-right text-gray-900">{formatCurrency(t.entry_price)}</td>
+                      <td className="px-4 py-3 text-right text-gray-900">{formatCurrency(t.current_price)}</td>
+                      <td className={`px-4 py-3 text-right font-bold ${t.live_pnl >= 0 ? 'text-green-600' : 'text-red-600'}`}>
+                        {t.live_pnl >= 0 ? '+' : ''}{formatCurrency(t.live_pnl)}
+                      </td>
+                      <td className={`px-4 py-3 text-right font-bold ${t.pnl_percentage >= 0 ? 'text-green-600' : 'text-red-600'}`}>
+                        {t.pnl_percentage >= 0 ? '+' : ''}{(t.pnl_percentage || 0).toFixed(2)}%
                       </td>
                     </tr>
                   ))}
@@ -742,7 +732,7 @@ function App() {
       {/* Footer */}
       <footer className="border-t border-gray-200 bg-white/80 backdrop-blur-sm mt-8 py-4 shadow-sm">
         <div className="container mx-auto px-4 text-center text-sm text-gray-600">
-          <p>{tradingMode === 'LIVE' ? 'LIVE TRADING' : 'Paper Trading'} Mode | AI-Powered Options Trading Bot | v3.1.1</p>
+          <p>{tradingMode === 'LIVE' ? 'LIVE TRADING' : 'Paper Trading'} Mode | AI-Powered Options Trading Bot | v3.1.6</p>
           <p className="text-xs mt-1 text-gray-500">Trading involves risk. Past performance does not guarantee future results.</p>
         </div>
       </footer>
