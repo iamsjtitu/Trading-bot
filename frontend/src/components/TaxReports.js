@@ -36,6 +36,34 @@ export default function TaxReports({ formatCurrency }) {
   const [exporting, setExporting] = useState('');
   const [viewMode, setViewMode] = useState('summary'); // summary | monthly
 
+  const buildMonthlyBreakdown = (trades) => {
+    const months = {};
+    for (const t of trades) {
+      const d = new Date(t.exit_date || t.entry_date || '');
+      if (isNaN(d)) continue;
+      const key = d.toLocaleString('en-IN', { month: 'short', year: 'numeric' });
+      if (!months[key]) months[key] = { trades: 0, profit: 0, loss: 0, net_pnl: 0, turnover: 0 };
+      months[key].trades++;
+      const pnl = t.pnl || 0;
+      if (pnl > 0) months[key].profit += pnl;
+      else months[key].loss += Math.abs(pnl);
+      months[key].net_pnl += pnl;
+      months[key].turnover += Math.abs(pnl);
+    }
+    for (const m of Object.values(months)) {
+      m.profit = Math.round(m.profit * 100) / 100;
+      m.loss = Math.round(m.loss * 100) / 100;
+      m.net_pnl = Math.round(m.net_pnl * 100) / 100;
+      m.turnover = Math.round(m.turnover * 100) / 100;
+      const stcg = m.net_pnl > 0 ? Math.round(m.net_pnl * 0.15 * 100) / 100 : 0;
+      const cess = Math.round(stcg * 0.04 * 100) / 100;
+      m.stcg_tax = stcg;
+      m.cess = cess;
+      m.total_tax = Math.round((stcg + cess) * 100) / 100;
+    }
+    return months;
+  };
+
   const fetchReport = useCallback(async () => {
     setLoading(true);
     try {
@@ -44,13 +72,59 @@ export default function TaxReports({ formatCurrency }) {
         axios.get(`${API}/combined-status`).catch(() => ({ data: {} })),
       ]);
       if (taxRes.data?.status === 'success') {
-        const rep = taxRes.data.report;
+        const raw = taxRes.data.report;
+        const tradeDetails = raw.trade_details || [];
+        const winCount = tradeDetails.filter(t => (t.pnl || 0) > 0).length;
+
+        // Map backend fields — preserve existing flat fields (Python backend), fall back to nested (Node.js)
+        const rep = {
+          ...raw,
+          turnover: raw.turnover ?? raw.total_turnover ?? 0,
+          stcg_tax: raw.stcg_tax ?? raw.tax?.tax_at_30_pct ?? 0,
+          cess: raw.cess ?? raw.tax?.cess_4_pct ?? 0,
+          total_tax_liability: raw.total_tax_liability ?? raw.tax?.total_tax ?? 0,
+          stt_paid: raw.stt_paid ?? raw.charges?.stt ?? 0,
+          audit_limit: raw.audit_limit ?? 100000000,
+          win_rate: raw.win_rate ?? (raw.total_trades > 0 ? Math.round(winCount / raw.total_trades * 100 * 10) / 10 : 0),
+          effective_tax_rate: raw.effective_tax_rate ?? (raw.net_pnl > 0 ? Math.round((raw.tax?.total_tax || 0) / raw.net_pnl * 100 * 100) / 100 : 0),
+          total_buy_value: raw.total_buy_value ?? tradeDetails.reduce((s, t) => s + (t.entry_price || 0) * (t.quantity || 0), 0),
+          total_sell_value: raw.total_sell_value ?? tradeDetails.reduce((s, t) => s + (t.exit_price || 0) * (t.quantity || 0), 0),
+          monthly_breakdown: raw.monthly_breakdown ?? buildMonthlyBreakdown(tradeDetails),
+        };
+
         // Override with broker P&L when available (more accurate for LIVE trades)
-        if (statusRes.data?.portfolio?.total_pnl != null) {
-          rep.broker_pnl = statusRes.data.portfolio.total_pnl;
-          rep.net_pnl = statusRes.data.portfolio.total_pnl;
-          rep.tax_liability = Math.max(0, Math.round(statusRes.data.portfolio.total_pnl * 0.156 * 100) / 100);
+        const brokerPnl = statusRes.data?.portfolio?.total_pnl;
+        if (brokerPnl != null) {
+          rep.broker_pnl = brokerPnl;
+          rep.net_pnl = brokerPnl;
+
+          // Recalculate ALL tax figures from broker P&L (STCG @15%)
+          const taxable = Math.max(0, brokerPnl);
+          const stcg = Math.round(taxable * 0.15 * 100) / 100;
+          const cessAmt = Math.round(stcg * 0.04 * 100) / 100;
+          rep.stcg_tax = stcg;
+          rep.cess = cessAmt;
+          rep.total_tax_liability = Math.round((stcg + cessAmt) * 100) / 100;
+          rep.effective_tax_rate = brokerPnl > 0 ? Math.round(rep.total_tax_liability / brokerPnl * 100 * 100) / 100 : 0;
+
+          // Adjust profit/loss to match broker net P&L
+          const storedProfit = raw.total_profit || 0;
+          const storedLoss = raw.total_loss || 0;
+          const storedNet = storedProfit - storedLoss;
+          if (storedNet !== 0 && storedProfit > 0 && storedLoss > 0) {
+            // Scale both proportionally so profit - loss = brokerPnl
+            const factor = brokerPnl / storedNet;
+            rep.total_profit = Math.round(Math.max(0, storedProfit * factor) * 100) / 100;
+            rep.total_loss = Math.round(Math.max(0, storedLoss * Math.abs(factor)) * 100) / 100;
+          } else {
+            rep.total_profit = brokerPnl >= 0 ? Math.round(brokerPnl * 100) / 100 : 0;
+            rep.total_loss = brokerPnl < 0 ? Math.round(Math.abs(brokerPnl) * 100) / 100 : 0;
+          }
+
+          // F&O turnover = absolute sum of profits and losses
+          rep.turnover = Math.round((rep.total_profit + rep.total_loss) * 100) / 100;
         }
+
         setReport(rep);
       }
     } catch (e) {

@@ -1,64 +1,47 @@
 # AI Trading Bot - Product Requirements Document
 
 ## Original Problem Statement
-Build an AI-powered automated options trading bot with multi-broker support, AI sentiment analysis, and desktop app delivery.
+Build an AI-powered automated options trading bot with multi-broker support, AI sentiment analysis, and desktop app delivery (Windows/Mac).
 
 ## Architecture
 - **Frontend:** React + Tailwind + Shadcn/UI + Chart.js
-- **Backend (Web):** Python FastAPI + MongoDB
-- **Backend (Desktop):** Node.js Express (inside Electron)
+- **Backend (Desktop - PRIMARY):** Node.js Express (inside Electron) with lowdb
+- **Backend (Web - DEPRECATED):** Python FastAPI + MongoDB (preview environment only)
 - **Desktop:** Electron + electron-builder + electron-updater
 - **AI:** OpenAI GPT-4o via Emergent LLM Key
+- **Broker:** Upstox (primary), framework for Zerodha, Angel One, 5paisa, Paytm Money, IIFL
 
-## Current Version: v3.1.6
+## Current Version: v3.2.7
 
-### v3.1.6 Fixes
-- **CRITICAL FIX: Frontend `displayTrades` was OVERRIDING backend data** — LIVE mode mein frontend directly raw Upstox positions use kar raha tha (with `average_price: 0`) instead of backend se aaye merged data. Fixed to use backend `/api/trades/active` response which has proper `buy_price` fallback.
-- **Manual Exit Button** — Each active trade pe red "Exit" button. LIVE mode: places SELL MARKET order on Upstox. PAPER mode: closes trade locally.
-- **Live Positions table fixed** — Now shows proper Entry Price, P&L % from backend data instead of raw Upstox data.
-- **Portfolio P&L** — Header P&L now uses actual live_pnl from active trades.
-- **Footer version** updated to v3.1.6.
+## What's Implemented
+- News analysis from 11 sources with AI sentiment (Bullish/Bearish)
+- Auto-trade entry/exit based on AI signals (Paper + Live modes)
+- Multi-instrument support: Nifty, BankNifty, FinNifty, MidcapNifty, Sensex, Bankex
+- Option Chain with live data from Upstox
+- Trade Analytics with charts (cumulative P&L, win/loss, CALL/PUT distribution)
+- Tax Reports with Summary and Monthly views
+- Risk Management dashboard
+- Fix Trade Data (Sync with Upstox) utility
+- Desktop app with auto-updates via GitHub Releases
 
-### Option Chain - LIVE DATA (FIXED v3.0.7)
-- NSE moved ALL derivatives expiry from Thursday to TUESDAY (Aug 2025)
-- Fetches ACTUAL nearest expiry from Upstox `/v2/option/contract` API
-- 30-minute cache for expiry dates to reduce API calls
-- Falls back to calculated next Tuesday if API fails
-
-### Auto-Trade System (MAJOR OVERHAUL v3.0.8)
-- Auto-Entry on Signal: article analyzed -> signal generated -> LIVE trade placed
-- Auto-Entry for Untraded Signals: checks and executes after news analysis
-- Robust Error Handling: failures saved to db
-- Dynamic Strike Prices based on actual market spot price
-- Correct Expiry Dates from Upstox API
-
-### Debug System (v3.1.0)
-- `GET /api/debug/auto-trade-test` - Simulates full auto-trade flow step by step
-- "Debug Auto-Trade" button in UI for user testing
-
-### 6 Trading Instruments (NSE/BSE)
-- NSE: NIFTY50, BANKNIFTY, FINNIFTY, MIDCPNIFTY
-- BSE: SENSEX, BANKEX
-
-### News Sources (11 sources)
-- Moneycontrol, Economic Times, NDTV Profit, CNBC TV18, Livemint
-- Business Today, The Hindu Business Line, NSE India, NewsAPI, Alpha Vantage, Demo
+## Completed (This Session - 19 Mar 2026)
+- **Tax Report Fix (P0)**: Fixed field name mismatches between backend and frontend in TaxReports.js. The component now correctly maps backend fields using nullish coalescing (`??`) to support both Python and Node.js backends. Broker P&L override now properly updates `total_tax_liability`, `stcg_tax`, `cess`, `effective_tax_rate`, profit/loss split, and turnover. Monthly breakdown computed from trade details.
 
 ## Bug Fix History
-- v3.1.2: Fixed product 'D' -> 'I' across ALL files, lot-size calc, enhanced error logging
-- v3.1.1: Fixed expiry date selection (nearest vs farthest), partial product fix in news.js
-- v3.1.0: Added debug endpoint and UI button for auto-trade diagnostics
-- v3.0.8: Major auto-trade overhaul, reduced dedup, execute-signal endpoint
-- v3.0.7: NSE Tuesday expiry fix, fetchNearestExpiry from Upstox API
-- v3.0.6: Version display, diagnostics, dynamic strike prices
+- v3.2.7: Fixed API response parsing for live total P&L in Analytics and Tax tabs
+- v3.2.6: Fix Trade Data endpoint also corrects exit_price from Upstox trade book
+- v3.2.5: Fixed "axios is not defined" crash in Fix Trade Data button
+- v3.2.4: Fix Trade Data feature + correct broker fill price storage
+- v3.2.3: Signal generation fixes (daily limit logic, market hours check)
+- v3.2.0: Fixed SyntaxError crash in news.js (duplicate `activeInst` declaration)
+- v3.1.2-v3.1.9: Duplicate trade protection, manual exit, P&L display, lot sizes, product 'D'->'I'
 
 ## Pending
-- P0: User to build v3.1.2 and test auto-trade via "Debug Auto-Trade" button first
-- P0: Full end-to-end LIVE auto-trade test after debug verification
+- P0: Trigger desktop app build v3.2.8 (after tax fix)
+- P1: Full end-to-end user verification (signals, auto-trade, auto-exit, reporting)
 
 ## Future/Backlog
+- Remove deprecated Python backend (`/app/backend`)
 - Stock Options trading support
 - Telegram notifications integration
-- Code refactoring (unify dual Node.js/Python backend)
-- Enhanced analytics & tax reports
-- Refactor news.js and trading.js (remove duplicated logic)
+- Refactor news.js and trading.js into smaller modules
