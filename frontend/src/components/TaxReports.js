@@ -3,7 +3,7 @@ import { Card } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import axios from 'axios';
-import { FaFileExcel, FaFilePdf, FaCalendarAlt, FaChartBar } from 'react-icons/fa';
+import { FaFileExcel, FaFilePdf, FaCalendarAlt, FaChartBar, FaLink, FaDatabase } from 'react-icons/fa';
 
 const BACKEND_URL = (() => {
   const envUrl = process.env.REACT_APP_BACKEND_URL || '';
@@ -192,6 +192,17 @@ export default function TaxReports({ formatCurrency }) {
             </div>
           </div>
           <div className="flex items-center gap-2">
+            {report && (
+              report.broker_pnl != null ? (
+                <Badge className="bg-green-100 text-green-700 border border-green-200 gap-1.5 px-3 py-1 text-xs font-semibold" data-testid="data-source-badge">
+                  <FaLink className="text-[10px]" /> Live Broker Data
+                </Badge>
+              ) : (
+                <Badge className="bg-amber-50 text-amber-700 border border-amber-200 gap-1.5 px-3 py-1 text-xs font-semibold" data-testid="data-source-badge">
+                  <FaDatabase className="text-[10px]" /> Local Trade Data
+                </Badge>
+              )
+            )}
             <Button onClick={downloadExcel} disabled={!!exporting} variant="outline" size="sm" className="gap-1.5 border-green-300 text-green-700 hover:bg-green-50" data-testid="export-excel-btn">
               <FaFileExcel /> {exporting === 'excel' ? 'Exporting...' : 'Excel'}
             </Button>

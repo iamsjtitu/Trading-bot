@@ -25,7 +25,8 @@ Build an AI-powered automated options trading bot with multi-broker support, AI 
 - Desktop app with auto-updates via GitHub Releases
 
 ## Completed (This Session - 19 Mar 2026)
-- **Tax Report Fix (P0)**: Fixed field name mismatches between backend and frontend in TaxReports.js. The component now correctly maps backend fields using nullish coalescing (`??`) to support both Python and Node.js backends. Broker P&L override now properly updates `total_tax_liability`, `stcg_tax`, `cess`, `effective_tax_rate`, profit/loss split, and turnover. Monthly breakdown computed from trade details.
+- **Tax Report Fix (P0)**: Fixed field name mismatches between backend and frontend in TaxReports.js. Broker P&L override now properly updates all tax fields.
+- **Data Source Badge**: Added "Live Broker Data" (green) / "Local Trade Data" (amber) badge in Tax Reports controls bar showing data provenance for user trust.
 
 ## Bug Fix History
 - v3.2.7: Fixed API response parsing for live total P&L in Analytics and Tax tabs
