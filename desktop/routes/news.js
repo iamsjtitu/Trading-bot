@@ -435,6 +435,102 @@ module.exports = function (db) {
     return articles.slice(0, max);
   }
 
+
+  // --- NDTV Profit ---
+  async function fetchFromNDTVProfit(max) {
+    const articles = [];
+    const marketKeywords = ['market', 'nifty', 'sensex', 'stock', 'share', 'trade', 'rbi', 'bank',
+      'invest', 'rupee', 'gdp', 'inflation', 'earnings', 'ipo', 'fund', 'economy', 'fiscal', 'budget', 'profit', 'revenue', 'sector', 'fii', 'dii'];
+    try {
+      const resp = await axios.get('https://feeds.feedburner.com/ndtvprofit-latest', {
+        timeout: 10000, headers: { 'User-Agent': 'Mozilla/5.0' },
+      });
+      const xml = resp.data;
+      const items = xml.match(/<item>[\s\S]*?<\/item>/g) || [];
+      for (const item of items.slice(0, max * 2)) {
+        const title = (item.match(/<title><!\[CDATA\[(.*?)\]\]>/)?.[1] || item.match(/<title>(.*?)<\/title>/)?.[1] || '').trim();
+        const desc = (item.match(/<description><!\[CDATA\[(.*?)\]\]>/)?.[1] || item.match(/<description>(.*?)<\/description>/)?.[1] || '').replace(/<[^>]+>/g, '').trim();
+        const link = (item.match(/<link>(.*?)<\/link>/)?.[1] || '').trim();
+        const pub = item.match(/<pubDate>(.*?)<\/pubDate>/)?.[1] || '';
+        if (!title) continue;
+        const textLower = (title + ' ' + desc).toLowerCase();
+        if (marketKeywords.some(kw => textLower.includes(kw))) {
+          articles.push({
+            title, description: desc, content: desc,
+            source: 'NDTV Profit', url: link,
+            published_at: pub ? new Date(pub).toISOString() : new Date().toISOString(),
+            fetched_at: new Date().toISOString(),
+          });
+        }
+      }
+    } catch (e) {
+      console.error('[News] NDTV Profit error:', e.message);
+    }
+    return articles.slice(0, max);
+  }
+
+  // --- CNBC TV18 ---
+  async function fetchFromCNBCTV18(max) {
+    const articles = [];
+    const feeds = [
+      'https://www.cnbctv18.com/commonfeeds/v1/cne/rss/market.xml',
+      'https://www.cnbctv18.com/commonfeeds/v1/cne/rss/economy.xml',
+    ];
+    for (const feedUrl of feeds) {
+      try {
+        const resp = await axios.get(feedUrl, {
+          timeout: 10000, headers: { 'User-Agent': 'Mozilla/5.0' },
+        });
+        const xml = resp.data;
+        const items = xml.match(/<item>[\s\S]*?<\/item>/g) || [];
+        for (const item of items.slice(0, Math.ceil(max / feeds.length))) {
+          const title = (item.match(/<title><!\[CDATA\[(.*?)\]\]>/)?.[1] || item.match(/<title>(.*?)<\/title>/)?.[1] || '').trim();
+          const desc = (item.match(/<description><!\[CDATA\[(.*?)\]\]>/)?.[1] || item.match(/<description>(.*?)<\/description>/)?.[1] || '').replace(/<[^>]+>/g, '').trim();
+          const link = (item.match(/<link>(.*?)<\/link>/)?.[1] || '').trim();
+          const pub = item.match(/<pubDate>(.*?)<\/pubDate>/)?.[1] || '';
+          if (!title) continue;
+          articles.push({
+            title, description: desc, content: desc,
+            source: 'CNBC TV18', url: link,
+            published_at: pub ? new Date(pub).toISOString() : new Date().toISOString(),
+            fetched_at: new Date().toISOString(),
+          });
+        }
+      } catch (e) {
+        console.error(`[News] CNBC TV18 error (${feedUrl}):`, e.message);
+      }
+    }
+    return articles.slice(0, max);
+  }
+
+  // --- Livemint ---
+  async function fetchFromLivemint(max) {
+    const articles = [];
+    try {
+      const resp = await axios.get('https://www.livemint.com/rss/markets', {
+        timeout: 10000, headers: { 'User-Agent': 'Mozilla/5.0' },
+      });
+      const xml = resp.data;
+      const items = xml.match(/<item>[\s\S]*?<\/item>/g) || [];
+      for (const item of items.slice(0, max)) {
+        const title = (item.match(/<title><!\[CDATA\[(.*?)\]\]>/)?.[1] || item.match(/<title>(.*?)<\/title>/)?.[1] || '').trim();
+        const desc = (item.match(/<description><!\[CDATA\[(.*?)\]\]>/)?.[1] || item.match(/<description>(.*?)<\/description>/)?.[1] || '').replace(/<[^>]+>/g, '').trim();
+        const link = (item.match(/<link>(.*?)<\/link>/)?.[1] || '').trim();
+        const pub = item.match(/<pubDate>(.*?)<\/pubDate>/)?.[1] || '';
+        if (!title) continue;
+        articles.push({
+          title, description: desc, content: desc,
+          source: 'Livemint', url: link,
+          published_at: pub ? new Date(pub).toISOString() : new Date().toISOString(),
+          fetched_at: new Date().toISOString(),
+        });
+      }
+    } catch (e) {
+      console.error('[News] Livemint error:', e.message);
+    }
+    return articles.slice(0, max);
+  }
+
   // --- NewsAPI ---
   function fetchFromNewsAPI(apiKey, max) {
     return axios.get('https://newsapi.org/v2/everything', {
@@ -507,6 +603,12 @@ module.exports = function (db) {
             allNews = allNews.concat(await fetchFromBusinessToday(10));
           } else if (src === 'hindubusinessline') {
             allNews = allNews.concat(await fetchFromHinduBusinessLine(10));
+          } else if (src === 'ndtv_profit') {
+            allNews = allNews.concat(await fetchFromNDTVProfit(10));
+          } else if (src === 'cnbc_tv18') {
+            allNews = allNews.concat(await fetchFromCNBCTV18(10));
+          } else if (src === 'livemint') {
+            allNews = allNews.concat(await fetchFromLivemint(10));
           }
         } catch (e) {
           console.error(`[News] ${src} error:`, e.message);
@@ -803,8 +905,9 @@ module.exports = function (db) {
     if (sentiment.market_regime && sentiment.market_regime !== 'UNKNOWN') enhancedReason += ` | Regime: ${sentiment.market_regime}`;
     if (historicalAdj !== 0) enhancedReason += ` | Historical: ${historicalAdj > 0 ? '+' : ''}${historicalAdj}`;
 
+    const activeInst = db.data?.settings?.active_instrument || 'NIFTY50';
     return {
-      id: uuid(), signal_type: signalType, symbol: 'NIFTY50',
+      id: uuid(), signal_type: signalType, symbol: activeInst,
       strike_price: 24000 + (signalType === 'CALL' ? 500 : -500),
       option_premium: optionPremium, quantity, investment_amount: quantity * optionPremium,
       entry_price: optionPremium,
@@ -825,6 +928,7 @@ module.exports = function (db) {
       position_sizing: dynamicSize.factors,
       reason: enhancedReason,
       news_id: newsDoc.id, status: 'ACTIVE',
+      mode: db.data?.settings?.trading_mode || 'PAPER',
       created_at: new Date().toISOString(),
       expires_at: new Date(Date.now() + 7 * 86400000).toISOString(),
     };
@@ -838,6 +942,7 @@ module.exports = function (db) {
       entry_price: signal.entry_price, quantity: signal.quantity,
       investment: signal.investment_amount, stop_loss: signal.stop_loss,
       target: signal.target, status: 'OPEN',
+      mode: db.data?.settings?.trading_mode || 'PAPER',
       exit_time: null, exit_price: null, pnl: 0, pnl_percentage: 0,
     };
     db.data.trades.push(trade);
