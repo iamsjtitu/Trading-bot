@@ -631,9 +631,11 @@ module.exports = function (db) {
         allNews = getDemoNews();
       }
 
-      // Deduplicate articles by normalized title
+      // Deduplicate articles - only against articles from the last 1 hour (not forever)
       const seenTitles = new Set();
-      const existingTitles = new Set((db.data.news_articles || []).slice(-100).map(n => (n.title || '').toLowerCase().trim()));
+      const oneHourAgo = new Date(Date.now() - 60 * 60 * 1000).toISOString();
+      const recentArticles = (db.data.news_articles || []).filter(n => (n.created_at || '') > oneHourAgo);
+      const existingTitles = new Set(recentArticles.map(n => (n.title || '').toLowerCase().trim()));
       allNews = allNews.filter(a => {
         const norm = (a.title || '').toLowerCase().trim();
         if (!norm || seenTitles.has(norm) || existingTitles.has(norm)) return false;
@@ -673,11 +675,31 @@ module.exports = function (db) {
             const activeBroker = db.data.settings?.active_broker || db.data.settings?.broker?.name || 'upstox';
             const token = db.data.settings?.broker?.[`${activeBroker}_token`] || db.data.settings?.broker?.access_token;
 
+            // Set mode on signal for filtering
+            signal.mode = mode;
+
             if (mode === 'LIVE' && token) {
               console.log(`[AutoTrade] LIVE mode, executing trade for ${signal.symbol} ${signal.signal_type}`);
-              const result = await executeLiveTrade(signal, token);
-              if (db.notify) db.notify('entry', `LIVE ${signal.signal_type} Entry`, `${signal.symbol} | Qty: ${signal.quantity} | ${result.success ? 'Order ID: ' + result.order_id : 'FAILED: ' + (result.error || '')}`);
+              try {
+                const result = await executeLiveTrade(signal, token);
+                const msg = result.success ? `Order: ${result.order_id}` : `FAILED: ${result.error || 'Unknown'}`;
+                console.log(`[AutoTrade] Result: ${msg}`);
+                if (db.notify) db.notify('entry', `LIVE ${signal.signal_type} Entry`, `${signal.symbol} | Qty: ${signal.quantity} | ${msg}`);
+              } catch (tradeErr) {
+                console.error(`[AutoTrade] LIVE trade error: ${tradeErr.message}`);
+                // Save failed trade record
+                if (!db.data.trades) db.data.trades = [];
+                db.data.trades.push({
+                  id: uuid(), signal_id: signal.id, trade_type: signal.signal_type,
+                  symbol: signal.symbol, entry_time: new Date().toISOString(),
+                  entry_price: signal.entry_price, quantity: signal.quantity,
+                  investment: signal.investment_amount, status: 'FAILED',
+                  mode: 'LIVE', error: tradeErr.message,
+                });
+                if (db.notify) db.notify('error', 'Trade Failed', `${signal.symbol} ${signal.signal_type}: ${tradeErr.message}`);
+              }
             } else {
+              signal.mode = 'PAPER';
               executePaperTrade(signal);
               if (db.notify) db.notify('entry', `Paper ${signal.signal_type} Entry`, `${signal.symbol} | Qty: ${signal.quantity} | Investment: ${signal.investment_amount}`);
             }
@@ -694,6 +716,36 @@ module.exports = function (db) {
       }
 
       db.save();
+
+      // AUTO-ENTRY: If auto_entry is ON and there are untraded signals, execute them
+      const autoEntryOn = db.data.settings?.auto_trading?.auto_entry || false;
+      const mode = db.data.settings?.trading_mode || 'PAPER';
+      const activeBroker2 = db.data.settings?.active_broker || db.data.settings?.broker?.name || 'upstox';
+      const token2 = db.data.settings?.broker?.[`${activeBroker2}_token`] || db.data.settings?.broker?.access_token;
+
+      if (autoEntryOn && mode === 'LIVE' && token2) {
+        // Find signals that don't have any trade (OPEN or FAILED within last 30 min)
+        const recentTradeSignalIds = new Set(
+          (db.data.trades || [])
+            .filter(t => t.mode === 'LIVE' && (t.status === 'OPEN' || (t.status === 'FAILED' && (t.entry_time || '') > new Date(Date.now() - 30 * 60 * 1000).toISOString())))
+            .map(t => t.signal_id)
+        );
+        const untradedSignals = (db.data.signals || [])
+          .filter(s => s.status === 'ACTIVE' && s.mode === 'LIVE' && !recentTradeSignalIds.has(s.id))
+          .sort((a, b) => (b.created_at || '').localeCompare(a.created_at || ''))
+          .slice(0, 1); // Only execute the latest untraded signal
+
+        for (const signal of untradedSignals) {
+          console.log(`[AutoEntry] Executing untraded signal: ${signal.id} ${signal.signal_type} ${signal.symbol}`);
+          try {
+            const result = await executeLiveTrade(signal, token2);
+            if (db.notify) db.notify('entry', `Auto-Entry ${signal.signal_type}`, `${signal.symbol} | Qty: ${signal.quantity} | ${result.success ? 'Order: ' + result.order_id : 'FAILED: ' + (result.error || '')}`);
+          } catch (autoErr) {
+            console.error(`[AutoEntry] Failed: ${autoErr.message}`);
+          }
+        }
+      }
+
       res.json({ status: 'success', articles_processed: processed.length, articles: processed, errors });
     } catch (err) {
       console.error('[News] Fetch error:', err);

@@ -10,58 +10,49 @@ Build an AI-powered automated options trading bot with multi-broker support, AI 
 - **Desktop:** Electron + electron-builder + electron-updater
 - **AI:** OpenAI GPT-4o via Emergent LLM Key
 
-## What's Implemented (v3.0.7)
+## Current Version: v3.0.8
 
-### Multi-Broker Architecture (6 Brokers)
-- Upstox (Active), Zerodha, Angel One, 5paisa, Paytm Money, IIFL
-- Per-broker credential storage with isolated tokens
+### Option Chain - LIVE DATA (FIXED)
+- NSE moved ALL derivatives expiry from Thursday to TUESDAY (Aug 2025)
+- Now fetches ACTUAL nearest expiry from Upstox `/v2/option/contract` API
+- 30-minute cache for expiry dates to reduce API calls
+- Falls back to calculated next Tuesday if API fails
+- Parses Upstox data into frontend format with full Greeks
 
-### 6 Trading Instruments (NSE/BSE only, MCX removed)
-- NSE: NIFTY50, BANKNIFTY, FINNIFTY, MIDCPNIFTY
-- BSE: SENSEX, BANKEX
-- ALL expiry: TUESDAY (NSE moved from Thursday to Tuesday in Aug 2025)
+### Auto-Trade System (MAJOR OVERHAUL v3.0.8)
+- **Auto-Entry on Signal**: When new article analyzed → signal generated → LIVE trade placed automatically
+- **Auto-Entry for Untraded Signals**: After news analysis, checks for untraded ACTIVE signals and executes them
+- **Robust Error Handling**: Trade failures saved to db with error message, won't crash analysis loop
+- **Reduced Deduplication**: Articles only deduped against last 1 hour (was: last 100 articles forever)
+- **Dynamic Strike Prices**: Based on actual market spot price, not hardcoded 24000
+- **Correct Expiry Dates**: Fetches from Upstox API, falls back to Tuesday
+- **New Endpoints**:
+  - `POST /api/trades/execute-signal` - Execute trade from existing signal
+  - `GET /api/trades/log` - View ALL trades including FAILED (for debugging)
+  - `GET /api/version` - Check app version
+  - `GET /api/diagnostics` - Full diagnostic info
 
-### Option Chain - LIVE DATA
-- Fetches ACTUAL nearest expiry from Upstox `/v2/option/contract` API
-- Falls back to calculated Tuesday if API unavailable
-- Caches expiry for 30 minutes to reduce API calls
-- Parses raw Upstox data with full Greeks (IV, Delta, Gamma, Theta, Vega)
-
-### Auto-Trade
-- Uses correct expiry date from Upstox API for instrument lookup
-- Dynamic strike price calculation based on actual market spot price
-- Proper instrument key mapping for all 6 instruments
-- Error handling with trade status tracking
+### 6 Trading Instruments (NSE/BSE, MCX removed)
+- NSE: NIFTY50, BANKNIFTY, FINNIFTY, MIDCPNIFTY (ALL expire Tuesday)
+- BSE: SENSEX, BANKEX (expire Tuesday)
 
 ### News Sources (11 sources)
 - Moneycontrol, Economic Times, NDTV Profit, CNBC TV18, Livemint
 - Business Today, The Hindu Business Line, Reuters, Bloomberg + RSS
 
-### Desktop App
-- Electron with auto-updates (v3.0.7)
-- Node.js backend synced with Python backend
-- CI/CD via GitHub Actions
-
-## Key Bug Fixes (v3.0.7) - CRITICAL
-- ROOT CAUSE: NSE moved ALL derivatives expiry from Thursday to TUESDAY (Aug 2025)
-- Option Chain was sending wrong expiry_date (Thursday) → Upstox returned empty data
-- Now fetches ACTUAL nearest expiry from Upstox `/v2/option/contract` endpoint
-- Auto-trade executeLiveTrade() and executeLiveAutoEntry() also fixed
-- Fixed broken fallback instrument token construction (referenced deleted variable)
-- Both Python and Node.js backends updated
-
-## Previous Fixes
-- v3.0.6: Version display, diagnostics endpoint, dynamic strike prices
-- v3.0.5: Added expiry_date parameter (required by Upstox API)
+## Bug Fix History
+- v3.0.8: Major auto-trade overhaul, reduced dedup, execute-signal endpoint, trade log
+- v3.0.7: NSE Tuesday expiry fix, fetchNearestExpiry from Upstox API
+- v3.0.6: Version display, diagnostics, dynamic strike prices
+- v3.0.5: Added required expiry_date parameter to Upstox API calls
 - v3.0.4: parseLiveChain(), error handling, MCX cleanup
-- v3.0.3: JS crash fix, token path fix, missing scrapers, data separation
 
 ## Pending
-- P0: User to build v3.0.7 and test option chain + auto-trade
-- P1: Full end-to-end verification
+- P0: User to build v3.0.8 and test auto-trade end-to-end
+- P1: Verify option chain data loads in market hours
 
 ## Future/Backlog
 - Stock Options trading support
 - Telegram notifications
-- Code refactoring (App.js, news.js, trading.js)
+- Code refactoring
 - Enhanced analytics & tax reports

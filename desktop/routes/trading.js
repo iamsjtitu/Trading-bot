@@ -520,6 +520,65 @@ _Sent automatically by AI Trading Bot_`;
     });
   });
 
+  // POST /api/trades/execute-signal - Execute a trade from an existing signal
+  router.post('/api/trades/execute-signal', async (req, res) => {
+    const { signal_id } = req.body || {};
+    const mode = db.data.settings?.trading_mode || 'PAPER';
+
+    // Find the signal (by ID or use latest untraded)
+    let signal;
+    if (signal_id) {
+      signal = (db.data.signals || []).find(s => s.id === signal_id);
+    } else {
+      // Find latest ACTIVE signal that doesn't have an OPEN trade
+      const tradedSignalIds = new Set((db.data.trades || []).filter(t => t.status === 'OPEN').map(t => t.signal_id));
+      signal = (db.data.signals || [])
+        .filter(s => s.status === 'ACTIVE' && !tradedSignalIds.has(s.id))
+        .sort((a, b) => (b.created_at || '').localeCompare(a.created_at || ''))[0];
+    }
+
+    if (!signal) {
+      return res.json({ status: 'error', message: 'No active untraded signal found' });
+    }
+
+    if (mode === 'LIVE') {
+      const token = getActiveBrokerToken();
+      if (!token) {
+        return res.json({ status: 'error', message: 'Broker not connected. Cannot execute LIVE trade.' });
+      }
+      console.log(`[ExecuteSignal] Executing LIVE trade for signal ${signal.id}: ${signal.signal_type} ${signal.symbol}`);
+      const result = await executeLiveAutoEntry(signal, token);
+      if (result) {
+        return res.json({ status: 'success', trade: result, message: 'LIVE trade placed on Upstox' });
+      }
+      return res.json({ status: 'error', message: 'Trade execution failed. Check trade history for details.' });
+    } else {
+      _executePaperTrade(signal);
+      return res.json({ status: 'success', message: 'Paper trade executed' });
+    }
+  });
+
+  // GET /api/trades/log - Show ALL trades including FAILED ones (for debugging)
+  router.get('/api/trades/log', (req, res) => {
+    const limit = parseInt(req.query.limit) || 50;
+    const mode = db.data.settings?.trading_mode || 'PAPER';
+    const allTrades = (db.data.trades || [])
+      .filter(t => (t.mode || 'PAPER') === mode)
+      .slice(-limit)
+      .reverse();
+    const failed = allTrades.filter(t => t.status === 'FAILED');
+    const open = allTrades.filter(t => t.status === 'OPEN');
+    const closed = allTrades.filter(t => t.status === 'CLOSED');
+    res.json({
+      status: 'success',
+      total: allTrades.length,
+      open: open.length,
+      closed: closed.length,
+      failed: failed.length,
+      trades: allTrades,
+    });
+  });
+
   // GET /api/auto-settings
   router.get('/api/auto-settings', (req, res) => {
     const rp = riskParams[getRiskTolerance()] || riskParams.medium;

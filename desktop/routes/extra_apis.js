@@ -128,7 +128,7 @@ module.exports = function (db) {
 
   // ==================== Version & Diagnostics ====================
   router.get('/api/version', (req, res) => {
-    res.json({ status: 'success', version: '3.0.7', build_date: '2026-03-19' });
+    res.json({ status: 'success', version: '3.0.8', build_date: '2026-03-19' });
   });
 
   router.get('/api/diagnostics', (req, res) => {
@@ -147,7 +147,7 @@ module.exports = function (db) {
 
     res.json({
       status: 'success',
-      version: '3.0.7',
+      version: '3.0.8',
       diagnostics: {
         broker: activeBroker,
         broker_token: token ? `${token.substring(0, 8)}...` : 'MISSING',
