@@ -362,7 +362,7 @@ _Sent automatically by AI Trading Bot_`;
           try {
             const sellBody = {
               quantity: trade.quantity,
-              product: 'D',
+              product: 'I',
               validity: 'DAY',
               price: 0,
               instrument_token: trade.instrument_token,
@@ -707,7 +707,7 @@ _Sent automatically by AI Trading Bot_`;
     });
 
     const allOk = steps.every(s => s.ok);
-    res.json({ status: 'success', all_ok: allOk, version: '3.1.1', steps });
+    res.json({ status: 'success', all_ok: allOk, version: '3.1.2', steps });
   });
 
   // POST /api/test/generate-trade
@@ -938,13 +938,18 @@ _Sent automatically by AI Trading Bot_`;
         console.log(`[AutoEntry] Using constructed instrument: ${instrumentToken}`);
       }
 
+      // Ensure quantity is a multiple of lot size
+      const lotSizeMap = { NIFTY50: 75, BANKNIFTY: 30, FINNIFTY: 40, MIDCPNIFTY: 75, SENSEX: 20, BANKEX: 30 };
+      const lotSize = lotSizeMap[activeInst] || 75;
+      const qty = Math.max(lotSize, Math.round(signal.quantity / lotSize) * lotSize);
+
       const orderBody = {
-        quantity: signal.quantity, product: 'D', validity: 'DAY', price: 0,
+        quantity: qty, product: 'I', validity: 'DAY', price: 0,
         instrument_token: instrumentToken, order_type: 'MARKET', transaction_type: 'BUY',
         disclosed_quantity: 0, trigger_price: 0, is_amo: false,
       };
 
-      console.log(`[AutoEntry] Placing ${signal.signal_type} order: ${instrumentToken} qty=${signal.quantity}`);
+      console.log(`[AutoEntry] Placing ${signal.signal_type} order: ${instrumentToken} qty=${qty} product=I`);
       const orderResp = await axios.post('https://api.upstox.com/v2/order/place', orderBody, { headers, timeout: 15000 });
       const orderId = orderResp.data?.data?.order_id || '';
       const success = orderResp.data?.status === 'success';
@@ -965,7 +970,21 @@ _Sent automatically by AI Trading Bot_`;
       if (db.notify) db.notify('entry', `LIVE Re-Entry ${signal.signal_type}`, `${signal.symbol} | Qty: ${signal.quantity} | ${success ? 'Order: ' + orderId : 'FAILED'}`);
       return success ? trade : null;
     } catch (err) {
-      console.error(`[AutoEntry] LIVE error:`, err.message);
+      const upstoxErr = err.response?.data?.message || err.response?.data?.errors?.[0]?.message || err.message;
+      const errStatus = err.response?.status || 'unknown';
+      console.error(`[AutoEntry] LIVE error ${errStatus}: ${upstoxErr}`);
+      console.error(`[AutoEntry] Full error data:`, JSON.stringify(err.response?.data || {}));
+      // Save failed trade for tracking
+      if (!db.data.trades) db.data.trades = [];
+      db.data.trades.push({
+        id: crypto.randomUUID(), signal_id: signal.id, trade_type: signal.signal_type,
+        symbol: signal.symbol, entry_time: new Date().toISOString(),
+        entry_price: signal.entry_price, quantity: signal.quantity,
+        investment: signal.investment_amount, status: 'FAILED',
+        mode: 'LIVE', error: `${errStatus}: ${upstoxErr}`,
+        exit_time: null, exit_price: null, pnl: 0, pnl_percentage: 0,
+      });
+      db.save();
       return null;
     }
   }

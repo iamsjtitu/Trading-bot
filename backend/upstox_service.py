@@ -255,7 +255,7 @@ class UpstoxService(BrokerBase):
 
         body = {
             'quantity': params.get('quantity', 1),
-            'product': params.get('product', 'D'),
+            'product': params.get('product', 'I'),
             'validity': params.get('validity', 'DAY'),
             'price': params.get('price', 0),
             'instrument_token': params.get('instrument_token', ''),

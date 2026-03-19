@@ -186,7 +186,7 @@ module.exports = function (db) {
 
     const params = req.body || {};
     const body = {
-      quantity: params.quantity || 1, product: params.product || 'D',
+      quantity: params.quantity || 1, product: params.product || 'I',
       validity: params.validity || 'DAY', price: params.price || 0,
       instrument_token: params.instrument_token || '', order_type: params.order_type || 'MARKET',
       transaction_type: params.transaction_type || 'BUY', disclosed_quantity: 0,

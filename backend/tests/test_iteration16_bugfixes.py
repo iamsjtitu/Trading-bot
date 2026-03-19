@@ -15,7 +15,7 @@ import requests
 import os
 import time
 
-BASE_URL = os.environ.get('REACT_APP_BACKEND_URL', 'https://market-sentinel-68.preview.emergentagent.com').rstrip('/')
+BASE_URL = os.environ.get('REACT_APP_BACKEND_URL', 'https://auto-trade-signals-18.preview.emergentagent.com').rstrip('/')
 
 class TestAutoEntryStatus:
     """Test GET /api/auto-entry/status endpoint"""

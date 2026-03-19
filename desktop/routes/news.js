@@ -1129,10 +1129,15 @@ module.exports = function (db) {
         console.log(`[LiveTrade] Using constructed instrument: ${instrumentToken}`);
       }
 
-      // Step 2: Place MARKET order
+      // Step 2: Place MARKET order (F&O = Intraday product)
+      // Ensure quantity is a multiple of lot size
+      const lotSizeMap = { NIFTY50: 75, BANKNIFTY: 30, FINNIFTY: 40, MIDCPNIFTY: 75, SENSEX: 20, BANKEX: 30 };
+      const lotSize = lotSizeMap[activeInst] || 75;
+      const qty = Math.max(lotSize, Math.round(signal.quantity / lotSize) * lotSize);
+
       const orderBody = {
-        quantity: signal.quantity,
-        product: 'D',
+        quantity: qty,
+        product: 'I',
         validity: 'DAY',
         price: 0,
         instrument_token: instrumentToken,
@@ -1143,7 +1148,7 @@ module.exports = function (db) {
         is_amo: false,
       };
 
-      console.log(`[LiveTrade] Placing ${signal.signal_type} order: ${instrumentToken} qty=${signal.quantity}`);
+      console.log(`[LiveTrade] Placing ${signal.signal_type} order: ${instrumentToken} qty=${qty} product=I`);
 
       const orderResp = await axios.post('https://api.upstox.com/v2/order/place', orderBody, { headers, timeout: 15000 });
 
@@ -1184,7 +1189,11 @@ module.exports = function (db) {
       return { success: orderSuccess, order_id: orderId, trade };
 
     } catch (err) {
-      console.error(`[LiveTrade] Error: ${err.message}`);
+      // Extract ACTUAL Upstox error message
+      const upstoxErr = err.response?.data?.message || err.response?.data?.errors?.[0]?.message || err.message;
+      const errStatus = err.response?.status || 'unknown';
+      console.error(`[LiveTrade] Error ${errStatus}: ${upstoxErr}`);
+      console.error(`[LiveTrade] Full error data:`, JSON.stringify(err.response?.data || {}));
       // Save failed trade for tracking
       if (!db.data.trades) db.data.trades = [];
       db.data.trades.push({
@@ -1192,11 +1201,11 @@ module.exports = function (db) {
         symbol: signal.symbol, entry_time: new Date().toISOString(),
         entry_price: signal.entry_price, quantity: signal.quantity,
         investment: signal.investment_amount, status: 'FAILED',
-        mode: 'LIVE', error: err.message,
+        mode: 'LIVE', error: `${errStatus}: ${upstoxErr}`,
         exit_time: null, exit_price: null, pnl: 0, pnl_percentage: 0,
       });
       db.save();
-      return { success: false, error: err.message };
+      return { success: false, error: `${errStatus}: ${upstoxErr}` };
     }
   }
 
