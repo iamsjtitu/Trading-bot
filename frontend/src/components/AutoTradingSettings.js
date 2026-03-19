@@ -1,6 +1,9 @@
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
+import axios from 'axios';
+
+const API = process.env.REACT_APP_BACKEND_URL + '/api';
 
 export default function AutoTradingSettings({ autoSettings, showAutoSettings, setShowAutoSettings, updateAutoSettings, onDebug, onExecuteSignal, debugResult }) {
   return (
