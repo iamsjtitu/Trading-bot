@@ -78,8 +78,7 @@ export default function OptionChain() {
   };
 
   const instrumentGroups = {
-    'Index Options': Object.entries(instruments).filter(([, v]) => v.exchange !== 'MCX'),
-    'MCX Commodities': Object.entries(instruments).filter(([, v]) => v.exchange === 'MCX'),
+    'Index Options': Object.entries(instruments),
   };
 
   return (
