@@ -687,6 +687,16 @@ async def execute_signal():
     except Exception as e:
         return {"status": "error", "message": str(e)}
 
+@api_router.post("/trades/manual-exit")
+async def manual_exit():
+    """Manually exit/close a position"""
+    try:
+        body = await request.json() if hasattr(request, 'json') else {}
+        return {"status": "error", "message": "Manual exit is only available in the desktop app. Use the desktop app for LIVE trade management."}
+    except Exception as e:
+        return {"status": "error", "message": str(e)}
+
+
 @api_router.get("/trades/log")
 async def get_trade_log():
     """Get trade log including FAILED trades"""

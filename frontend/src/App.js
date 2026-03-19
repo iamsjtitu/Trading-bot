@@ -99,6 +99,25 @@ function App() {
     setTimeout(() => setNotifications(prev => prev.filter(n => n.id !== id)), 5000);
   }, []);
 
+  const handleManualExit = useCallback(async (trade) => {
+    try {
+      const res = await axios.post(`${API}/trades/manual-exit`, {
+        instrument_token: trade.instrument_token,
+        trade_id: trade.id,
+      });
+      if (res.data.status === 'success') {
+        addNotification('success', res.data.message || 'Position closed successfully');
+        // Refresh trades
+        const tradesRes = await axios.get(`${API}/trades/active`);
+        setTrades(tradesRes.data.trades || []);
+      } else {
+        addNotification('error', res.data.message || 'Exit failed');
+      }
+    } catch (err) {
+      addNotification('error', `Exit error: ${err.message}`);
+    }
+  }, [addNotification]);
+
   const loadUpstoxData = useCallback(async () => {
     try {
       const res = await axios.get(`${API}/combined-status`);
@@ -677,7 +696,7 @@ function App() {
 
           <TabsContent value="news"><NewsFeed news={news} formatTime={formatTime} /></TabsContent>
           <TabsContent value="signals"><SignalsList signals={signals} formatCurrency={formatCurrency} formatTime={formatTime} tradingMode={tradingMode} brokerConnected={brokerConnected} /></TabsContent>
-          <TabsContent value="trades"><TradesList trades={displayTrades} formatCurrency={formatCurrency} formatTime={formatTime} tradingMode={tradingMode} brokerConnected={brokerConnected} /></TabsContent>
+          <TabsContent value="trades"><TradesList trades={displayTrades} formatCurrency={formatCurrency} formatTime={formatTime} tradingMode={tradingMode} brokerConnected={brokerConnected} onManualExit={handleManualExit} /></TabsContent>
           <TabsContent value="history"><TradeHistory formatCurrency={formatCurrency} tradingMode={tradingMode} brokerConnected={brokerConnected} brokerOrders={brokerOrders} /></TabsContent>
           <TabsContent value="calculator"><PositionCalculator riskMetrics={riskMetrics} formatCurrency={formatCurrency} /></TabsContent>
           <TabsContent value="analytics"><TradeAnalytics /></TabsContent>

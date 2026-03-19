@@ -587,6 +587,132 @@ _Sent automatically by AI Trading Bot_`;
     });
   });
 
+
+  // POST /api/trades/manual-exit - Manually exit/close a position
+  router.post('/api/trades/manual-exit', async (req, res) => {
+    const { instrument_token, trade_id } = req.body || {};
+    const mode = db.data.settings?.trading_mode || 'PAPER';
+    const accessToken = getActiveBrokerToken();
+
+    if (mode === 'LIVE' && accessToken && instrument_token) {
+      // LIVE mode: Place SELL order on Upstox
+      try {
+        // First, get the position details to know quantity
+        const headers = { Accept: 'application/json', Authorization: `Bearer ${accessToken}`, 'Api-Version': '2.0', 'Content-Type': 'application/json' };
+        const posResp = await axios.get('https://api.upstox.com/v2/portfolio/short-term-positions', {
+          headers: { Accept: 'application/json', Authorization: `Bearer ${accessToken}`, 'Api-Version': '2.0' },
+          timeout: 10000,
+        });
+
+        let position = null;
+        if (posResp.data?.status === 'success') {
+          position = (posResp.data.data || []).find(p => p.instrument_token === instrument_token && p.quantity !== 0);
+        }
+
+        if (!position) {
+          return res.json({ status: 'error', message: 'Position not found on Upstox. It may have already been closed.' });
+        }
+
+        const qty = Math.abs(position.quantity);
+        const txnType = position.quantity > 0 ? 'SELL' : 'BUY'; // Reverse the position
+
+        const sellBody = {
+          quantity: qty,
+          product: 'I',
+          validity: 'DAY',
+          price: 0,
+          instrument_token: instrument_token,
+          order_type: 'MARKET',
+          transaction_type: txnType,
+          disclosed_quantity: 0,
+          trigger_price: 0,
+          is_amo: false,
+        };
+
+        console.log(`[ManualExit] Placing ${txnType} order: ${instrument_token} qty=${qty}`);
+        const orderResp = await axios.post('https://api.upstox.com/v2/order/place', sellBody, { headers, timeout: 15000 });
+        const orderId = orderResp.data?.data?.order_id || '';
+        const orderSuccess = orderResp.data?.status === 'success';
+
+        // Update stored trade
+        const storedTrade = (db.data.trades || []).find(t =>
+          t.instrument_token === instrument_token && t.status === 'OPEN' && t.mode === 'LIVE'
+        );
+        if (storedTrade) {
+          const exitPrice = position.last_price || 0;
+          const entryPrice = position.average_price || position.buy_price || storedTrade.entry_price || 0;
+          const pnl = position.pnl || ((exitPrice - entryPrice) * qty);
+
+          storedTrade.status = 'CLOSED';
+          storedTrade.exit_time = new Date().toISOString();
+          storedTrade.exit_price = exitPrice;
+          storedTrade.pnl = Math.round(pnl * 100) / 100;
+          storedTrade.pnl_percentage = entryPrice > 0 ? Math.round(((exitPrice - entryPrice) / entryPrice) * 10000) / 100 : 0;
+          storedTrade.exit_reason = 'MANUAL_EXIT';
+          storedTrade.exit_order_id = orderId;
+
+          // Update portfolio
+          const p = db.data.portfolio;
+          if (p) {
+            p.available_capital = (p.available_capital || 0) + (exitPrice * qty);
+            p.invested_amount = Math.max(0, (p.invested_amount || 0) - storedTrade.investment);
+            p.total_pnl = (p.total_pnl || 0) + pnl;
+            p.total_trades = (p.total_trades || 0) + 1;
+            if (pnl > 0) p.winning_trades = (p.winning_trades || 0) + 1;
+            else p.losing_trades = (p.losing_trades || 0) + 1;
+            p.last_updated = new Date().toISOString();
+          }
+          db.save();
+        }
+
+        if (db.notify) db.notify('exit', 'Manual Exit', `${instrument_token} | Qty: ${qty} | ${orderSuccess ? 'Order: ' + orderId : 'FAILED'}`);
+
+        return res.json({
+          status: orderSuccess ? 'success' : 'error',
+          message: orderSuccess ? `Exit order placed. Order ID: ${orderId}` : 'Exit order failed',
+          order_id: orderId,
+        });
+      } catch (err) {
+        const upstoxErr = err.response?.data?.message || err.response?.data?.errors?.[0]?.message || err.message;
+        console.error(`[ManualExit] Error: ${upstoxErr}`);
+        return res.json({ status: 'error', message: `Exit failed: ${upstoxErr}` });
+      }
+    }
+
+    // PAPER mode: close the trade locally
+    const trade = (db.data.trades || []).find(t =>
+      (trade_id ? t.id === trade_id : t.instrument_token === instrument_token) && t.status === 'OPEN'
+    );
+    if (!trade) {
+      return res.json({ status: 'error', message: 'Trade not found' });
+    }
+
+    const exitPrice = trade.current_price || trade.entry_price * (1 + (Math.random() - 0.5) * 0.1);
+    const pnl = (exitPrice - trade.entry_price) * trade.quantity;
+    trade.status = 'CLOSED';
+    trade.exit_time = new Date().toISOString();
+    trade.exit_price = Math.round(exitPrice * 100) / 100;
+    trade.pnl = Math.round(pnl * 100) / 100;
+    trade.pnl_percentage = trade.entry_price > 0 ? Math.round(((exitPrice - trade.entry_price) / trade.entry_price) * 10000) / 100 : 0;
+    trade.exit_reason = 'MANUAL_EXIT';
+
+    const p = db.data.portfolio;
+    if (p) {
+      p.available_capital = (p.available_capital || 0) + (exitPrice * trade.quantity);
+      p.invested_amount = Math.max(0, (p.invested_amount || 0) - trade.investment);
+      p.total_pnl = (p.total_pnl || 0) + pnl;
+      p.total_trades = (p.total_trades || 0) + 1;
+      if (pnl > 0) p.winning_trades = (p.winning_trades || 0) + 1;
+      else p.losing_trades = (p.losing_trades || 0) + 1;
+      p.last_updated = new Date().toISOString();
+    }
+    db.save();
+
+    if (db.notify) db.notify('exit', 'Manual Exit', `${trade.symbol} | P&L: ${Math.round(pnl)}`);
+
+    return res.json({ status: 'success', message: `Trade closed. P&L: ${Math.round(pnl * 100) / 100}` });
+  });
+
   // POST /api/trades/execute-signal - Execute a trade from an existing signal
   router.post('/api/trades/execute-signal', async (req, res) => {
     const { signal_id } = req.body || {};
@@ -778,7 +904,7 @@ _Sent automatically by AI Trading Bot_`;
     });
 
     const allOk = steps.every(s => s.ok);
-    res.json({ status: 'success', all_ok: allOk, version: '3.1.5', steps });
+    res.json({ status: 'success', all_ok: allOk, version: '3.1.6', steps });
   });
 
   // POST /api/test/generate-trade
