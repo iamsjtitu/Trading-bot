@@ -593,6 +593,112 @@ _Sent automatically by AI Trading Bot_`;
     });
   });
 
+  // GET /api/debug/auto-trade-test - Simulate entire auto-trade flow, return each step
+  router.get('/api/debug/auto-trade-test', async (req, res) => {
+    const steps = [];
+    const settings = db.data?.settings || {};
+
+    // Step 1: Check trading mode
+    const mode = settings.trading_mode || 'PAPER';
+    steps.push({ step: 1, name: 'Trading Mode', value: mode, ok: mode === 'LIVE' });
+
+    // Step 2: Check auto-entry
+    const autoEntry = settings.auto_trading?.auto_entry || false;
+    steps.push({ step: 2, name: 'Auto-Entry Enabled', value: autoEntry, ok: autoEntry === true });
+
+    // Step 3: Check broker token
+    const activeBroker = settings.active_broker || settings.broker?.name || 'upstox';
+    const token = settings.broker?.[`${activeBroker}_token`] || settings.broker?.access_token || null;
+    steps.push({ step: 3, name: 'Broker Token', value: token ? `Found (${activeBroker}: ${token.substring(0, 12)}...)` : 'MISSING', ok: !!token });
+
+    // Step 4: Check active instrument
+    const inst = settings.trading_instrument || 'NIFTY50';
+    steps.push({ step: 4, name: 'Active Instrument', value: inst, ok: true });
+
+    // Step 5: Check signals
+    const activeSignals = (db.data.signals || []).filter(s => s.status === 'ACTIVE');
+    const tradedSignalIds = new Set((db.data.trades || []).filter(t => t.status === 'OPEN').map(t => t.signal_id));
+    const untradedSignals = activeSignals.filter(s => !tradedSignalIds.has(s.id));
+    steps.push({ step: 5, name: 'Active Signals', value: `${activeSignals.length} total, ${untradedSignals.length} untraded`, ok: untradedSignals.length > 0 });
+
+    // Step 6: Try fetching nearest expiry from Upstox
+    let expiryStr = '';
+    if (token) {
+      const instKeyMap = {
+        'NIFTY50': 'NSE_INDEX|Nifty 50', 'BANKNIFTY': 'NSE_INDEX|Nifty Bank',
+        'FINNIFTY': 'NSE_INDEX|Nifty Fin Service', 'MIDCPNIFTY': 'NSE_INDEX|NIFTY MID SELECT',
+        'SENSEX': 'BSE_INDEX|SENSEX', 'BANKEX': 'BSE_INDEX|BANKEX',
+      };
+      const instKey = instKeyMap[inst] || 'NSE_INDEX|Nifty 50';
+      try {
+        const contractResp = await axios.get('https://api.upstox.com/v2/option/contract', {
+          headers: { Accept: 'application/json', Authorization: `Bearer ${token}`, 'Api-Version': '2.0' },
+          params: { instrument_key: instKey },
+          timeout: 10000,
+        });
+        if (contractResp.data?.status === 'success' && contractResp.data?.data?.length > 0) {
+          expiryStr = (contractResp.data.data[0].expiry || '').substring(0, 10);
+          steps.push({ step: 6, name: 'Nearest Expiry (from Upstox API)', value: expiryStr, ok: true, contracts_count: contractResp.data.data.length });
+        } else {
+          steps.push({ step: 6, name: 'Nearest Expiry', value: `API returned: ${contractResp.data?.message || 'empty data'}`, ok: false });
+        }
+      } catch (e) {
+        const errMsg = e.response?.data?.message || e.message;
+        steps.push({ step: 6, name: 'Nearest Expiry', value: `API ERROR: ${errMsg}`, ok: false });
+      }
+    } else {
+      steps.push({ step: 6, name: 'Nearest Expiry', value: 'Skipped (no token)', ok: false });
+    }
+
+    // Step 7: Try fetching option chain
+    if (token && expiryStr) {
+      const instKeyMap = {
+        'NIFTY50': 'NSE_INDEX|Nifty 50', 'BANKNIFTY': 'NSE_INDEX|Nifty Bank',
+        'FINNIFTY': 'NSE_INDEX|Nifty Fin Service', 'MIDCPNIFTY': 'NSE_INDEX|NIFTY MID SELECT',
+        'SENSEX': 'BSE_INDEX|SENSEX', 'BANKEX': 'BSE_INDEX|BANKEX',
+      };
+      try {
+        const ocResp = await axios.get('https://api.upstox.com/v2/option/chain', {
+          headers: { Accept: 'application/json', Authorization: `Bearer ${token}`, 'Api-Version': '2.0' },
+          params: { instrument_key: instKeyMap[inst] || 'NSE_INDEX|Nifty 50', expiry_date: expiryStr },
+          timeout: 15000,
+        });
+        if (ocResp.data?.status === 'success' && ocResp.data?.data?.length > 0) {
+          const strikes = ocResp.data.data.map(i => i.strike_price).sort((a, b) => a - b);
+          const sampleItem = ocResp.data.data[0];
+          const hasCallKey = !!sampleItem?.call_options?.instrument_key;
+          const hasPutKey = !!sampleItem?.put_options?.instrument_key;
+          steps.push({
+            step: 7, name: 'Option Chain Data', ok: true,
+            value: `${ocResp.data.data.length} strikes (${strikes[0]}-${strikes[strikes.length - 1]})`,
+            has_call_instrument_key: hasCallKey,
+            has_put_instrument_key: hasPutKey,
+            sample_call_key: sampleItem?.call_options?.instrument_key || 'MISSING',
+            sample_put_key: sampleItem?.put_options?.instrument_key || 'MISSING',
+          });
+        } else {
+          steps.push({ step: 7, name: 'Option Chain Data', value: `Empty or error: ${ocResp.data?.message || 'no data'}`, ok: false });
+        }
+      } catch (e) {
+        steps.push({ step: 7, name: 'Option Chain Data', value: `ERROR: ${e.response?.data?.message || e.message}`, ok: false });
+      }
+    } else {
+      steps.push({ step: 7, name: 'Option Chain Data', value: 'Skipped', ok: false });
+    }
+
+    // Step 8: Check recent trades including failed
+    const recentTrades = (db.data.trades || []).filter(t => t.mode === 'LIVE').slice(-5).reverse();
+    const failedTrades = recentTrades.filter(t => t.status === 'FAILED');
+    steps.push({
+      step: 8, name: 'Recent LIVE Trades', ok: recentTrades.length > 0,
+      value: `${recentTrades.length} total, ${failedTrades.length} failed`,
+      trades: recentTrades.map(t => ({ id: t.id?.substring(0, 8), status: t.status, type: t.trade_type, symbol: t.symbol, error: t.error || '', time: t.entry_time })),
+    });
+
+    const allOk = steps.every(s => s.ok);
+    res.json({ status: 'success', all_ok: allOk, version: '3.0.8', steps });
+  });
+
   // POST /api/test/generate-trade
   router.post('/api/test/generate-trade', (req, res) => {
     const newsArr = (db.data.news_articles || []).sort((a, b) => (b.created_at || '').localeCompare(a.created_at || ''));

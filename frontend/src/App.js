@@ -433,6 +433,24 @@ function App() {
     else { addNotification('success', 'Trading resumed!'); }
   };
 
+  const [debugResult, setDebugResult] = useState(null);
+  const runAutoTradeDebug = async () => {
+    try {
+      const r = await axios.get(`${API}/debug/auto-trade-test`);
+      setDebugResult(r.data);
+      if (r.data.all_ok) addNotification('success', 'All auto-trade checks PASSED!');
+      else addNotification('warning', 'Some auto-trade checks FAILED - see debug panel');
+    } catch (e) { addNotification('error', `Debug test failed: ${e.message}`); }
+  };
+
+  const executeLatestSignal = async () => {
+    try {
+      const r = await axios.post(`${API}/trades/execute-signal`, {});
+      if (r.data.status === 'success') addNotification('success', r.data.message);
+      else addNotification('error', r.data.message);
+    } catch (e) { addNotification('error', `Execute failed: ${e.message}`); }
+  };
+
   // Determine portfolio data based on mode
   const displayPortfolio = (() => {
     if (tradingMode === 'LIVE') {
@@ -589,7 +607,7 @@ function App() {
         )}
 
         <RiskPanel riskMetrics={riskMetrics} emergencyStop={emergencyStop} onEmergencyStop={handleEmergencyStop} formatCurrency={formatCurrency} tradingMode={tradingMode} brokerConnected={brokerConnected} />
-        <AutoTradingSettings autoSettings={autoSettings} showAutoSettings={showAutoSettings} setShowAutoSettings={setShowAutoSettings} updateAutoSettings={updateAutoSettings} />
+        <AutoTradingSettings autoSettings={autoSettings} showAutoSettings={showAutoSettings} setShowAutoSettings={setShowAutoSettings} updateAutoSettings={updateAutoSettings} onDebug={runAutoTradeDebug} onExecuteSignal={executeLatestSignal} debugResult={debugResult} />
 
         {/* Portfolio Summary Cards */}
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">

@@ -632,6 +632,77 @@ async def get_auto_settings():
         logger.error(f"Get settings error: {e}")
         return {"status": "error", "message": str(e)}
 
+@api_router.get("/debug/auto-trade-test")
+async def debug_auto_trade_test():
+    """Debug endpoint to test auto-trade flow step by step"""
+    steps = []
+    try:
+        settings = await settings_manager.get_settings()
+
+        # Step 1: Trading mode
+        mode = settings.get('trading_mode', 'PAPER')
+        steps.append({"step": 1, "name": "Trading Mode", "value": mode, "ok": mode == "LIVE"})
+
+        # Step 2: Auto-entry
+        auto_entry = settings.get('auto_trading', {}).get('auto_entry', False)
+        steps.append({"step": 2, "name": "Auto-Entry Enabled", "value": auto_entry, "ok": auto_entry is True})
+
+        # Step 3: Broker token
+        broker = settings.get('broker', {})
+        active_broker = settings.get('active_broker', broker.get('name', 'upstox'))
+        token = broker.get(f'{active_broker}_token', broker.get('access_token'))
+        token_display = f"Found ({active_broker}: {token[:12]}...)" if token else "MISSING"
+        steps.append({"step": 3, "name": "Broker Token", "value": token_display, "ok": bool(token)})
+
+        # Step 4: Active instrument
+        inst = settings.get('trading_instrument', 'NIFTY50')
+        steps.append({"step": 4, "name": "Active Instrument", "value": inst, "ok": True})
+
+        # Step 5: Signals
+        signals_coll = db.signals if hasattr(db, 'signals') else db.get('signals', [])
+        if hasattr(signals_coll, 'find'):
+            active_signals = await signals_coll.find({"status": "ACTIVE"}, {"_id": 0}).to_list(50)
+        else:
+            active_signals = [s for s in (signals_coll or []) if s.get('status') == 'ACTIVE']
+        steps.append({"step": 5, "name": "Active Signals", "value": f"{len(active_signals)} signals", "ok": len(active_signals) > 0})
+
+        # Step 6-8: Skipped in web preview (no broker connection)
+        steps.append({"step": 6, "name": "Nearest Expiry", "value": "Web preview - use desktop app for full test", "ok": False})
+        steps.append({"step": 7, "name": "Option Chain Data", "value": "Web preview - use desktop app for full test", "ok": False})
+        steps.append({"step": 8, "name": "Recent Trades", "value": "Web preview - use desktop app for full test", "ok": False})
+
+        all_ok = all(s["ok"] for s in steps)
+        return {"status": "success", "all_ok": all_ok, "version": "3.0.8", "steps": steps}
+    except Exception as e:
+        logger.error(f"Debug test error: {e}")
+        return {"status": "error", "message": str(e), "steps": steps}
+
+@api_router.post("/trades/execute-signal")
+async def execute_signal():
+    """Execute a trade from the latest untraded signal"""
+    try:
+        settings = await settings_manager.get_settings()
+        mode = settings.get('trading_mode', 'PAPER')
+        return {"status": "error", "message": f"Execute signal: mode={mode}. Use desktop app for LIVE execution. Paper trades work via Analyze Now."}
+    except Exception as e:
+        return {"status": "error", "message": str(e)}
+
+@api_router.get("/trades/log")
+async def get_trade_log():
+    """Get trade log including FAILED trades"""
+    try:
+        trades_coll = db.paper_trades if hasattr(db, 'paper_trades') else db.get('trades', [])
+        if hasattr(trades_coll, 'find'):
+            trades = await trades_coll.find({}, {"_id": 0}).sort("entry_time", -1).to_list(50)
+        else:
+            trades = sorted((trades_coll or []), key=lambda t: t.get('entry_time', ''), reverse=True)[:50]
+        failed = [t for t in trades if t.get('status') == 'FAILED']
+        open_t = [t for t in trades if t.get('status') == 'OPEN']
+        return {"status": "success", "total": len(trades), "open": len(open_t), "failed": len(failed), "trades": trades}
+    except Exception as e:
+        return {"status": "error", "message": str(e)}
+
+
 @api_router.get("/settings")
 async def get_bot_settings():
     """Get all bot settings"""

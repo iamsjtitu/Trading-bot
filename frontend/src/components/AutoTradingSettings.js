@@ -2,7 +2,7 @@ import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 
-export default function AutoTradingSettings({ autoSettings, showAutoSettings, setShowAutoSettings, updateAutoSettings }) {
+export default function AutoTradingSettings({ autoSettings, showAutoSettings, setShowAutoSettings, updateAutoSettings, onDebug, onExecuteSignal, debugResult }) {
   return (
     <Card className="bg-gradient-to-r from-blue-50 to-purple-50 border-blue-200 p-4 mb-6 shadow-lg" data-testid="auto-trading-settings">
       <div
@@ -102,6 +102,39 @@ export default function AutoTradingSettings({ autoSettings, showAutoSettings, se
               {autoSettings.auto_entry && ' With auto-entry ON, a new trade will open automatically after a profitable exit.'}
             </p>
           </div>
+
+          <div className="md:col-span-2 flex gap-3">
+            <Button onClick={onDebug} className="bg-orange-600 hover:bg-orange-700 text-white" data-testid="debug-auto-trade">
+              Debug Auto-Trade
+            </Button>
+            <Button onClick={onExecuteSignal} className="bg-purple-600 hover:bg-purple-700 text-white" data-testid="execute-signal-btn">
+              Execute Latest Signal
+            </Button>
+          </div>
+
+          {debugResult && (
+            <div className="md:col-span-2 p-3 bg-gray-900 rounded-lg text-xs font-mono text-green-400 max-h-64 overflow-auto" data-testid="debug-result">
+              <p className="text-white font-bold mb-2">Auto-Trade Debug (v{debugResult.version}): {debugResult.all_ok ? '✅ ALL OK' : '❌ ISSUES FOUND'}</p>
+              {debugResult.steps?.map((s, i) => (
+                <div key={i} className="mb-1">
+                  <span className={s.ok ? 'text-green-400' : 'text-red-400'}>
+                    {s.ok ? '✅' : '❌'} Step {s.step}: {s.name} = {typeof s.value === 'object' ? JSON.stringify(s.value) : String(s.value)}
+                  </span>
+                  {s.sample_call_key && <div className="ml-4 text-gray-400">Call: {s.sample_call_key}</div>}
+                  {s.sample_put_key && <div className="ml-4 text-gray-400">Put: {s.sample_put_key}</div>}
+                  {s.trades && s.trades.length > 0 && (
+                    <div className="ml-4">
+                      {s.trades.map((t, j) => (
+                        <div key={j} className={t.status === 'FAILED' ? 'text-red-400' : 'text-green-400'}>
+                          {t.status} | {t.type} {t.symbol} | {t.error || t.time}
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              ))}
+            </div>
+          )}
         </div>
       )}
     </Card>
