@@ -933,7 +933,7 @@ _Sent automatically by AI Trading Bot_`;
     });
 
     const allOk = steps.every(s => s.ok);
-    res.json({ status: 'success', all_ok: allOk, version: '3.2.2', steps });
+    res.json({ status: 'success', all_ok: allOk, version: '3.2.3', steps });
   });
 
   // POST /api/test/generate-trade
@@ -977,9 +977,9 @@ _Sent automatically by AI Trading Bot_`;
 
     // Check market hours
     const activeInstrument = db.data?.settings?.trading_instrument || db.data?.settings?.active_instrument || 'NIFTY50';
+    // Market hours flag - signals generate anytime, order placement checks this separately
     if (!_isMarketOpen(activeInstrument)) {
-      console.log('[Signal] Market closed, skipping signal generation');
-      return null;
+      console.log('[Signal] Market closed, signal will be saved for later execution');
     }
 
     const signalType = sentiment.trading_signal === 'BUY_CALL' ? 'CALL' : 'PUT';
@@ -1004,9 +1004,13 @@ _Sent automatically by AI Trading Bot_`;
     const dailyLimit = riskCfg.daily_limit || 100000;
 
     const todayStart = new Date(); todayStart.setHours(0, 0, 0, 0);
-    const todayTrades = (db.data.trades || []).filter(t => t.entry_time >= todayStart.toISOString());
+    // Only count OPEN trades towards daily limit (CLOSED/FAILED trades free up capital)
+    const todayTrades = (db.data.trades || []).filter(t => t.entry_time >= todayStart.toISOString() && t.status === 'OPEN');
     const todayValue = todayTrades.reduce((s, t) => s + (t.investment || 0), 0);
-    if (todayValue >= dailyLimit) return null;
+    if (todayValue >= dailyLimit) {
+      console.log(`[Signal] Daily limit reached: ${todayValue}/${dailyLimit}`);
+      return null;
+    }
 
     const positionSize = Math.min(maxTrade, available * rp.max_position_size, dailyLimit - todayValue);
     if (positionSize < 1000) return null;

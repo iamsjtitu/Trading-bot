@@ -679,13 +679,24 @@ module.exports = function (db) {
             signal.mode = mode;
 
             if (mode === 'LIVE' && token) {
-              // DUPLICATE TRADE PROTECTION before placing order (only check LIVE mode trades)
-              const openSameType = (db.data.trades || []).find(t =>
-                t.status === 'OPEN' && t.trade_type === signal.signal_type && t.symbol === signal.symbol && t.mode === 'LIVE'
-              );
-              if (openSameType) {
-                console.log(`[AutoTrade] Skipping ${signal.signal_type} ${signal.symbol} - already have OPEN position`);
+              // Check market hours before placing order
+              const nowTrade = new Date();
+              const istTrade = new Date(nowTrade.getTime() + 5.5 * 60 * 60 * 1000);
+              const istDayTrade = istTrade.getUTCDay();
+              const istMinsTrade = istTrade.getUTCHours() * 60 + istTrade.getUTCMinutes();
+              const marketOpen = !(istDayTrade === 0 || istDayTrade === 6 || istMinsTrade < 555 || istMinsTrade > 930);
+
+              if (!marketOpen) {
+                console.log(`[AutoTrade] Market closed, signal saved for later: ${signal.signal_type} ${signal.symbol}`);
+                if (db.notify) db.notify('signal', 'Signal Saved', `${signal.signal_type} ${signal.symbol} - Market closed, will trade when market opens`);
               } else {
+                // DUPLICATE TRADE PROTECTION before placing order (only check LIVE mode trades)
+                const openSameType = (db.data.trades || []).find(t =>
+                  t.status === 'OPEN' && t.trade_type === signal.signal_type && t.symbol === signal.symbol && t.mode === 'LIVE'
+                );
+                if (openSameType) {
+                  console.log(`[AutoTrade] Skipping ${signal.signal_type} ${signal.symbol} - already have OPEN position`);
+                } else {
                 console.log(`[AutoTrade] LIVE mode, executing trade for ${signal.symbol} ${signal.signal_type}`);
                 try {
                   const result = await executeLiveTrade(signal, token);
@@ -705,6 +716,7 @@ module.exports = function (db) {
                   if (db.notify) db.notify('error', 'Trade Failed', `${signal.symbol} ${signal.signal_type}: ${tradeErr.message}`);
                 }
               }
+              } // end marketOpen check
             } else {
               signal.mode = 'PAPER';
               executePaperTrade(signal);
@@ -942,9 +954,13 @@ module.exports = function (db) {
     const dailyLimit = riskCfg.daily_limit || 100000;
 
     const todayStart = new Date(); todayStart.setHours(0, 0, 0, 0);
-    const todayTrades = (db.data.trades || []).filter(t => t.entry_time >= todayStart.toISOString());
+    // Only count OPEN trades towards daily limit (CLOSED/FAILED trades free up capital)
+    const todayTrades = (db.data.trades || []).filter(t => t.entry_time >= todayStart.toISOString() && t.status === 'OPEN');
     const todayValue = todayTrades.reduce((s, t) => s + (t.investment || 0), 0);
-    if (todayValue >= dailyLimit) return null;
+    if (todayValue >= dailyLimit) {
+      console.log(`[Signal] Daily limit reached: ${todayValue}/${dailyLimit} (only counting OPEN trades)`);
+      return null;
+    }
 
     // Historical pattern adjustment
     const historicalAdj = getHistoricalAdjustment(sentiment.sector || 'BROAD_MARKET', sentiment.sentiment);
@@ -953,16 +969,13 @@ module.exports = function (db) {
     const adjustedConfidence = sentiment.composite_score || Math.max(30, Math.min(98, (sentiment.confidence || 50) + historicalAdj));
     if (adjustedConfidence < 55) return null;
 
-    // Market hours check
+    // Market hours flag - signals generate anytime, but trades only during market hours
     const now = new Date();
     const istOffset = 5.5 * 60 * 60 * 1000;
     const ist = new Date(now.getTime() + istOffset);
     const istDay = ist.getUTCDay();
     const istMins = ist.getUTCHours() * 60 + ist.getUTCMinutes();
-    if (istDay === 0 || istDay === 6 || istMins < 555 || istMins > 930) {
-      console.log('[Signal] Market closed, skipping signal generation');
-      return null;
-    }
+    const isMarketOpen = !(istDay === 0 || istDay === 6 || istMins < 555 || istMins > 930);
 
     // Dynamic position sizing via AI engine
     const basePositionSize = Math.min(maxTrade, available * rp.max_position_size, dailyLimit - todayValue);
