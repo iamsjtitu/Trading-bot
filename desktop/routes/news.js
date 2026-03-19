@@ -988,8 +988,6 @@ module.exports = function (db) {
     if (sentiment.market_regime && sentiment.market_regime !== 'UNKNOWN') enhancedReason += ` | Regime: ${sentiment.market_regime}`;
     if (historicalAdj !== 0) enhancedReason += ` | Historical: ${historicalAdj > 0 ? '+' : ''}${historicalAdj}`;
 
-    const activeInst = db.data?.settings?.trading_instrument || db.data?.settings?.active_instrument || 'NIFTY50';
-    
     // Get actual spot price from latest market data or use instrument default
     const instConfig = INSTRUMENTS[activeInst] || INSTRUMENTS.NIFTY50;
     let spotPrice = instConfig.base_price || 24000;
