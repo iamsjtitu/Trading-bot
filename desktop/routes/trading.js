@@ -904,7 +904,7 @@ _Sent automatically by AI Trading Bot_`;
     });
 
     const allOk = steps.every(s => s.ok);
-    res.json({ status: 'success', all_ok: allOk, version: '3.1.8', steps });
+    res.json({ status: 'success', all_ok: allOk, version: '3.1.9', steps });
   });
 
   // POST /api/test/generate-trade
@@ -955,12 +955,13 @@ _Sent automatically by AI Trading Bot_`;
 
     const signalType = sentiment.trading_signal === 'BUY_CALL' ? 'CALL' : 'PUT';
 
-    // DUPLICATE TRADE PROTECTION: Skip if same type OPEN trade exists
+    // DUPLICATE TRADE PROTECTION: Skip if same type OPEN trade exists IN CURRENT MODE
+    const currentMode = db.data?.settings?.trading_mode || 'PAPER';
     const existingOpen = (db.data.trades || []).find(t =>
-      t.status === 'OPEN' && t.trade_type === signalType && t.symbol === activeInstrument
+      t.status === 'OPEN' && t.trade_type === signalType && t.symbol === activeInstrument && t.mode === currentMode
     );
     if (existingOpen) {
-      console.log(`[Signal] Skipping ${signalType} ${activeInstrument} - already have OPEN position (${existingOpen.id?.substring(0, 8)})`);
+      console.log(`[Signal] Skipping ${signalType} ${activeInstrument} - already have OPEN ${currentMode} position (${existingOpen.id?.substring(0, 8)})`);
       return null;
     }
 
@@ -1071,12 +1072,12 @@ _Sent automatically by AI Trading Bot_`;
       const optionType = signal.signal_type === 'CALL' ? 'CE' : 'PE';
       const activeInst = signal.symbol || 'NIFTY50';
 
-      // DUPLICATE TRADE PROTECTION: Skip if same type OPEN trade exists
+      // DUPLICATE TRADE PROTECTION: Skip if same type OPEN trade exists IN CURRENT MODE
       const existingOpen = (db.data.trades || []).find(t =>
-        t.status === 'OPEN' && t.trade_type === signal.signal_type && t.symbol === activeInst
+        t.status === 'OPEN' && t.trade_type === signal.signal_type && t.symbol === activeInst && t.mode === 'LIVE'
       );
       if (existingOpen) {
-        console.log(`[AutoEntry] Skipping ${signal.signal_type} ${activeInst} - already have OPEN position`);
+        console.log(`[AutoEntry] Skipping ${signal.signal_type} ${activeInst} - already have OPEN LIVE position`);
         return null;
       }
 

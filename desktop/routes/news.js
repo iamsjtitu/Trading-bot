@@ -679,9 +679,9 @@ module.exports = function (db) {
             signal.mode = mode;
 
             if (mode === 'LIVE' && token) {
-              // DUPLICATE TRADE PROTECTION before placing order
+              // DUPLICATE TRADE PROTECTION before placing order (only check LIVE mode trades)
               const openSameType = (db.data.trades || []).find(t =>
-                t.status === 'OPEN' && t.trade_type === signal.signal_type && t.symbol === signal.symbol
+                t.status === 'OPEN' && t.trade_type === signal.signal_type && t.symbol === signal.symbol && t.mode === 'LIVE'
               );
               if (openSameType) {
                 console.log(`[AutoTrade] Skipping ${signal.signal_type} ${signal.symbol} - already have OPEN position`);
@@ -921,12 +921,13 @@ module.exports = function (db) {
     const signalType = sentiment.trading_signal === 'BUY_CALL' ? 'CALL' : 'PUT';
     const activeInst = db.data?.settings?.trading_instrument || db.data?.settings?.active_instrument || 'NIFTY50';
 
-    // DUPLICATE TRADE PROTECTION: Skip if same type OPEN trade exists for this instrument
+    // DUPLICATE TRADE PROTECTION: Skip if same type OPEN trade exists for this instrument IN CURRENT MODE
+    const currentMode = db.data?.settings?.trading_mode || 'PAPER';
     const existingOpen = (db.data.trades || []).find(t =>
-      t.status === 'OPEN' && t.trade_type === signalType && t.symbol === activeInst
+      t.status === 'OPEN' && t.trade_type === signalType && t.symbol === activeInst && t.mode === currentMode
     );
     if (existingOpen) {
-      console.log(`[Signal] Skipping ${signalType} ${activeInst} - already have OPEN position (${existingOpen.id?.substring(0, 8)})`);
+      console.log(`[Signal] Skipping ${signalType} ${activeInst} - already have OPEN ${currentMode} position (${existingOpen.id?.substring(0, 8)})`);
       return null;
     }
 
@@ -1059,13 +1060,13 @@ module.exports = function (db) {
     const headers = { Accept: 'application/json', Authorization: `Bearer ${accessToken}`, 'Api-Version': '2.0', 'Content-Type': 'application/json' };
 
     try {
-      // DUPLICATE TRADE PROTECTION: Skip if same type OPEN trade exists
+      // DUPLICATE TRADE PROTECTION: Skip if same type OPEN trade exists IN LIVE MODE
       const activeInst = signal.symbol || 'NIFTY50';
       const existingOpen = (db.data.trades || []).find(t =>
-        t.status === 'OPEN' && t.trade_type === signal.signal_type && t.symbol === activeInst
+        t.status === 'OPEN' && t.trade_type === signal.signal_type && t.symbol === activeInst && t.mode === 'LIVE'
       );
       if (existingOpen) {
-        console.log(`[LiveTrade] Skipping ${signal.signal_type} ${activeInst} - already have OPEN position`);
+        console.log(`[LiveTrade] Skipping ${signal.signal_type} ${activeInst} - already have OPEN LIVE position`);
         return { success: false, error: 'Duplicate position blocked' };
       }
 
