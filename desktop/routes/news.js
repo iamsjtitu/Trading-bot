@@ -1054,7 +1054,7 @@ module.exports = function (db) {
       };
       const instKey = instKeyMap[activeInst] || 'NSE_INDEX|Nifty 50';
 
-      // Get nearest valid expiry from Upstox API (or calculated Tuesday fallback)
+      // Get nearest valid expiry from Upstox API (pick NEAREST future date, not first)
       let expiryStr = '';
       try {
         const contractResp = await axios.get('https://api.upstox.com/v2/option/contract', {
@@ -1063,7 +1063,15 @@ module.exports = function (db) {
           timeout: 10000,
         });
         if (contractResp.data?.status === 'success' && contractResp.data?.data?.length > 0) {
-          expiryStr = (contractResp.data.data[0].expiry || '').substring(0, 10);
+          const todayStr = new Date(Date.now() + 5.5 * 60 * 60 * 1000).toISOString().substring(0, 10);
+          const expirySet = new Set();
+          for (const c of contractResp.data.data) {
+            const exp = (c.expiry || '').substring(0, 10);
+            if (exp && exp >= todayStr) expirySet.add(exp);
+          }
+          const sorted = [...expirySet].sort();
+          if (sorted.length > 0) expiryStr = sorted[0]; // NEAREST expiry
+          console.log(`[LiveTrade] Nearest expiry: ${expiryStr} (from ${sorted.length} available)`);
         }
       } catch (e) { console.error(`[LiveTrade] Expiry fetch failed: ${e.message}`); }
       if (!expiryStr) {

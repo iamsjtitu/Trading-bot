@@ -64,22 +64,27 @@ async function fetchNearestExpiry(instrument, token) {
 
   const instKey = INST_KEY_MAP[instrument] || INST_KEY_MAP.NIFTY50;
   try {
-    // Call option/contract WITHOUT expiry_date to get nearest expiry
+    // Call option/contract WITHOUT expiry_date to get all available contracts
     const resp = await axios.get('https://api.upstox.com/v2/option/contract', {
       headers: { Authorization: `Bearer ${token}`, 'Api-Version': '2.0', Accept: 'application/json' },
       params: { instrument_key: instKey },
       timeout: 10000,
     });
     if (resp.data?.status === 'success' && resp.data?.data?.length > 0) {
-      // Extract expiry from first contract
-      const firstContract = resp.data.data[0];
-      const expiry = firstContract.expiry || firstContract.expiry_date || '';
-      if (expiry) {
-        // Format: might be "2026-03-24" or "2026-03-24T00:00:00" etc
-        const formatted = expiry.substring(0, 10); // YYYY-MM-DD
-        console.log(`[Expiry] ${instrument}: fetched nearest expiry = ${formatted}`);
-        expiryCache[cacheKey] = { expiry: formatted, ts: now };
-        return formatted;
+      // Collect ALL unique expiry dates
+      const todayStr = new Date(now + 5.5 * 60 * 60 * 1000).toISOString().substring(0, 10);
+      const expirySet = new Set();
+      for (const contract of resp.data.data) {
+        const exp = (contract.expiry || '').substring(0, 10);
+        if (exp && exp >= todayStr) expirySet.add(exp);
+      }
+      // Sort ascending and pick the NEAREST future expiry
+      const sortedExpiries = [...expirySet].sort();
+      if (sortedExpiries.length > 0) {
+        const nearest = sortedExpiries[0];
+        console.log(`[Expiry] ${instrument}: nearest expiry = ${nearest} (from ${sortedExpiries.length} available: ${sortedExpiries.slice(0, 5).join(', ')}...)`);
+        expiryCache[cacheKey] = { expiry: nearest, ts: now };
+        return nearest;
       }
     }
   } catch (e) {
@@ -128,7 +133,7 @@ module.exports = function (db) {
 
   // ==================== Version & Diagnostics ====================
   router.get('/api/version', (req, res) => {
-    res.json({ status: 'success', version: '3.1.0', build_date: '2026-03-19' });
+    res.json({ status: 'success', version: '3.1.1', build_date: '2026-03-19' });
   });
 
   router.get('/api/diagnostics', (req, res) => {
@@ -147,7 +152,7 @@ module.exports = function (db) {
 
     res.json({
       status: 'success',
-      version: '3.1.0',
+      version: '3.1.1',
       diagnostics: {
         broker: activeBroker,
         broker_token: token ? `${token.substring(0, 8)}...` : 'MISSING',

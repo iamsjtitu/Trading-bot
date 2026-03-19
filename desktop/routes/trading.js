@@ -637,8 +637,19 @@ _Sent automatically by AI Trading Bot_`;
           timeout: 10000,
         });
         if (contractResp.data?.status === 'success' && contractResp.data?.data?.length > 0) {
-          expiryStr = (contractResp.data.data[0].expiry || '').substring(0, 10);
-          steps.push({ step: 6, name: 'Nearest Expiry (from Upstox API)', value: expiryStr, ok: true, contracts_count: contractResp.data.data.length });
+          const todayStr = new Date(Date.now() + 5.5 * 60 * 60 * 1000).toISOString().substring(0, 10);
+          const expirySet = new Set();
+          for (const c of contractResp.data.data) {
+            const exp = (c.expiry || '').substring(0, 10);
+            if (exp && exp >= todayStr) expirySet.add(exp);
+          }
+          const sorted = [...expirySet].sort();
+          if (sorted.length > 0) {
+            expiryStr = sorted[0]; // NEAREST expiry
+            steps.push({ step: 6, name: 'Nearest Expiry (from Upstox API)', value: expiryStr, ok: true, all_expiries: sorted.slice(0, 10), contracts_count: contractResp.data.data.length });
+          } else {
+            steps.push({ step: 6, name: 'Nearest Expiry', value: 'No future expiries found', ok: false });
+          }
         } else {
           steps.push({ step: 6, name: 'Nearest Expiry', value: `API returned: ${contractResp.data?.message || 'empty data'}`, ok: false });
         }
@@ -696,7 +707,7 @@ _Sent automatically by AI Trading Bot_`;
     });
 
     const allOk = steps.every(s => s.ok);
-    res.json({ status: 'success', all_ok: allOk, version: '3.1.0', steps });
+    res.json({ status: 'success', all_ok: allOk, version: '3.1.1', steps });
   });
 
   // POST /api/test/generate-trade
@@ -870,7 +881,15 @@ _Sent automatically by AI Trading Bot_`;
           timeout: 10000,
         });
         if (contractResp.data?.status === 'success' && contractResp.data?.data?.length > 0) {
-          expiryStr = (contractResp.data.data[0].expiry || '').substring(0, 10);
+          const todayStr = new Date(Date.now() + 5.5 * 60 * 60 * 1000).toISOString().substring(0, 10);
+          const expirySet = new Set();
+          for (const c of contractResp.data.data) {
+            const exp = (c.expiry || '').substring(0, 10);
+            if (exp && exp >= todayStr) expirySet.add(exp);
+          }
+          const sorted = [...expirySet].sort();
+          if (sorted.length > 0) expiryStr = sorted[0]; // NEAREST expiry
+          console.log(`[AutoEntry] Nearest expiry: ${expiryStr} (from ${sorted.length} available)`);
         }
       } catch (e) { console.error(`[AutoEntry] Expiry fetch failed: ${e.message}`); }
       if (!expiryStr) {
