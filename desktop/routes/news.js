@@ -1056,6 +1056,7 @@ module.exports = function (db) {
 
       // Get nearest valid expiry from Upstox API (pick NEAREST future date, not first)
       let expiryStr = '';
+      let apiLotSize = 0;
       try {
         const contractResp = await axios.get('https://api.upstox.com/v2/option/contract', {
           headers: { Accept: 'application/json', Authorization: `Bearer ${accessToken}`, 'Api-Version': '2.0' },
@@ -1068,10 +1069,11 @@ module.exports = function (db) {
           for (const c of contractResp.data.data) {
             const exp = (c.expiry || '').substring(0, 10);
             if (exp && exp >= todayStr) expirySet.add(exp);
+            if (!apiLotSize && c.lot_size > 0) apiLotSize = c.lot_size;
           }
           const sorted = [...expirySet].sort();
           if (sorted.length > 0) expiryStr = sorted[0]; // NEAREST expiry
-          console.log(`[LiveTrade] Nearest expiry: ${expiryStr} (from ${sorted.length} available)`);
+          console.log(`[LiveTrade] Nearest expiry: ${expiryStr} (from ${sorted.length} available), lot_size from API: ${apiLotSize}`);
         }
       } catch (e) { console.error(`[LiveTrade] Expiry fetch failed: ${e.message}`); }
       if (!expiryStr) {
@@ -1130,9 +1132,9 @@ module.exports = function (db) {
       }
 
       // Step 2: Place MARKET order (F&O = Intraday product)
-      // Ensure quantity is a multiple of lot size
-      const lotSizeMap = { NIFTY50: 75, BANKNIFTY: 30, FINNIFTY: 40, MIDCPNIFTY: 75, SENSEX: 20, BANKEX: 30 };
-      const lotSize = lotSizeMap[activeInst] || 75;
+      // Ensure quantity is a multiple of lot size (fetch from API first, fallback to updated Jan 2026 values)
+      const lotSizeMap = { NIFTY50: 65, BANKNIFTY: 30, FINNIFTY: 60, MIDCPNIFTY: 120, SENSEX: 20, BANKEX: 30 };
+      const lotSize = apiLotSize || lotSizeMap[activeInst] || 65;
       const qty = Math.max(lotSize, Math.round(signal.quantity / lotSize) * lotSize);
 
       const orderBody = {

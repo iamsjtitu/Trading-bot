@@ -639,14 +639,18 @@ _Sent automatically by AI Trading Bot_`;
         if (contractResp.data?.status === 'success' && contractResp.data?.data?.length > 0) {
           const todayStr = new Date(Date.now() + 5.5 * 60 * 60 * 1000).toISOString().substring(0, 10);
           const expirySet = new Set();
+          let debugLotSize = 0;
           for (const c of contractResp.data.data) {
             const exp = (c.expiry || '').substring(0, 10);
             if (exp && exp >= todayStr) expirySet.add(exp);
+            if (!debugLotSize && c.lot_size > 0) debugLotSize = c.lot_size;
           }
           const sorted = [...expirySet].sort();
+          const fallbackLotSizeMap = { NIFTY50: 65, BANKNIFTY: 30, FINNIFTY: 60, MIDCPNIFTY: 120, SENSEX: 20, BANKEX: 30 };
+          const effectiveLotSize = debugLotSize || fallbackLotSizeMap[inst] || 65;
           if (sorted.length > 0) {
             expiryStr = sorted[0]; // NEAREST expiry
-            steps.push({ step: 6, name: 'Nearest Expiry (from Upstox API)', value: expiryStr, ok: true, all_expiries: sorted.slice(0, 10), contracts_count: contractResp.data.data.length });
+            steps.push({ step: 6, name: 'Nearest Expiry (from Upstox API)', value: expiryStr, ok: true, all_expiries: sorted.slice(0, 10), contracts_count: contractResp.data.data.length, lot_size_from_api: debugLotSize, effective_lot_size: effectiveLotSize });
           } else {
             steps.push({ step: 6, name: 'Nearest Expiry', value: 'No future expiries found', ok: false });
           }
@@ -707,7 +711,7 @@ _Sent automatically by AI Trading Bot_`;
     });
 
     const allOk = steps.every(s => s.ok);
-    res.json({ status: 'success', all_ok: allOk, version: '3.1.3', steps });
+    res.json({ status: 'success', all_ok: allOk, version: '3.1.4', steps });
   });
 
   // POST /api/test/generate-trade
@@ -874,6 +878,7 @@ _Sent automatically by AI Trading Bot_`;
 
       // Get nearest valid expiry from Upstox API
       let expiryStr = '';
+      let apiLotSize = 0;
       try {
         const contractResp = await axios.get('https://api.upstox.com/v2/option/contract', {
           headers: { Accept: 'application/json', Authorization: `Bearer ${accessToken}`, 'Api-Version': '2.0' },
@@ -886,10 +891,11 @@ _Sent automatically by AI Trading Bot_`;
           for (const c of contractResp.data.data) {
             const exp = (c.expiry || '').substring(0, 10);
             if (exp && exp >= todayStr) expirySet.add(exp);
+            if (!apiLotSize && c.lot_size > 0) apiLotSize = c.lot_size;
           }
           const sorted = [...expirySet].sort();
           if (sorted.length > 0) expiryStr = sorted[0]; // NEAREST expiry
-          console.log(`[AutoEntry] Nearest expiry: ${expiryStr} (from ${sorted.length} available)`);
+          console.log(`[AutoEntry] Nearest expiry: ${expiryStr} (from ${sorted.length} available), lot_size from API: ${apiLotSize}`);
         }
       } catch (e) { console.error(`[AutoEntry] Expiry fetch failed: ${e.message}`); }
       if (!expiryStr) {
@@ -938,9 +944,9 @@ _Sent automatically by AI Trading Bot_`;
         console.log(`[AutoEntry] Using constructed instrument: ${instrumentToken}`);
       }
 
-      // Ensure quantity is a multiple of lot size
-      const lotSizeMap = { NIFTY50: 75, BANKNIFTY: 30, FINNIFTY: 40, MIDCPNIFTY: 75, SENSEX: 20, BANKEX: 30 };
-      const lotSize = lotSizeMap[activeInst] || 75;
+      // Ensure quantity is a multiple of lot size (fetch from API first, fallback to updated Jan 2026 values)
+      const lotSizeMap = { NIFTY50: 65, BANKNIFTY: 30, FINNIFTY: 60, MIDCPNIFTY: 120, SENSEX: 20, BANKEX: 30 };
+      const lotSize = apiLotSize || lotSizeMap[activeInst] || 65;
       const qty = Math.max(lotSize, Math.round(signal.quantity / lotSize) * lotSize);
 
       const orderBody = {
