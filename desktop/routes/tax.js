@@ -17,8 +17,8 @@ module.exports = function (db) {
 
   // GET /api/tax/report
   router.get('/api/tax/report', (req, res) => {
-    const fy = req.query.fy || getFinancialYear(new Date().toISOString());
-    const closedTrades = (db.data.trades || []).filter(t => t.status === 'CLOSED');
+    const fy = req.query.fy_year || req.query.fy || getFinancialYear(new Date().toISOString());
+    const closedTrades = (db.data.trades || []).filter(t => t.status === 'CLOSED' && t.status !== 'FAILED');
 
     // Filter by financial year
     const fyStart = parseInt(fy.split('-')[0]);

@@ -56,6 +56,13 @@ module.exports = function (db) {
     }
     if (!settings.type) settings.type = 'main';
 
+    // SYNC: If risk settings changed, also update auto_trading settings
+    if (body.risk) {
+      if (!settings.auto_trading) settings.auto_trading = {};
+      if (body.risk.target_pct != null) settings.auto_trading.target_pct = body.risk.target_pct;
+      if (body.risk.stop_loss_pct != null) settings.auto_trading.stoploss_pct = body.risk.stop_loss_pct;
+    }
+
     db.data.settings = settings;
     db.save();
     res.json({ status: 'success', settings });

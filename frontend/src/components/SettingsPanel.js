@@ -83,8 +83,19 @@ export default function SettingsPanel({ onClose, onSave }) {
 
   const loadSettings = async () => {
     try {
-      const response = await axios.get(`${API}/settings`);
-      if (response.data.status === 'success') setSettings(response.data.settings);
+      const [settingsRes, autoRes] = await Promise.all([
+        axios.get(`${API}/settings`),
+        axios.get(`${API}/auto-settings`).catch(() => ({ data: {} })),
+      ]);
+      if (settingsRes.data.status === 'success') {
+        const s = settingsRes.data.settings;
+        // Sync auto-settings values into risk settings for display
+        const autoS = autoRes.data?.settings || {};
+        if (!s.risk) s.risk = {};
+        if (autoS.target_pct != null) s.risk.target_pct = autoS.target_pct;
+        if (autoS.stoploss_pct != null) s.risk.stop_loss_pct = autoS.stoploss_pct;
+        setSettings(s);
+      }
     } catch (error) {
       console.error('Load settings error:', error);
     } finally {

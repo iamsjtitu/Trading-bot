@@ -213,6 +213,9 @@ module.exports = function (db) {
       trades = trades.filter(t => (t.mode || 'PAPER') === filterMode);
     }
 
+    // Always exclude FAILED trades from analytics (they never executed)
+    trades = trades.filter(t => t.status !== 'FAILED');
+
     // Apply filters
     if (trade_type && trade_type !== 'all') {
       trades = trades.filter(t => t.trade_type === trade_type);
@@ -581,13 +584,18 @@ _Sent automatically by AI Trading Bot_`;
     if ('target_pct' in body) customTargetPct = body.target_pct;
     if ('stoploss_pct' in body) customStoplossPct = body.stoploss_pct;
 
-    // Persist to settings
+    // Persist to auto_trading settings
     if (!db.data.settings) db.data.settings = {};
     if (!db.data.settings.auto_trading) db.data.settings.auto_trading = {};
     db.data.settings.auto_trading.auto_exit = autoExitEnabled;
     db.data.settings.auto_trading.auto_entry = autoEntryEnabled;
     if (customTargetPct != null) db.data.settings.auto_trading.target_pct = customTargetPct;
     if (customStoplossPct != null) db.data.settings.auto_trading.stoploss_pct = customStoplossPct;
+
+    // SYNC: Also update risk settings so SettingsPanel shows same values
+    if (!db.data.settings.risk) db.data.settings.risk = {};
+    if (customTargetPct != null) db.data.settings.risk.target_pct = customTargetPct;
+    if (customStoplossPct != null) db.data.settings.risk.stop_loss_pct = customStoplossPct;
     db.save();
 
     res.json({
@@ -788,6 +796,13 @@ _Sent automatically by AI Trading Bot_`;
 
   // GET /api/auto-settings
   router.get('/api/auto-settings', (req, res) => {
+    // Always sync in-memory from db to handle settings saved via SettingsPanel
+    const savedAT = db.data?.settings?.auto_trading || {};
+    if (savedAT.target_pct != null) customTargetPct = savedAT.target_pct;
+    if (savedAT.stoploss_pct != null) customStoplossPct = savedAT.stoploss_pct;
+    if (savedAT.auto_exit != null) autoExitEnabled = savedAT.auto_exit;
+    if (savedAT.auto_entry != null) autoEntryEnabled = savedAT.auto_entry;
+
     const rp = riskParams[getRiskTolerance()] || riskParams.medium;
     res.json({
       status: 'success',
@@ -918,7 +933,7 @@ _Sent automatically by AI Trading Bot_`;
     });
 
     const allOk = steps.every(s => s.ok);
-    res.json({ status: 'success', all_ok: allOk, version: '3.2.1', steps });
+    res.json({ status: 'success', all_ok: allOk, version: '3.2.2', steps });
   });
 
   // POST /api/test/generate-trade
@@ -1338,8 +1353,12 @@ _Sent by AI Trading Bot_`;
   }
 
   function calculateTaxReport(trades, fyYear) {
-    // Only use LIVE trades for tax calculation
-    const liveTrades = trades.filter(t => (t.mode || 'PAPER') === 'LIVE' && t.status === 'CLOSED');
+    // Only use LIVE CLOSED trades for tax (exclude FAILED + POSITION_CLOSED without P&L)
+    const liveTrades = trades.filter(t =>
+      (t.mode || 'PAPER') === 'LIVE' &&
+      t.status === 'CLOSED' &&
+      t.exit_reason !== 'POSITION_CLOSED_ON_BROKER' // exclude auto-closed without real P&L
+    );
     const { start, end } = getFYRange(fyYear);
     const fyTrades = liveTrades.filter(t => (t.exit_time || t.entry_time || '') >= start && (t.exit_time || t.entry_time || '') <= end);
 
