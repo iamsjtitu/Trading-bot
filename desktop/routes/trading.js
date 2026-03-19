@@ -605,11 +605,31 @@ _Sent automatically by AI Trading Bot_`;
     const settings = db.data?.settings || {};
     const tradingMode = settings.trading_mode || 'PAPER';
 
+    // Get actual spot price from latest market data or use instrument default
+    const INST_CONFIG = {
+      NIFTY50: { base_price: 24000, strike_step: 50 },
+      BANKNIFTY: { base_price: 52000, strike_step: 100 },
+      FINNIFTY: { base_price: 23800, strike_step: 50 },
+      MIDCPNIFTY: { base_price: 12000, strike_step: 25 },
+      SENSEX: { base_price: 79800, strike_step: 100 },
+      BANKEX: { base_price: 55000, strike_step: 100 },
+    };
+    const instCfg = INST_CONFIG[activeInstrument] || INST_CONFIG.NIFTY50;
+    let spotPrice = instCfg.base_price;
+    if (db.data.market_data?.indices) {
+      const key = activeInstrument.toLowerCase();
+      const idx = db.data.market_data.indices[key];
+      if (idx?.value > 0) spotPrice = idx.value;
+    }
+    const strikeStep = instCfg.strike_step || 50;
+    const atmStrike = Math.round(spotPrice / strikeStep) * strikeStep;
+    const strikeOffset = signalType === 'CALL' ? strikeStep * 2 : -(strikeStep * 2);
+
     return {
       id: uuid(),
       signal_type: signalType,
       symbol: activeInstrument,
-      strike_price: 24000 + (signalType === 'CALL' ? 500 : -500),
+      strike_price: atmStrike + strikeOffset,
       option_premium: optionPremium,
       quantity,
       investment_amount: quantity * optionPremium,

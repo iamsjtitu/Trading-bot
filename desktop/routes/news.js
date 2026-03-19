@@ -11,6 +11,16 @@ module.exports = function (db) {
   const router = Router();
   const aiEngine = new AIDecisionEngine(db);
 
+  // Instrument configs for signal generation
+  const INSTRUMENTS = {
+    NIFTY50: { base_price: 24000, strike_step: 50 },
+    BANKNIFTY: { base_price: 52000, strike_step: 100 },
+    FINNIFTY: { base_price: 23800, strike_step: 50 },
+    MIDCPNIFTY: { base_price: 12000, strike_step: 25 },
+    SENSEX: { base_price: 79800, strike_step: 100 },
+    BANKEX: { base_price: 55000, strike_step: 100 },
+  };
+
   // ============ Simple RSS Parser (no dependencies) ============
   function stripHtml(str) {
     return (str || '')
@@ -908,9 +918,23 @@ module.exports = function (db) {
     if (historicalAdj !== 0) enhancedReason += ` | Historical: ${historicalAdj > 0 ? '+' : ''}${historicalAdj}`;
 
     const activeInst = db.data?.settings?.trading_instrument || db.data?.settings?.active_instrument || 'NIFTY50';
+    
+    // Get actual spot price from latest market data or use instrument default
+    const instConfig = INSTRUMENTS[activeInst] || INSTRUMENTS.NIFTY50;
+    let spotPrice = instConfig.base_price || 24000;
+    // Try to get real spot price from stored market data
+    if (db.data.market_data?.indices) {
+      const key = activeInst.toLowerCase();
+      const idx = db.data.market_data.indices[key];
+      if (idx?.value > 0) spotPrice = idx.value;
+    }
+    const strikeStep = instConfig.strike_step || 50;
+    const atmStrike = Math.round(spotPrice / strikeStep) * strikeStep;
+    const strikeOffset = signalType === 'CALL' ? strikeStep * 2 : -(strikeStep * 2);
+
     return {
       id: uuid(), signal_type: signalType, symbol: activeInst,
-      strike_price: 24000 + (signalType === 'CALL' ? 500 : -500),
+      strike_price: atmStrike + strikeOffset,
       option_premium: optionPremium, quantity, investment_amount: quantity * optionPremium,
       entry_price: optionPremium,
       stop_loss: Math.round(optionPremium * (1 - rp.stop_loss_pct / 100) * 100) / 100,

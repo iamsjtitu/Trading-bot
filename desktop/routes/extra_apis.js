@@ -73,6 +73,44 @@ function getNextExpiry(instrument) {
 module.exports = function (db) {
   const router = Router();
 
+  // ==================== Version & Diagnostics ====================
+  router.get('/api/version', (req, res) => {
+    res.json({ status: 'success', version: '3.0.5', build_date: '2026-03-19' });
+  });
+
+  router.get('/api/diagnostics', (req, res) => {
+    const settings = db.data?.settings || {};
+    const activeBroker = settings.active_broker || settings.broker?.name || 'upstox';
+    const token = settings.broker?.[`${activeBroker}_token`] || settings.broker?.access_token || null;
+    const inst = settings.trading_instrument || 'NOT SET';
+    const mode = settings.trading_mode || 'PAPER';
+    const autoEntry = settings.auto_trading?.auto_entry || false;
+    const autoExit = settings.auto_trading?.auto_exit !== false;
+    const expiry = getNextExpiry(inst !== 'NOT SET' ? inst : 'NIFTY50');
+    const tradeCount = (db.data.trades || []).length;
+    const signalCount = (db.data.signals || []).length;
+    const failedTrades = (db.data.trades || []).filter(t => t.status === 'FAILED').length;
+    const newsCount = (db.data.news_articles || []).length;
+
+    res.json({
+      status: 'success',
+      version: '3.0.5',
+      diagnostics: {
+        broker: activeBroker,
+        broker_token: token ? `${token.substring(0, 8)}...` : 'MISSING',
+        trading_mode: mode,
+        active_instrument: inst,
+        next_expiry: expiry,
+        auto_entry: autoEntry,
+        auto_exit: autoExit,
+        total_signals: signalCount,
+        total_trades: tradeCount,
+        failed_trades: failedTrades,
+        total_news: newsCount,
+      },
+    });
+  });
+
   function getToken() {
     const activeBroker = db.data.settings?.broker?.name || 'upstox';
     return db.data.settings?.broker?.[`${activeBroker}_token`] || null;
@@ -121,6 +159,10 @@ module.exports = function (db) {
           const changePct = prevClose > 0 ? (netChange / prevClose) * 100 : 0;
           indices[key] = { value: ltp, change: Math.round(netChange * 100) / 100, changePct: Math.round(changePct * 100) / 100 };
         }
+        // Cache market data for signal generation
+        if (!db.data.market_data) db.data.market_data = {};
+        db.data.market_data.indices = indices;
+        db.data.market_data.last_updated = new Date().toISOString();
         return res.json({ status: 'success', data: indices, source: 'rest', ts: new Date().toISOString() });
       } else {
         console.log('[QuickData] API response not success:', resp.data?.status, resp.data?.message);
