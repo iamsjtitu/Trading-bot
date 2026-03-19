@@ -134,17 +134,10 @@ class OptionChainService:
         return get_market_status()
 
     def _get_next_expiry(self, instrument: str) -> str:
-        """Calculate next weekly expiry date for an instrument (YYYY-MM-DD format)"""
-        # Weekly expiry day: Mon=0, Tue=1, ... Sun=6
-        expiry_weekday = {
-            'NIFTY50': 3,      # Thursday
-            'BANKNIFTY': 2,    # Wednesday
-            'FINNIFTY': 1,     # Tuesday
-            'MIDCPNIFTY': 0,   # Monday
-            'SENSEX': 4,       # Friday
-            'BANKEX': 0,       # Monday
-        }
-        target = expiry_weekday.get(instrument, 3)  # Default Thursday
+        """Calculate next weekly expiry date for an instrument (YYYY-MM-DD format)
+        NOTE: From Aug 28, 2025, NSE moved ALL derivatives expiry to Tuesday"""
+        # Post Aug 2025: All NSE/BSE options expire on Tuesday
+        target = 1  # Tuesday (Monday=0, Tuesday=1, ... Sunday=6)
         ist = datetime.now(timezone(timedelta(hours=5, minutes=30)))
         current_weekday = ist.weekday()  # Mon=0, Sun=6
         days_ahead = target - current_weekday

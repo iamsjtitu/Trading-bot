@@ -33,9 +33,11 @@ const BROKER_INFO = {
   iifl: { id: 'iifl', name: 'IIFL Securities', description: 'Coming soon - IIFL Markets API', status: 'coming_soon', features: ['options', 'futures'] },
 };
 
-// Weekly expiry day mapping: 0=Sun, 1=Mon, 2=Tue, 3=Wed, 4=Thu, 5=Fri, 6=Sat
+// Weekly expiry day mapping (UPDATED Aug 2025: NSE moved to Tuesday)
+// 0=Sun, 1=Mon, 2=Tue, 3=Wed, 4=Thu, 5=Fri, 6=Sat
 const EXPIRY_DAY = {
-  NIFTY50: 4, BANKNIFTY: 3, FINNIFTY: 2, MIDCPNIFTY: 1, SENSEX: 5, BANKEX: 1,
+  NIFTY50: 2, BANKNIFTY: 2, FINNIFTY: 2, MIDCPNIFTY: 2, // NSE: Tuesday (from Aug 2025)
+  SENSEX: 2, BANKEX: 2, // BSE: also Tuesday
 };
 
 // Instrument key mapping for Upstox API
@@ -45,12 +47,58 @@ const INST_KEY_MAP = {
   'SENSEX': 'BSE_INDEX|SENSEX', 'BANKEX': 'BSE_INDEX|BANKEX',
 };
 
+// Cache for expiry dates fetched from Upstox
+const expiryCache = {};
+
+/**
+ * Get the nearest valid expiry date from Upstox API
+ * Falls back to calculated Tuesday if API fails
+ */
+async function fetchNearestExpiry(instrument, token) {
+  const cacheKey = instrument;
+  const now = Date.now();
+  // Use cached value if less than 30 minutes old
+  if (expiryCache[cacheKey] && (now - expiryCache[cacheKey].ts) < 30 * 60 * 1000) {
+    return expiryCache[cacheKey].expiry;
+  }
+
+  const instKey = INST_KEY_MAP[instrument] || INST_KEY_MAP.NIFTY50;
+  try {
+    // Call option/contract WITHOUT expiry_date to get nearest expiry
+    const resp = await axios.get('https://api.upstox.com/v2/option/contract', {
+      headers: { Authorization: `Bearer ${token}`, 'Api-Version': '2.0', Accept: 'application/json' },
+      params: { instrument_key: instKey },
+      timeout: 10000,
+    });
+    if (resp.data?.status === 'success' && resp.data?.data?.length > 0) {
+      // Extract expiry from first contract
+      const firstContract = resp.data.data[0];
+      const expiry = firstContract.expiry || firstContract.expiry_date || '';
+      if (expiry) {
+        // Format: might be "2026-03-24" or "2026-03-24T00:00:00" etc
+        const formatted = expiry.substring(0, 10); // YYYY-MM-DD
+        console.log(`[Expiry] ${instrument}: fetched nearest expiry = ${formatted}`);
+        expiryCache[cacheKey] = { expiry: formatted, ts: now };
+        return formatted;
+      }
+    }
+  } catch (e) {
+    console.error(`[Expiry] ${instrument}: API fetch failed - ${e.response?.data?.message || e.message}`);
+  }
+
+  // Fallback: calculate next Tuesday (NSE post-Aug 2025 schedule)
+  const fallback = calcNextExpiry(instrument);
+  console.log(`[Expiry] ${instrument}: using calculated fallback = ${fallback}`);
+  return fallback;
+}
+
 /**
  * Calculate the next weekly expiry date for an instrument (IST)
+ * NSE: Tuesday (from Aug 2025), BSE: Tuesday
  * Returns YYYY-MM-DD string
  */
-function getNextExpiry(instrument) {
-  const targetDay = EXPIRY_DAY[instrument] || 4; // default Thursday
+function calcNextExpiry(instrument) {
+  const targetDay = EXPIRY_DAY[instrument] || 2; // default Tuesday
   const now = new Date();
   const istOffset = 5.5 * 60 * 60 * 1000;
   const ist = new Date(now.getTime() + istOffset);
@@ -70,12 +118,17 @@ function getNextExpiry(instrument) {
   return `${yyyy}-${mm}-${dd}`;
 }
 
+// Kept for backward compat
+function getNextExpiry(instrument) {
+  return calcNextExpiry(instrument);
+}
+
 module.exports = function (db) {
   const router = Router();
 
   // ==================== Version & Diagnostics ====================
   router.get('/api/version', (req, res) => {
-    res.json({ status: 'success', version: '3.0.6', build_date: '2026-03-19' });
+    res.json({ status: 'success', version: '3.0.7', build_date: '2026-03-19' });
   });
 
   router.get('/api/diagnostics', (req, res) => {
@@ -94,7 +147,7 @@ module.exports = function (db) {
 
     res.json({
       status: 'success',
-      version: '3.0.6',
+      version: '3.0.7',
       diagnostics: {
         broker: activeBroker,
         broker_token: token ? `${token.substring(0, 8)}...` : 'MISSING',
@@ -485,21 +538,16 @@ module.exports = function (db) {
 
     // Try fetching live option chain from Upstox (NSE/BSE only)
     try {
-      const instKeyMap = {
-        'NIFTY50': 'NSE_INDEX|Nifty 50', 'BANKNIFTY': 'NSE_INDEX|Nifty Bank',
-        'FINNIFTY': 'NSE_INDEX|Nifty Fin Service', 'MIDCPNIFTY': 'NSE_INDEX|NIFTY MID SELECT',
-        'SENSEX': 'BSE_INDEX|SENSEX', 'BANKEX': 'BSE_INDEX|BANKEX',
-      };
-      const instKey = instKeyMap[instrument];
+      const instKey = INST_KEY_MAP[instrument];
       if (!instKey) {
         return res.json({ status: 'success', source: 'not_supported', instrument, config: instConfig, market_message: 'Option chain not supported for this instrument', chain: [], summary: null, timestamp: new Date().toISOString() });
       }
 
-      console.log(`[OptionChain] Fetching ${instrument} key=${instKey}`);
+      // Step 1: Get the ACTUAL nearest expiry date from Upstox
+      const expiryDate = await fetchNearestExpiry(instrument, brokerToken);
+      console.log(`[OptionChain] Fetching ${instrument} key=${instKey} expiry=${expiryDate}`);
 
-      const expiryDate = getNextExpiry(instrument);
-      console.log(`[OptionChain] Using expiry_date=${expiryDate}`);
-
+      // Step 2: Fetch option chain with the correct expiry
       const ocResp = await axios.get('https://api.upstox.com/v2/option/chain', {
         headers: { Authorization: `Bearer ${brokerToken}`, 'Api-Version': '2.0', Accept: 'application/json' },
         params: { instrument_key: instKey, expiry_date: expiryDate },
