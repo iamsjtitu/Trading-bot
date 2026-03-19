@@ -1188,8 +1188,8 @@ module.exports = function (db) {
       const trade = {
         id: uuid(), signal_id: signal.id, trade_type: signal.signal_type,
         symbol: signal.symbol, entry_time: new Date().toISOString(),
-        entry_price: signal.entry_price, quantity: signal.quantity,
-        investment: signal.investment_amount, stop_loss: signal.stop_loss,
+        entry_price: signal.entry_price, quantity: qty,
+        investment: qty * signal.entry_price, stop_loss: signal.stop_loss,
         target: signal.target, status: orderSuccess ? 'OPEN' : 'FAILED',
         mode: 'LIVE', order_id: orderId, instrument_token: instrumentToken,
         exit_time: null, exit_price: null, pnl: 0, pnl_percentage: 0,

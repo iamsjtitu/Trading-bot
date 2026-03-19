@@ -1177,8 +1177,8 @@ _Sent automatically by AI Trading Bot_`;
       const trade = {
         id: crypto.randomUUID(), signal_id: signal.id, trade_type: signal.signal_type,
         symbol: signal.symbol, entry_time: new Date().toISOString(),
-        entry_price: signal.entry_price, quantity: signal.quantity,
-        investment: signal.investment_amount, stop_loss: signal.stop_loss,
+        entry_price: signal.entry_price, quantity: qty,
+        investment: qty * signal.entry_price, stop_loss: signal.stop_loss,
         target: signal.target, status: success ? 'OPEN' : 'FAILED',
         mode: 'LIVE', order_id: orderId, instrument_token: instrumentToken,
         exit_time: null, exit_price: null, pnl: 0, pnl_percentage: 0,
@@ -1186,7 +1186,7 @@ _Sent automatically by AI Trading Bot_`;
       db.data.trades.push(trade);
       db.save();
       console.log(`[AutoEntry] LIVE order ${success ? 'placed' : 'failed'}: ${orderId}`);
-      if (db.notify) db.notify('entry', `LIVE Re-Entry ${signal.signal_type}`, `${signal.symbol} | Qty: ${signal.quantity} | ${success ? 'Order: ' + orderId : 'FAILED'}`);
+      if (db.notify) db.notify('entry', `LIVE Re-Entry ${signal.signal_type}`, `${signal.symbol} | Qty: ${qty} | ${success ? 'Order: ' + orderId : 'FAILED'}`);
       return success ? trade : null;
     } catch (err) {
       const upstoxErr = err.response?.data?.message || err.response?.data?.errors?.[0]?.message || err.message;
