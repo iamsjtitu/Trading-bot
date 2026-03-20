@@ -1,12 +1,22 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Card } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { FaChartLine, FaSignOutAlt } from 'react-icons/fa';
+import { FaChartLine, FaSignOutAlt, FaCircle } from 'react-icons/fa';
 
 export default function TradesList({ trades, formatCurrency, formatTime, tradingMode, brokerConnected, onManualExit }) {
   const isLiveMode = tradingMode === 'LIVE';
   const [exitingId, setExitingId] = useState(null);
+  const [pulse, setPulse] = useState(false);
+
+  // Pulse animation on every trade update (live refresh indicator)
+  useEffect(() => {
+    if (trades.length > 0) {
+      setPulse(true);
+      const t = setTimeout(() => setPulse(false), 300);
+      return () => clearTimeout(t);
+    }
+  }, [trades]);
 
   const handleExit = async (trade) => {
     if (!window.confirm(`Are you sure you want to exit this position?\n${trade.symbol} | Qty: ${trade.quantity}`)) return;
@@ -35,6 +45,20 @@ export default function TradesList({ trades, formatCurrency, formatTime, trading
 
   return (
     <div className="space-y-4">
+      {/* Live Refresh Indicator */}
+      {trades.length > 0 && (
+        <div className="flex items-center justify-between bg-gray-50 border border-gray-200 rounded-lg px-3 py-2" data-testid="live-refresh-banner">
+          <div className="flex items-center gap-2 text-sm">
+            <FaCircle className={`text-xs ${pulse ? 'text-green-500' : 'text-green-400'} ${pulse ? 'animate-ping' : ''}`} style={{ fontSize: '8px' }} />
+            <span className="text-gray-600 font-medium">Live P&L</span>
+            <span className="text-gray-400">|</span>
+            <span className="text-gray-500 text-xs">Auto-refresh every 1s</span>
+          </div>
+          <Badge variant="outline" className="text-xs border-green-300 text-green-700">
+            {trades.length} position{trades.length > 1 ? 's' : ''}
+          </Badge>
+        </div>
+      )}
       {isLiveMode && brokerConnected && trades[0]?.isLive && (
         <div className="bg-green-50 border border-green-300 rounded-lg p-3 text-sm text-green-800 font-medium" data-testid="live-trades-banner">
           Showing live positions from Upstox
@@ -88,13 +112,13 @@ export default function TradesList({ trades, formatCurrency, formatTime, trading
                   </div>
                   <div>
                     <p className="text-xs text-gray-600 font-medium">Live P&L</p>
-                    <p className={`text-2xl font-bold ${trade.live_pnl >= 0 ? 'text-green-600' : 'text-red-600'}`}>
+                    <p className={`text-2xl font-bold transition-all duration-300 ${trade.live_pnl >= 0 ? 'text-green-600' : 'text-red-600'}`}>
                       {trade.live_pnl >= 0 ? '+' : ''}{formatCurrency(trade.live_pnl)}
                     </p>
                   </div>
                   <div>
                     <p className="text-xs text-gray-600 font-medium">P&L %</p>
-                    <p className={`text-2xl font-bold ${trade.pnl_percentage >= 0 ? 'text-green-600' : 'text-red-600'}`}>
+                    <p className={`text-2xl font-bold transition-all duration-300 ${trade.pnl_percentage >= 0 ? 'text-green-600' : 'text-red-600'}`}>
                       {trade.pnl_percentage >= 0 ? '+' : ''}{(trade.pnl_percentage || 0).toFixed(2)}%
                     </p>
                   </div>

@@ -62,7 +62,16 @@ module.exports = function (db) {
       return res.json({ status: 'success', count: tradesFromPositions.length, trades: tradesFromPositions, isLive: true });
     }
 
-    const tradesWithPnl = dbOpenTrades.map(trade => { const change = (Math.random() - 0.5) * 0.3; const cp = trade.entry_price * (1 + change); const cv = cp * trade.quantity; const pnl = cv - trade.investment; return { ...trade, current_price: Math.round(cp * 100) / 100, current_value: Math.round(cv * 100) / 100, live_pnl: Math.round(pnl * 100) / 100, pnl_percentage: Math.round((pnl / trade.investment) * 10000) / 100 }; });
+    const tradesWithPnl = dbOpenTrades.map(trade => {
+      // Simulate realistic price movement - small incremental walk from last known price
+      if (!trade._simPrice) trade._simPrice = trade.entry_price;
+      const volatility = trade.entry_price * 0.0003; // 0.03% per tick
+      const drift = (Math.random() - 0.48) * volatility; // slight upward bias
+      trade._simPrice = Math.max(trade._simPrice + drift, trade.entry_price * 0.7);
+      const cp = trade._simPrice;
+      const cv = cp * trade.quantity; const pnl = cv - trade.investment;
+      return { ...trade, current_price: Math.round(cp * 100) / 100, current_value: Math.round(cv * 100) / 100, live_pnl: Math.round(pnl * 100) / 100, pnl_percentage: Math.round((pnl / trade.investment) * 10000) / 100, _simPrice: undefined };
+    });
     res.json({ status: 'success', count: tradesWithPnl.length, trades: tradesWithPnl });
   });
 

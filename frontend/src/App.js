@@ -75,6 +75,7 @@ function App() {
   const [brokerOrders, setBrokerOrders] = useState([]);
   const [wsConnected, setWsConnected] = useState(false);
   const wsRef = useRef(null);
+  const [activeTab, setActiveTab] = useState('news');
 
   // Ultra-fast market data polling for LIVE mode (500ms)
   const loadMarketDataQuick = useCallback(async () => {
@@ -358,6 +359,23 @@ function App() {
     }
     return () => { if (marketInterval) clearInterval(marketInterval); };
   }, [tradingMode, brokerConnected, loadMarketDataQuick]);
+
+  // 1-SECOND AUTO-REFRESH for Active Trades (live P&L)
+  // Only polls when "trades" tab is active - saves resources
+  useEffect(() => {
+    let tradeInterval;
+    if (activeTab === 'trades') {
+      const fetchActiveTrades = async () => {
+        try {
+          const res = await axios.get(`${API}/trades/active`);
+          if (res.data?.trades) setTrades(res.data.trades);
+        } catch (_) {}
+      };
+      fetchActiveTrades(); // Immediate first load
+      tradeInterval = setInterval(fetchActiveTrades, 1000);
+    }
+    return () => { if (tradeInterval) clearInterval(tradeInterval); };
+  }, [activeTab]);
 
   // WebSocket connection for real-time market data
   useEffect(() => {
@@ -669,7 +687,7 @@ function App() {
         </div>
 
         {/* Main Content Tabs */}
-        <Tabs defaultValue="news" className="space-y-4">
+        <Tabs defaultValue="news" value={activeTab} onValueChange={setActiveTab} className="space-y-4">
           <TabsList className="bg-white border-gray-200 shadow-sm">
             <TabsTrigger value="news" data-testid="news-tab" className="data-[state=active]:bg-blue-100 data-[state=active]:text-blue-900">News Feed</TabsTrigger>
             <TabsTrigger value="signals" data-testid="signals-tab" className="data-[state=active]:bg-blue-100 data-[state=active]:text-blue-900">Signals</TabsTrigger>

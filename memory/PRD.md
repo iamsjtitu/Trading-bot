@@ -22,7 +22,7 @@ Build an AI-powered automated options trading bot that:
 │       │   ├── tax_calculator.js
 │       │   └── technical_analysis.js
 │       ├── news.js
-│       ├── trading.js
+│       ├── trading.js         # Gradual price simulation + journal hook
 │       ├── journal.js         # AI Trade Journal
 │       ├── portfolio.js
 │       ├── settings.js
@@ -33,33 +33,50 @@ Build an AI-powered automated options trading bot that:
 │       ├── tax.js
 │       ├── technical.js
 │       └── ai_engine.js
-├── frontend/                  # React + Tailwind + Shadcn
-│   └── src/components/
-│       └── TradeJournal.js    # AI Journal UI
+├── frontend/
+│   └── src/
+│       ├── App.js             # Active tab tracking + 1s trade refresh
+│       └── components/
+│           ├── TradesList.js   # Live P&L indicator + smooth transitions
+│           ├── TradeJournal.js
+│           ├── TaxReports.js
+│           └── TechnicalAnalysis.js
 └── backend/                   # MINIMAL PROXY (103 lines)
-    ├── .env                   # Environment variables
-    ├── requirements.txt       # fastapi, httpx only
     └── server.py              # Proxy → Node.js:8002
 ```
 
 ## Tech Stack
 - **Frontend**: React, Tailwind CSS, Shadcn UI
-- **Backend**: Node.js (Express) - SOLE backend, 13 route files, 5 lib modules
+- **Backend**: Node.js (Express) - SOLE backend
 - **Desktop**: Electron
 - **Database**: lowdb (JSON file)
 - **AI**: OpenAI GPT-4o via Emergent LLM Key
 - **Broker**: Upstox (active)
 
-## Version History
-- v4.1.0: Python backend deleted, unified Node.js backend, AI Trade Journal
-- v4.0.1: Tax reports with broker charges, Technical Analysis, code refactoring
-- v4.0.0: Multi-broker framework, Option Chain, Desktop builds
+## What's Been Implemented
+- Full news scraping from 11 sources
+- AI sentiment analysis (GPT-4o)
+- Automated signal generation with confidence scoring
+- Paper and Live trading modes
+- Auto-entry/exit engine
+- Multi-broker support framework (Upstox active)
+- Live Option Chain with Greeks
+- Tax Reports with broker charges breakdown
+- Technical Analysis (RSI, MACD, EMA, SMA, VWAP)
+- Market status and holiday tracking
+- Sector heatmap and AI insights
+- Desktop app builds (v4.1.0)
+- Python backend deleted, Node.js unified backend
+- AI Trade Journal (auto-review, insights, stats)
+- **1-second live P&L auto-refresh** on Active Trades tab
+- Gradual price simulation for PAPER mode
+- Live refresh indicator with pulse animation
 
 ## Prioritized Backlog
 
 ### P1 - High Priority
 - New desktop app build (v4.1.0)
-- Full end-to-end user verification with live trades
+- Full end-to-end user verification
 
 ### P2 - Medium Priority
 - Stock Options trading support

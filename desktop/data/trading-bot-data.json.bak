@@ -113,6 +113,42 @@
       "exit_price": null,
       "pnl": 0,
       "pnl_percentage": 0
+    },
+    {
+      "id": "test_trade_1",
+      "trade_type": "BUY",
+      "symbol": "NIFTY2632423150PE",
+      "quantity": 65,
+      "entry_price": 188,
+      "investment": 12220,
+      "stop_loss": 141,
+      "target": 282,
+      "status": "OPEN",
+      "mode": "PAPER",
+      "entry_time": "2026-03-20T04:00:56.594Z",
+      "confidence": 78,
+      "sentiment": "BULLISH",
+      "sector": "BROAD_MARKET",
+      "instrument": "NIFTY50",
+      "signal_id": "test_sig_1"
+    },
+    {
+      "id": "test_trade_2",
+      "trade_type": "BUY",
+      "symbol": "NIFTY2632423100CE",
+      "quantity": 65,
+      "entry_price": 345,
+      "investment": 22425,
+      "stop_loss": 259,
+      "target": 517,
+      "status": "OPEN",
+      "mode": "PAPER",
+      "entry_time": "2026-03-20T04:00:56.594Z",
+      "confidence": 72,
+      "sentiment": "BULLISH",
+      "sector": "BROAD_MARKET",
+      "instrument": "NIFTY50",
+      "signal_id": "test_sig_2"
     }
   ],
   "signals": [
