@@ -1,19 +1,20 @@
 {
   "settings": {
     "type": "main",
-    "trading_mode": "PAPER",
+    "trading_mode": "LIVE",
     "ai": {
       "emergent_llm_key": "sk-emergent-754BdB27f511c159cC",
-      "model": "gpt-4.1-mini",
+      "model": "gpt-4o",
       "provider": "openai"
     },
     "broker": {
-      "name": "upstox",
+      "name": "zerodha",
       "api_key": "",
       "api_secret": "",
       "redirect_uri": "",
-      "access_token": "",
-      "token_timestamp": ""
+      "access_token": "eyJ0eXAiOiJKV1QiLCJrZXlfaWQiOiJza192MS4wIiwiYWxnIjoiSFMyNTYifQ.eyJzdWIiOiIyOEE3RUUiLCJqdGkiOiI2OWJjYzQ4ZWYzNzhjMDcwMmRiZTk1MzEiLCJpc011bHRpQ2xpZW50IjpmYWxzZSwiaXNQbHVzUGxhbiI6ZmFsc2UsImlhdCI6MTc3Mzk3ODc2NiwiaXNzIjoidWRhcGktZ2F0ZXdheS1zZXJ2aWNlIiwiZXhwIjoxNzc0MDQ0MDAwfQ.IBZ8NZs1NwyGdCZMIwKXUAgCSxsrZAhDW_Y5BbsitPc",
+      "token_timestamp": "",
+      "upstox_token": "eyJ0eXAiOiJKV1QiLCJrZXlfaWQiOiJza192MS4wIiwiYWxnIjoiSFMyNTYifQ.eyJzdWIiOiIyOEE3RUUiLCJqdGkiOiI2OWJjYzQ4ZWYzNzhjMDcwMmRiZTk1MzEiLCJpc011bHRpQ2xpZW50IjpmYWxzZSwiaXNQbHVzUGxhbiI6ZmFsc2UsImlhdCI6MTc3Mzk3ODc2NiwiaXNzIjoidWRhcGktZ2F0ZXdheS1zZXJ2aWNlIiwiZXhwIjoxNzc0MDQ0MDAwfQ.IBZ8NZs1NwyGdCZMIwKXUAgCSxsrZAhDW_Y5BbsitPc"
     },
     "risk": {
       "initial_capital": 500000,
@@ -61,7 +62,8 @@
       "daily_summary": true
     },
     "trading_instrument": "BANKNIFTY",
-    "emergency_stop": false
+    "emergency_stop": false,
+    "active_broker": "upstox"
   },
   "portfolio": {
     "type": "paper",
@@ -99,7 +101,7 @@
       "exit_price": null,
       "pnl": 0,
       "pnl_percentage": 0,
-      "_simPrice": 149.9445500381187
+      "_simPrice": 149.9989324588769
     },
     {
       "id": "81b3c059-c51c-4ed0-aabf-4b3bc9deec8a",
@@ -118,7 +120,7 @@
       "exit_price": null,
       "pnl": 0,
       "pnl_percentage": 0,
-      "_simPrice": 150.00451098231576
+      "_simPrice": 150.01850908128154
     },
     {
       "id": "test_trade_1",
@@ -137,7 +139,7 @@
       "sector": "BROAD_MARKET",
       "instrument": "NIFTY50",
       "signal_id": "test_sig_1",
-      "_simPrice": 188.2715275943602
+      "_simPrice": 188.3314093315706
     },
     {
       "id": "test_trade_2",
@@ -156,7 +158,7 @@
       "sector": "BROAD_MARKET",
       "instrument": "NIFTY50",
       "signal_id": "test_sig_2",
-      "_simPrice": 345.33003801707656
+      "_simPrice": 345.4005549440479
     }
   ],
   "signals": [
@@ -233,6 +235,82 @@
       "mode": "PAPER",
       "created_at": "2026-03-19T17:26:47.752Z",
       "expires_at": "2026-03-26T17:26:47.752Z"
+    },
+    {
+      "id": "6e7fdf30-ae27-464b-8372-e6aae8462612",
+      "signal_type": "CALL",
+      "symbol": "BANKNIFTY",
+      "option_symbol": "BANKNIFTY26032052200CE",
+      "strike_price": 52200,
+      "option_premium": 150,
+      "quantity": 74,
+      "investment_amount": 11100,
+      "entry_price": 150,
+      "stop_loss": 105,
+      "target": 172.5,
+      "confidence": 72,
+      "composite_score": 72,
+      "correlation_score": 50,
+      "confluence_score": 0,
+      "market_regime": "UNKNOWN",
+      "sentiment": "BULLISH",
+      "sector": "BROAD_MARKET",
+      "secondary_sector": "BANKING",
+      "volatility": "INCREASING",
+      "time_horizon": "IMMEDIATE",
+      "risk_level": "MEDIUM",
+      "freshness_score": 89,
+      "position_sizing": {
+        "confidence": 0.8,
+        "winRate": 1,
+        "regime": 0.7,
+        "sector": 1,
+        "drawdown": 1
+      },
+      "reason": "The Nifty 50 rally by 2% is a significant market move, driven by robust FII inflows and positive global economic data. Such inflows suggest confidence in the Indian market and are likely to boost sentiment across sectors, particularly Banking and IT. Historically, similar FII-driven rallies have sustained for a few sessions. Although option premiums are likely to rise due to increased volatility, the immediate momentum suggests continued upward pressure. | Correlation: 50%",
+      "news_id": "02e3307c-3687-4205-aeb8-a5db2955d64c",
+      "status": "ACTIVE",
+      "mode": "LIVE",
+      "created_at": "2026-03-20T13:35:32.633Z",
+      "expires_at": "2026-03-27T13:35:32.633Z"
+    },
+    {
+      "id": "8f1c73b4-19c1-4fb7-ac03-3f4da63864e6",
+      "signal_type": "CALL",
+      "symbol": "BANKNIFTY",
+      "option_symbol": "BANKNIFTY26032052200CE",
+      "strike_price": 52200,
+      "option_premium": 150,
+      "quantity": 74,
+      "investment_amount": 11100,
+      "entry_price": 150,
+      "stop_loss": 105,
+      "target": 172.5,
+      "confidence": 68,
+      "composite_score": 68,
+      "correlation_score": 87,
+      "confluence_score": 100,
+      "market_regime": "MIXED",
+      "sentiment": "BULLISH",
+      "sector": "BROAD_MARKET",
+      "secondary_sector": "FMCG",
+      "volatility": "DECREASING",
+      "time_horizon": "SHORT_TERM",
+      "risk_level": "MEDIUM",
+      "freshness_score": 12,
+      "position_sizing": {
+        "confidence": 0.7,
+        "winRate": 1,
+        "regime": 0.8,
+        "sector": 1,
+        "drawdown": 1
+      },
+      "reason": "The 3% decline in global crude oil prices is directly beneficial for India, which is a net importer of oil. This reduction lowers input costs and eases fiscal deficit pressures, supporting an overall BULLISH sentiment for the market. Historically, such drops in oil prices correlate with market rallies due to reduced inflationary pressure and potentially stronger INR, encouraging FII inflows. | Correlation: 87% | Confluence: 100% | Regime: MIXED",
+      "news_id": "5d5bd6a6-7e6b-41fd-be78-621fd60ac214",
+      "status": "ACTIVE",
+      "mode": "LIVE",
+      "created_at": "2026-03-20T13:35:44.501Z",
+      "expires_at": "2026-03-27T13:35:44.501Z"
     }
   ],
   "news_articles": [
@@ -601,6 +679,152 @@
         "market_regime": "UNKNOWN"
       },
       "created_at": "2026-03-19T17:26:47.639Z"
+    },
+    {
+      "id": "02e3307c-3687-4205-aeb8-a5db2955d64c",
+      "title": "Nifty 50 rallies 2% as global markets surge on positive economic data",
+      "description": "Indian benchmark index Nifty 50 closed at fresh highs today, driven by strong FII inflows and positive global cues. Banking and IT stocks led the rally.",
+      "content": "Market experts suggest bullish trend may continue",
+      "source": "Demo Market News",
+      "url": "#",
+      "published_at": "2026-03-20T13:25:29.399Z",
+      "sentiment_analysis": {
+        "sentiment": "BULLISH",
+        "confidence": 85,
+        "impact": "HIGH",
+        "sector": "BROAD_MARKET",
+        "reason": "The Nifty 50 rally by 2% is a significant market move, driven by robust FII inflows and positive global economic data. Such inflows suggest confidence in the Indian market and are likely to boost sentiment across sectors, particularly Banking and IT. Historically, similar FII-driven rallies have sustained for a few sessions. Although option premiums are likely to rise due to increased volatility, the immediate momentum suggests continued upward pressure.",
+        "trading_signal": "BUY_CALL",
+        "volatility": "INCREASING",
+        "time_horizon": "IMMEDIATE",
+        "risk_level": "MEDIUM",
+        "secondary_sector": "BANKING",
+        "correlation_score": 50,
+        "correlation_detail": "Insufficient signals for correlation",
+        "confluence_score": 0,
+        "confluence_aligned": 0,
+        "composite_score": 72,
+        "freshness_score": 89,
+        "market_regime": "UNKNOWN"
+      },
+      "created_at": "2026-03-20T13:35:32.632Z"
+    },
+    {
+      "id": "66d27ff5-9ed8-46e6-9d98-8b7e3fe4b047",
+      "title": "RBI maintains repo rate, signals cautious stance on inflation",
+      "description": "Reserve Bank of India kept interest rates unchanged in its latest policy meeting, citing concerns over persistent inflation despite growth moderation.",
+      "content": "Markets react mixed to RBI decision",
+      "source": "Demo Financial Times",
+      "url": "#",
+      "published_at": "2026-03-20T13:05:29.399Z",
+      "sentiment_analysis": {
+        "sentiment": "NEUTRAL",
+        "confidence": 65,
+        "impact": "MEDIUM",
+        "sector": "BROAD_MARKET",
+        "reason": "The RBI's decision to maintain the repo rate suggests a cautious approach towards inflation, despite moderated growth. This steady policy is likely to stabilize the markets in the short term, bringing stability to financial and real estate sectors which are sensitive to interest rate changes. With no immediate rate cuts, relief in borrowing costs is not forthcoming. The neutral stance on rates indicates no significant capital inflows or outflows based purely on this news, leading to a balanced market sentiment.",
+        "trading_signal": "HOLD",
+        "volatility": "STABLE",
+        "time_horizon": "SHORT_TERM",
+        "risk_level": "MEDIUM",
+        "secondary_sector": "BANKING",
+        "correlation_score": 80,
+        "correlation_detail": "Direction alignment: 50%, Sector: 100%, Buffer: 2 signals",
+        "confluence_score": 0,
+        "confluence_aligned": 0,
+        "composite_score": 60,
+        "freshness_score": 71,
+        "market_regime": "UNKNOWN"
+      },
+      "created_at": "2026-03-20T13:35:35.349Z"
+    },
+    {
+      "id": "b5ba8ae1-fd90-4483-9e6d-fae9e5b8f670",
+      "title": "Tech stocks under pressure as valuations questioned by analysts",
+      "description": "Major IT companies face selling pressure as analysts raise concerns about high valuations amid global tech slowdown.",
+      "content": "Investors advised caution",
+      "source": "Demo Business Wire",
+      "url": "#",
+      "published_at": "2026-03-20T12:35:29.399Z",
+      "sentiment_analysis": {
+        "sentiment": "BEARISH",
+        "confidence": 75,
+        "impact": "MEDIUM",
+        "sector": "IT",
+        "reason": "The news about valuation concerns in major IT companies comes amidst a global tech slowdown, likely leading to increased selling pressure on IT stocks. Historically, such news has resulted in a broad-market impact on Nifty, given the sector's index weight. Additionally, there may be a negative spillover into the broader market due to sector interlinkages.",
+        "trading_signal": "HOLD",
+        "volatility": "INCREASING",
+        "time_horizon": "SHORT_TERM",
+        "risk_level": "MEDIUM",
+        "secondary_sector": "BROAD_MARKET",
+        "correlation_score": 65,
+        "correlation_detail": "Direction alignment: 33%, Sector: 33%, Buffer: 3 signals",
+        "confluence_score": 0,
+        "confluence_aligned": 0,
+        "composite_score": 60,
+        "freshness_score": 50,
+        "market_regime": "UNKNOWN"
+      },
+      "created_at": "2026-03-20T13:35:38.921Z"
+    },
+    {
+      "id": "6dcb7c5e-ad21-4473-9981-29cab914073f",
+      "title": "Strong Q4 earnings boost sentiment in banking sector",
+      "description": "Major banks report better-than-expected quarterly results, leading to renewed investor interest in financial stocks.",
+      "content": "Banking index outperforms",
+      "source": "Demo Market Watch",
+      "url": "#",
+      "published_at": "2026-03-20T11:35:29.399Z",
+      "sentiment_analysis": {
+        "sentiment": "BULLISH",
+        "confidence": 80,
+        "impact": "HIGH",
+        "sector": "BANKING",
+        "reason": "The strong Q4 earnings report from major banks indicates robust financial health and profitability, likely leading to increased investor confidence in the banking sector. This positive sentiment could drive up prices in both Nifty 50 and Bank Nifty indices, particularly impacting heavyweight banking stocks positively. Historical patterns suggest that better-than-expected earnings in the banking sector often result in substantial price moves, with increased volatility as traders react swiftly to earnings reports.",
+        "trading_signal": "HOLD",
+        "volatility": "INCREASING",
+        "time_horizon": "SHORT_TERM",
+        "risk_level": "MEDIUM",
+        "secondary_sector": "BROAD_MARKET",
+        "trend_note": "Confidence adjusted by -5 based on recent trend",
+        "correlation_score": 69,
+        "correlation_detail": "Direction alignment: 50%, Sector: 25%, Buffer: 4 signals",
+        "confluence_score": 0,
+        "confluence_aligned": 0,
+        "composite_score": 58,
+        "freshness_score": 25,
+        "market_regime": "UNKNOWN"
+      },
+      "created_at": "2026-03-20T13:35:41.782Z"
+    },
+    {
+      "id": "5d5bd6a6-7e6b-41fd-be78-621fd60ac214",
+      "title": "Global crude oil prices fall 3%, benefiting import-dependent India",
+      "description": "International oil prices declined sharply on demand concerns, providing relief to Indian markets.",
+      "content": "Energy stocks react",
+      "source": "Demo Energy News",
+      "url": "#",
+      "published_at": "2026-03-20T10:35:29.399Z",
+      "sentiment_analysis": {
+        "sentiment": "BULLISH",
+        "confidence": 80,
+        "impact": "MEDIUM",
+        "sector": "BROAD_MARKET",
+        "reason": "The 3% decline in global crude oil prices is directly beneficial for India, which is a net importer of oil. This reduction lowers input costs and eases fiscal deficit pressures, supporting an overall BULLISH sentiment for the market. Historically, such drops in oil prices correlate with market rallies due to reduced inflationary pressure and potentially stronger INR, encouraging FII inflows.",
+        "trading_signal": "BUY_CALL",
+        "volatility": "DECREASING",
+        "time_horizon": "SHORT_TERM",
+        "risk_level": "MEDIUM",
+        "secondary_sector": "FMCG",
+        "correlation_score": 87,
+        "correlation_detail": "Direction alignment: 60%, Sector: 60%, Buffer: 5 signals",
+        "confluence_score": 100,
+        "confluence_aligned": 3,
+        "composite_score": 68,
+        "freshness_score": 12,
+        "market_regime": "MIXED"
+      },
+      "created_at": "2026-03-20T13:35:44.501Z"
     }
   ],
   "journal_entries": [],
