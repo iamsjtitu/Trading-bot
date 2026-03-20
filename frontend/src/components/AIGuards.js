@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback } from 'react';
 import { Card } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Switch } from '@/components/ui/switch';
+import { Button } from '@/components/ui/button';
 import axios from 'axios';
 import { FaShieldAlt, FaSync, FaClock, FaChartLine, FaLayerGroup, FaNewspaper, FaArrowUp, FaExclamationTriangle } from 'react-icons/fa';
 
@@ -27,6 +28,7 @@ export default function AIGuards() {
   const [guards, setGuards] = useState(null);
   const [currentTime, setCurrentTime] = useState('');
   const [loading, setLoading] = useState(false);
+  const [isExpanded, setIsExpanded] = useState(false);
 
   const fetchStatus = useCallback(async () => {
     try {
@@ -51,71 +53,101 @@ export default function AIGuards() {
 
   if (!guards) return null;
 
+  // Count active & blocking guards for summary badge
+  const guardEntries = Object.entries(GUARD_INFO);
+  const activeCount = guardEntries.filter(([key]) => guards[key]?.enabled !== false).length;
+  const blockingCount = guardEntries.filter(([key]) => guards[key]?.blocked).length;
+
   return (
-    <Card className="p-5" data-testid="ai-guards-panel">
-      <div className="flex items-center justify-between mb-4">
-        <div className="flex items-center gap-2">
+    <Card className="bg-gradient-to-r from-blue-50 to-indigo-50 border-blue-200 p-4 shadow-lg" data-testid="ai-guards-panel">
+      {/* Collapsible Header */}
+      <div
+        className="flex items-center justify-between cursor-pointer"
+        onClick={() => setIsExpanded(!isExpanded)}
+        data-testid="ai-guards-toggle"
+      >
+        <h2 className="text-lg font-bold text-gray-800 flex items-center gap-2">
           <FaShieldAlt className="text-blue-600" />
-          <h3 className="font-bold text-gray-800 text-base">AI Loss Prevention Guards</h3>
-        </div>
+          AI Loss Prevention Guards
+          <Badge className="bg-blue-600 text-xs">
+            {activeCount}/{guardEntries.length} Active
+          </Badge>
+          {blockingCount > 0 && (
+            <Badge className="bg-red-600 text-xs">{blockingCount} Blocking</Badge>
+          )}
+        </h2>
         <div className="flex items-center gap-2">
           <span className="text-xs text-gray-400">{currentTime}</span>
-          <button onClick={fetchStatus} className="text-gray-400 hover:text-blue-600 transition" data-testid="refresh-guards-btn"><FaSync className="text-sm" /></button>
+          <button
+            onClick={(e) => { e.stopPropagation(); fetchStatus(); }}
+            className="text-gray-400 hover:text-blue-600 transition"
+            data-testid="refresh-guards-btn"
+          >
+            <FaSync className="text-sm" />
+          </button>
+          <Button variant="ghost" className="text-gray-600" data-testid="ai-guards-expand-btn">
+            {isExpanded ? '\u25B2 Hide' : '\u25BC Show'}
+          </Button>
         </div>
       </div>
 
-      <div className="space-y-3">
-        {Object.entries(GUARD_INFO).map(([key, info]) => {
-          const guard = guards[key] || {};
-          const Icon = info.icon;
-          const isBlocked = guard.blocked;
-          const isEnabled = guard.enabled !== false;
-          const canToggle = key !== 'max_daily_loss'; // max_daily_loss is always on
+      {/* Expandable Content */}
+      {isExpanded && (
+        <div className="mt-4 space-y-3 animate-slide-in" data-testid="ai-guards-list">
+          {guardEntries.map(([key, info]) => {
+            const guard = guards[key] || {};
+            const Icon = info.icon;
+            const isBlocked = guard.blocked;
+            const isEnabled = guard.enabled !== false;
+            const canToggle = key !== 'max_daily_loss';
 
-          return (
-            <div key={key} className={`p-3 rounded-lg border transition ${isBlocked ? 'border-red-300 bg-red-50' : isEnabled ? 'border-green-200 bg-green-50/50' : 'border-gray-200 bg-gray-50'}`} data-testid={`guard-${key}`}>
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-2.5 flex-1 min-w-0">
-                  <Icon className={`text-sm flex-shrink-0 ${isBlocked ? 'text-red-500' : isEnabled ? 'text-green-600' : 'text-gray-400'}`} />
-                  <div className="min-w-0">
-                    <div className="flex items-center gap-2">
-                      <span className="text-sm font-semibold text-gray-800">{info.label}</span>
-                      {isBlocked && <Badge className="bg-red-100 text-red-700 text-[10px] px-1.5 py-0">BLOCKING</Badge>}
+            return (
+              <div key={key} className={`p-3 rounded-lg border transition ${isBlocked ? 'border-red-300 bg-red-50' : isEnabled ? 'border-green-200 bg-green-50/50' : 'border-gray-200 bg-gray-50'}`} data-testid={`guard-${key}`}>
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2.5 flex-1 min-w-0">
+                    <Icon className={`text-sm flex-shrink-0 ${isBlocked ? 'text-red-500' : isEnabled ? 'text-green-600' : 'text-gray-400'}`} />
+                    <div className="min-w-0">
+                      <div className="flex items-center gap-2">
+                        <span className="text-sm font-semibold text-gray-800">{info.label}</span>
+                        {isBlocked && <Badge className="bg-red-100 text-red-700 text-[10px] px-1.5 py-0">BLOCKING</Badge>}
+                      </div>
+                      <p className="text-xs text-gray-500 mt-0.5 leading-tight">{info.desc}</p>
+                      {key === 'market_regime_filter' && guard.current_regime && (
+                        <p className="text-xs mt-1 font-medium text-gray-600">Current: {guard.current_regime} ({guard.confidence}%)</p>
+                      )}
+                      {key === 'time_of_day_filter' && guard.current_window && (
+                        <p className={`text-xs mt-1 font-medium ${guard.current_window.includes('BLOCKED') ? 'text-red-600' : 'text-green-600'}`}>{guard.current_window}</p>
+                      )}
+                      {key === 'max_daily_loss' && (
+                        <p className={`text-xs mt-1 font-medium ${guard.blocked ? 'text-red-600' : 'text-gray-600'}`}>
+                          Today's Loss: &#8377;{guard.today_loss?.toLocaleString('en-IN')} / &#8377;{guard.limit?.toLocaleString('en-IN')}
+                        </p>
+                      )}
+                      {key === 'multi_source_verification' && guard.recent_sources && Object.keys(guard.recent_sources).length > 0 && (
+                        <p className="text-xs mt-1 text-gray-600">Recent: {Object.entries(guard.recent_sources).map(([dir, count]) => `${dir}: ${count} sources`).join(', ')}</p>
+                      )}
+                      {key === 'kelly_sizing' && guard.enabled !== false && (
+                        <p className="text-xs mt-1 text-gray-600">Mode: {guard.mode} | Win Rate: {guard.win_rate}% | Trades: {guard.total_trades}</p>
+                      )}
                     </div>
-                    <p className="text-xs text-gray-500 mt-0.5 leading-tight">{info.desc}</p>
-                    {/* Extra status info */}
-                    {key === 'market_regime_filter' && guard.current_regime && (
-                      <p className="text-xs mt-1 font-medium text-gray-600">Current: {guard.current_regime} ({guard.confidence}%)</p>
-                    )}
-                    {key === 'time_of_day_filter' && guard.current_window && (
-                      <p className={`text-xs mt-1 font-medium ${guard.current_window.includes('BLOCKED') ? 'text-red-600' : 'text-green-600'}`}>{guard.current_window}</p>
-                    )}
-                    {key === 'max_daily_loss' && (
-                      <p className={`text-xs mt-1 font-medium ${guard.blocked ? 'text-red-600' : 'text-gray-600'}`}>
-                        Today's Loss: ₹{guard.today_loss?.toLocaleString('en-IN')} / ₹{guard.limit?.toLocaleString('en-IN')}
-                      </p>
-                    )}
-                    {key === 'multi_source_verification' && guard.recent_sources && Object.keys(guard.recent_sources).length > 0 && (
-                      <p className="text-xs mt-1 text-gray-600">Recent: {Object.entries(guard.recent_sources).map(([dir, count]) => `${dir}: ${count} sources`).join(', ')}</p>
-                    )}
                   </div>
+                  {canToggle && (
+                    <Switch
+                      checked={isEnabled}
+                      onCheckedChange={(v) => toggleGuard(key, v)}
+                      disabled={loading}
+                      data-testid={`toggle-${key}`}
+                    />
+                  )}
+                  {!canToggle && (
+                    <Badge className="bg-blue-100 text-blue-700 text-[10px]">Always ON</Badge>
+                  )}
                 </div>
-                {canToggle && (
-                  <Switch
-                    checked={isEnabled}
-                    onCheckedChange={(v) => toggleGuard(key, v)}
-                    disabled={loading}
-                    data-testid={`toggle-${key}`}
-                  />
-                )}
-                {!canToggle && (
-                  <Badge className="bg-blue-100 text-blue-700 text-[10px]">Always ON</Badge>
-                )}
               </div>
-            </div>
-          );
-        })}
-      </div>
+            );
+          })}
+        </div>
+      )}
     </Card>
   );
 }
