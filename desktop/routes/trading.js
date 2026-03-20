@@ -112,25 +112,39 @@ module.exports = function (db) {
     const allTrades = (db.data.trades || []).filter(t => (t.entry_time || '') >= todayISO && (t.mode || 'PAPER') === currentMode);
     const closed = allTrades.filter(t => t.status === 'CLOSED');
     const openTrades = allTrades.filter(t => t.status === 'OPEN');
-    // Realized P&L from closed trades
-    const realizedPnl = Math.round(closed.reduce((s,t)=>s+(t.pnl||0),0)*100)/100;
-    // Unrealized P&L from ALL open trades in current mode
+
+    let realizedPnl = 0;
     let unrealizedPnl = 0;
+    let totalTodayPnl = 0;
+
     if (currentMode === 'LIVE') {
+      // LIVE MODE: Get ACTUAL P&L directly from Upstox positions API
       const token = getActiveBrokerToken();
       if (token) {
         try {
           const headers = { Accept: 'application/json', Authorization: `Bearer ${token}`, 'Api-Version': '2.0' };
           const posResp = await axios.get('https://api.upstox.com/v2/portfolio/short-term-positions', { headers, timeout: 10000 });
           if (posResp.data?.status === 'success') {
-            for (const pos of (posResp.data.data || []).filter(p => p.quantity !== 0)) {
-              const entry = pos.average_price || 0;
-              const current = pos.last_price || 0;
-              unrealizedPnl += (current - entry) * Math.abs(pos.quantity);
+            // Sum P&L from ALL positions (including closed ones with qty=0)
+            for (const pos of (posResp.data.data || [])) {
+              const posPnl = pos.pnl || 0;
+              const posRealized = pos.realised || 0;
+              const posUnrealized = pos.unrealised || 0;
+              if (pos.quantity !== 0) {
+                // Open position - has unrealized P&L
+                unrealizedPnl += posUnrealized || ((pos.last_price - pos.average_price) * Math.abs(pos.quantity));
+                realizedPnl += posRealized;
+              } else {
+                // Closed position - only realized P&L
+                realizedPnl += posPnl || posRealized;
+              }
             }
           }
         } catch (e) { console.error('[Today] Live position fetch error:', e.message); }
       }
+      realizedPnl = Math.round(realizedPnl * 100) / 100;
+      unrealizedPnl = Math.round(unrealizedPnl * 100) / 100;
+      totalTodayPnl = Math.round((realizedPnl + unrealizedPnl) * 100) / 100;
     } else {
       // PAPER mode: calculate unrealized P&L from all open paper trades
       const allOpenPaper = (db.data.trades || []).filter(t => t.status === 'OPEN' && (t.mode || 'PAPER') === 'PAPER');
@@ -141,9 +155,10 @@ module.exports = function (db) {
         trade._simPrice = Math.max(trade._simPrice + drift, trade.entry_price * 0.7);
         unrealizedPnl += (trade._simPrice - trade.entry_price) * trade.quantity;
       }
+      realizedPnl = Math.round(closed.reduce((s,t)=>s+(t.pnl||0),0)*100)/100;
+      unrealizedPnl = Math.round(unrealizedPnl * 100) / 100;
+      totalTodayPnl = Math.round((realizedPnl + unrealizedPnl) * 100) / 100;
     }
-    unrealizedPnl = Math.round(unrealizedPnl * 100) / 100;
-    const totalTodayPnl = Math.round((realizedPnl + unrealizedPnl) * 100) / 100;
     res.json({ status: 'success', total_trades_today: allTrades.length, closed_trades: closed.length, open_trades: openTrades.length, today_pnl: totalTodayPnl, realized_pnl: realizedPnl, unrealized_pnl: unrealizedPnl, today_invested: Math.round(allTrades.reduce((s,t)=>s+(t.investment||0),0)*100)/100 });
   });
 

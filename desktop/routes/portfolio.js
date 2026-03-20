@@ -61,10 +61,20 @@ module.exports = function (db) {
         const used = equity.used_margin || 0;
         let totalPnl = 0;
         let activeCount = 0;
+        let realizedPnl = 0;
+        let unrealizedPnl = 0;
         for (const pos of (posRes.data?.data || [])) {
-          totalPnl += pos.pnl || pos.realised || 0;
-          if (pos.quantity !== 0) activeCount++;
+          if (pos.quantity !== 0) {
+            // Open position
+            activeCount++;
+            unrealizedPnl += pos.unrealised || ((pos.last_price - pos.average_price) * Math.abs(pos.quantity));
+            realizedPnl += pos.realised || 0;
+          } else {
+            // Closed position - use pnl or realised
+            realizedPnl += pos.pnl || pos.realised || 0;
+          }
         }
+        totalPnl = Math.round((realizedPnl + unrealizedPnl) * 100) / 100;
 
         return res.json({
           initial_capital: available + used,

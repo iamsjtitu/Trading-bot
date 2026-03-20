@@ -7,7 +7,7 @@ module.exports = function (db) {
     return {
       type: 'main',
       trading_mode: 'PAPER',
-      ai: { emergent_llm_key: '', model: 'gpt-4.1-mini', provider: 'openai' },
+      ai: { emergent_llm_key: '', model: 'gpt-4o', provider: 'openai' },
       broker: { name: 'upstox', api_key: '', api_secret: '', redirect_uri: '', access_token: '', token_timestamp: '' },
       risk: { initial_capital: 500000, daily_limit: 100000, max_per_trade: 20000, stop_loss_pct: 25, target_pct: 50, risk_tolerance: 'medium' },
       auto_trading: { auto_exit: true, auto_entry: false, auto_analysis: true, analysis_interval_minutes: 5 },

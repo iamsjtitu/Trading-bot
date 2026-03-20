@@ -50,7 +50,7 @@ TRADE DATA:
 
     try {
       const completion = await client.chat.completions.create({
-        model: 'openai/gpt-4.1-mini',
+        model: 'gpt-4o',
         messages: [
           {
             role: 'system',
@@ -341,7 +341,7 @@ PATTERN TAGS (use 1-3): momentum_trade, news_driven, trend_following, counter_tr
       try {
         const recentEntries = entries.slice(-10).map(e => `${e.trade_type} ${e.symbol}: Rs.${e.pnl} (${e.verdict}, ${e.rating}/10, ${e.emotion_flag})`).join('\n');
         const completion = await client.chat.completions.create({
-          model: 'openai/gpt-4.1-mini',
+          model: 'gpt-4o',
           messages: [
             { role: 'system', content: 'You are a trading coach. Given recent trade journal entries, give ONE concise insight (2-3 sentences) about the trader\'s pattern and ONE specific actionable advice. Be encouraging but honest. Keep it under 100 words.' },
             { role: 'user', content: `Recent trades:\n${recentEntries}\n\nOverall stats: ${entries.length} trades, ${Math.round(entries.filter(e => e.pnl > 0).length / entries.length * 100)}% win rate, avg rating ${Math.round(entries.reduce((s, e) => s + e.rating, 0) / entries.length * 10) / 10}/10` },

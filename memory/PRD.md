@@ -1,39 +1,21 @@
 # AI Trading Bot - Product Requirements Document
 
-## Original Problem Statement
-AI-powered automated options trading bot with Upstox integration, sentiment analysis (GPT-4o), and desktop app.
-
-## Architecture (v4.3.0)
+## Architecture (v4.4.0)
 - **Backend**: Node.js/Express (port 8002)
-- **Frontend**: React + Tailwind + Shadcn
-- **Desktop**: Electron
-- **Database**: lowdb (JSON)
-- **AI**: GPT-4o via Emergent LLM Key
+- **AI**: GPT-4o via Emergent LLM Key (FIXED: was gpt-4.1-mini which silently failed)
+- **Broker**: Upstox (LIVE mode)
 
-## Implemented Features
-- Full news scraping (11 sources) + GPT-4o sentiment analysis
-- Automated signal generation with CALL/PUT mapping
-- Paper/Live trading with Upstox integration
-- Emergency stop (persists to backend)
-- Auto-entry/exit controls (properly enforced)
-- Max per trade limit (strict with LTP check)
-- **Max open trades limit: 5 across all instruments** (configurable in Settings → Risk)
-- AI Trade Journal with learning-based blocking
-- Sentiment-signal mismatch validation
-- India-specific market context in AI prompt
-- Live P&L auto-refresh, Technical Analysis, Tax Reports
+## v4.4.0 Fixes
+1. **GPT-4.1-mini references removed EVERYWHERE** (settings.js default, journal.js x2, SettingsPanel.js display, DB saved value)
+2. **LIVE P&L now reads ALL Upstox positions** (including closed qty=0) - fixes massive P&L mismatch
+3. **Portfolio endpoint** properly separates realized vs unrealized P&L from Upstox
+4. **5 trades per instrument** (configurable)
+5. **Journal AI reviews** now use GPT-4o (were failing with wrong model)
 
 ## Trade Limits
-- 1 CALL + 1 PUT per instrument (duplicate protection)
-- Total max 5 open trades across all instruments (configurable via `max_open_trades`)
+- Max 5 open trades per selected instrument (configurable in Settings → Risk)
+- No per-direction (CALL/PUT) limit within instrument
 
 ## Backlog
-### P1
-- Desktop build v4.3.0
-- Live broker verification
-
-### P2
-- Stock Options support
-- Telegram notifications
-- Strategy Backtesting
-- Dark Mode, Export Journal PDF
+### P1: Desktop build v4.4.0, Live verification
+### P2: Stock Options, Telegram, Backtesting, Dark Mode

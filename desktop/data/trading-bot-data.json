@@ -4,7 +4,7 @@
     "trading_mode": "PAPER",
     "ai": {
       "emergent_llm_key": "sk-emergent-754BdB27f511c159cC",
-      "model": "gpt-4.1-mini",
+      "model": "gpt-4o",
       "provider": "openai"
     },
     "broker": {

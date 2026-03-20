@@ -445,7 +445,7 @@ export default function SettingsPanel({ onClose, onSave }) {
                     <p className="text-xs text-gray-500 mt-1">Get from: Profile → Universal Key on Emergent platform. Without key, keyword-based analysis will be used.</p>
                   </div>
                   <div className="bg-blue-50 p-3 rounded border border-blue-200 text-sm text-gray-700">
-                    Currently using: <Badge className="bg-blue-600">GPT-4.1-mini</Badge> for news sentiment analysis
+                    Currently using: <Badge className="bg-blue-600">GPT-4o</Badge> for news sentiment analysis
                   </div>
                 </div>
               </div>
