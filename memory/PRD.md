@@ -7,22 +7,22 @@ Build an AI-powered automated options trading bot that:
 - Desktop application for Windows/Mac with auto-updates
 - Paper and Live trading modes
 
-## Architecture (v4.1.0)
+## Architecture (v4.1.5)
 ```
 /app/
-├── desktop/                  # Node.js/Express backend (SOLE BACKEND)
+├── desktop/                  # Node.js/Express backend (SOLE BACKEND - port 8002)
 │   ├── main.js               # Electron entry point
 │   ├── web_server.js          # Standalone web server
-│   ├── package.json           # v4.1.0
+│   ├── package.json           # v4.1.5
 │   └── routes/
 │       ├── lib/               # Modular logic
 │       │   ├── news_fetcher.js
 │       │   ├── sentiment.js
 │       │   ├── signal_generator.js
 │       │   ├── tax_calculator.js
-│       │   └── technical_analysis.js
+│       │   └── technical_analysis.js  # SMA signal added
 │       ├── news.js
-│       ├── trading.js         # Gradual price simulation + journal hook
+│       ├── trading.js         # Fixed: /api/trades/today now includes PAPER unrealized P&L
 │       ├── journal.js         # AI Trade Journal
 │       ├── portfolio.js
 │       ├── settings.js
@@ -35,14 +35,16 @@ Build an AI-powered automated options trading bot that:
 │       └── ai_engine.js
 ├── frontend/
 │   └── src/
-│       ├── App.js             # Active tab tracking + 1s trade refresh
+│       ├── App.js             # Fixed: Today's P&L from active trades' live_pnl + realized
 │       └── components/
-│           ├── TradesList.js   # Live P&L indicator + smooth transitions
+│           ├── RiskPanel.js    # Displays Today's P&L from riskMetrics
+│           ├── TradesList.js   # Live P&L indicator
 │           ├── TradeJournal.js
-│           ├── TaxReports.js
-│           └── TechnicalAnalysis.js
-└── backend/                   # MINIMAL PROXY (103 lines)
-    └── server.py              # Proxy → Node.js:8002
+│           ├── AIInsights.js   # Verified working
+│           ├── TechnicalAnalysis.js # Verified working
+│           └── TaxReports.js
+└── backend/                   # MINIMAL PROXY (Python → Node.js:8002)
+    └── server.py
 ```
 
 ## Tech Stack
@@ -62,23 +64,25 @@ Build an AI-powered automated options trading bot that:
 - Multi-broker support framework (Upstox active)
 - Live Option Chain with Greeks
 - Tax Reports with broker charges breakdown
-- Technical Analysis (RSI, MACD, EMA, SMA, VWAP)
+- Technical Analysis (RSI, MACD, EMA, SMA with signal, VWAP)
 - Market status and holiday tracking
 - Sector heatmap and AI insights
-- Desktop app builds (v4.1.0)
+- Desktop app builds (v4.1.5)
 - Python backend deleted, Node.js unified backend
 - AI Trade Journal (auto-review, insights, stats)
-- **1-second live P&L auto-refresh** on Active Trades tab
+- 1-second live P&L auto-refresh on Active Trades tab
 - Gradual price simulation for PAPER mode
-- Live refresh indicator with pulse animation
+- **FIXED: Today's P&L now shows realized + unrealized P&L correctly**
+- **VERIFIED: AI Brain and Technical Analysis reading data correctly**
 
 ## Prioritized Backlog
 
 ### P1 - High Priority
-- New desktop app build (v4.1.0)
+- New desktop app build (v4.1.5)
 - Full end-to-end user verification
 
 ### P2 - Medium Priority
+- Increase active trade limit (currently 1 CALL + 1 PUT per instrument)
 - Stock Options trading support
 - Telegram notifications integration
 - Strategy Backtesting
@@ -89,3 +93,4 @@ Build an AI-powered automated options trading bot that:
 - Mobile app
 - Social trading features
 - Export Journal to PDF
+- App.js refactoring (800+ lines - should be broken into components/hooks)
