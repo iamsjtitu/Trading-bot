@@ -56,17 +56,13 @@ module.exports = function createSignalGenerator(db, aiEngine) {
     const activeInst = db.data?.settings?.trading_instrument || db.data?.settings?.active_instrument || 'NIFTY50';
     const currentMode = db.data?.settings?.trading_mode || 'PAPER';
 
-    // TOTAL OPEN TRADES LIMIT - max 5 across all instruments
+    // MAX OPEN TRADES in selected instrument - default 5
     const maxTotalTrades = db.data?.settings?.risk?.max_open_trades || 5;
-    const allOpenTrades = (db.data.trades || []).filter(t => t.status === 'OPEN' && t.mode === currentMode);
-    if (allOpenTrades.length >= maxTotalTrades) {
-      console.log(`[Signal] BLOCKED - Max open trades limit reached (${allOpenTrades.length}/${maxTotalTrades})`);
+    const openInInstrument = (db.data.trades || []).filter(t => t.status === 'OPEN' && (t.instrument === activeInst || t.symbol === activeInst) && t.mode === currentMode);
+    if (openInInstrument.length >= maxTotalTrades) {
+      console.log(`[Signal] BLOCKED - ${activeInst} has ${openInInstrument.length}/${maxTotalTrades} open trades`);
       return null;
     }
-
-    // Per-instrument duplicate protection - 1 CALL + 1 PUT per instrument
-    const existingOpen = (db.data.trades || []).find(t => t.status === 'OPEN' && t.trade_type === signalType && (t.instrument === activeInst || t.symbol === activeInst) && t.mode === currentMode);
-    if (existingOpen) { console.log(`[Signal] Skipping ${signalType} ${activeInst} - already OPEN (${existingOpen.symbol})`); return null; }
 
     // AI JOURNAL CHECK - block signals for consistently losing sector+sentiment combos
     const historicalBlock = _shouldBlockFromJournal(sentiment.sector || 'BROAD_MARKET', sentiment.sentiment, signalType);
