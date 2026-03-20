@@ -194,6 +194,15 @@ module.exports = function (db) {
         const raw = resp.data.data || {};
         const rawKeys = Object.keys(raw);
         console.log('[QuickData] API returned keys:', rawKeys.join(', '));
+        // Log first quote structure for debugging
+        if (rawKeys.length > 0) {
+          const firstQuote = raw[rawKeys[0]];
+          console.log('[QuickData] Sample quote fields:', JSON.stringify({
+            last_price: firstQuote?.last_price, net_change: firstQuote?.net_change,
+            percentage_change: firstQuote?.percentage_change,
+            ohlc_close: firstQuote?.ohlc?.close, ohlc_open: firstQuote?.ohlc?.open
+          }));
+        }
         const indices = {};
         for (const [key, instrument] of Object.entries(allKeys)) {
           let quote = raw[instrument];
@@ -212,9 +221,19 @@ module.exports = function (db) {
             continue;
           }
           const ltp = quote.last_price || 0;
-          const netChange = quote.net_change || 0;
-          const prevClose = ltp - netChange;
-          const changePct = prevClose > 0 ? (netChange / prevClose) * 100 : 0;
+          // Try multiple sources for change data
+          let netChange = quote.net_change || 0;
+          let changePct = quote.percentage_change || 0;
+          const prevClose = quote.ohlc?.close || (ltp - netChange) || 0;
+          // If net_change is 0 but we have previous close, calculate manually
+          if (netChange === 0 && prevClose > 0 && ltp > 0 && ltp !== prevClose) {
+            netChange = ltp - prevClose;
+            changePct = (netChange / prevClose) * 100;
+          }
+          // If percentage_change is provided but changePct is still 0
+          if (changePct === 0 && prevClose > 0 && netChange !== 0) {
+            changePct = (netChange / prevClose) * 100;
+          }
           indices[key] = { value: ltp, change: Math.round(netChange * 100) / 100, changePct: Math.round(changePct * 100) / 100 };
         }
         // Cache market data for signal generation
