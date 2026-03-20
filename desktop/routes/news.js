@@ -79,6 +79,14 @@ module.exports = function (db) {
                   if (openInInstrument.length >= maxOpenTrades) {
                     if (db.notify) db.notify('signal', 'Signal Saved', `${signal.signal_type} ${signal.symbol} - Max ${maxOpenTrades} trades open`);
                   } else {
+                    // FEATURE 1: Multi-Timeframe Confirmation before trade execution
+                    const tfCheck = await signals.validateMultiTimeframe(signal);
+                    if (!tfCheck.valid) {
+                      console.log(`[News] Trade BLOCKED by Multi-TF: ${tfCheck.reason}`);
+                      signal.status = 'BLOCKED_TF';
+                      signal.block_reason = tfCheck.reason;
+                      if (db.notify) db.notify('risk', 'Multi-TF Block', `${signal.signal_type} ${signal.symbol} - ${tfCheck.reason}`);
+                    } else {
                     try {
                       const result = await signals.executeLiveTrade(signal, token);
                       if (db.notify) db.notify('entry', `LIVE ${signal.signal_type} Entry`, `${signal.symbol} | ${result.success ? 'Order: ' + result.order_id : 'FAILED: ' + (result.error || '')}`);
@@ -86,6 +94,7 @@ module.exports = function (db) {
                       if (!db.data.trades) db.data.trades = [];
                       db.data.trades.push({ id: uuid(), signal_id: signal.id, trade_type: signal.signal_type, symbol: signal.symbol, entry_time: new Date().toISOString(), entry_price: signal.entry_price, quantity: signal.quantity, investment: signal.investment_amount, status: 'FAILED', mode: 'LIVE', error: tradeErr.message });
                       if (db.notify) db.notify('error', 'Trade Failed', `${signal.symbol} ${signal.signal_type}: ${tradeErr.message}`);
+                    }
                     }
                   }
                 }

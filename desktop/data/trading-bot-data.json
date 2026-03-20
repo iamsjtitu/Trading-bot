@@ -63,7 +63,12 @@
     },
     "trading_instrument": "BANKNIFTY",
     "emergency_stop": false,
-    "active_broker": "upstox"
+    "active_broker": "upstox",
+    "ai_guards": {
+      "multi_timeframe": true,
+      "trailing_stop": true,
+      "multi_source_verification": true
+    }
   },
   "portfolio": {
     "type": "paper",
@@ -101,7 +106,9 @@
       "exit_price": null,
       "pnl": 0,
       "pnl_percentage": 0,
-      "_simPrice": 149.9989324588769
+      "_simPrice": 149.9989324588769,
+      "peak_price": 172.17404623628184,
+      "trailing_sl": 127.5
     },
     {
       "id": "81b3c059-c51c-4ed0-aabf-4b3bc9deec8a",
@@ -120,7 +127,9 @@
       "exit_price": null,
       "pnl": 0,
       "pnl_percentage": 0,
-      "_simPrice": 150.01850908128154
+      "_simPrice": 150.01850908128154,
+      "peak_price": 171.00368258719197,
+      "trailing_sl": 127.5
     },
     {
       "id": "test_trade_1",
@@ -139,7 +148,9 @@
       "sector": "BROAD_MARKET",
       "instrument": "NIFTY50",
       "signal_id": "test_sig_1",
-      "_simPrice": 188.3314093315706
+      "_simPrice": 188.3314093315706,
+      "peak_price": 215.74010591378075,
+      "trailing_sl": 159.79999999999998
     },
     {
       "id": "test_trade_2",
@@ -158,7 +169,9 @@
       "sector": "BROAD_MARKET",
       "instrument": "NIFTY50",
       "signal_id": "test_sig_2",
-      "_simPrice": 345.4005549440479
+      "_simPrice": 345.4005549440479,
+      "peak_price": 395.00170925067937,
+      "trailing_sl": 293.25
     }
   ],
   "signals": [

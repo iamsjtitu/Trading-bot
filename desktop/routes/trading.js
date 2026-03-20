@@ -219,10 +219,34 @@ module.exports = function (db) {
         try { const ltp = await axios.get(`https://api.upstox.com/v2/market-quote/ltp?instrument_key=${encodeURIComponent(trade.instrument_token)}`, { headers: { Accept: 'application/json', Authorization: `Bearer ${accessToken}`, 'Api-Version': '2.0' }, timeout: 10000 }); const quotes = ltp.data?.data || {}; const key = Object.keys(quotes)[0]; currentPrice = quotes[key]?.last_price || null; if (!currentPrice) continue; } catch (err) { continue; }
       } else { currentPrice = trade.entry_price * (1 + (Math.random() - 0.5) * 0.3); }
 
-      const targetPrice = trade.entry_price * (1 + finalTargetPct / 100); const stoplossPrice = trade.entry_price * (1 - finalStoplossPct / 100);
+      // ===== FEATURE 3: TRAILING STOP LOSS =====
+      const trailingEnabled = db.data?.settings?.ai_guards?.trailing_stop !== false; // default ON
+      if (trailingEnabled && trade.entry_price > 0) {
+        // Track peak price since entry
+        if (!trade.peak_price || currentPrice > trade.peak_price) {
+          trade.peak_price = currentPrice;
+        }
+        const profitPct = ((trade.peak_price - trade.entry_price) / trade.entry_price) * 100;
+        // Trailing activation: once profit reaches 50% of target, start trailing
+        const trailActivation = finalTargetPct * 0.5;
+        if (profitPct >= trailActivation) {
+          // Trail SL at 50% of peak profit
+          const trailedSL = Math.round(trade.entry_price + (trade.peak_price - trade.entry_price) * 0.5 * 100) / 100;
+          const originalSL = trade.entry_price * (1 - finalStoplossPct / 100);
+          const newSL = Math.max(trailedSL, originalSL);
+          if (newSL > (trade.trailing_sl || 0)) {
+            trade.trailing_sl = newSL;
+            console.log(`[Trail] ${trade.symbol} Peak:${trade.peak_price} Profit:${profitPct.toFixed(1)}% → Trail SL moved to ${newSL.toFixed(2)}`);
+          }
+        }
+      }
+
+      const targetPrice = trade.entry_price * (1 + finalTargetPct / 100);
+      // Use trailing SL if available, otherwise fixed SL
+      const effectiveSL = trade.trailing_sl || (trade.entry_price * (1 - finalStoplossPct / 100));
       let shouldExit = false, exitReason = '';
       if (currentPrice >= targetPrice) { shouldExit = true; exitReason = 'TARGET_HIT'; }
-      else if (currentPrice <= stoplossPrice) { shouldExit = true; exitReason = 'STOPLOSS_HIT'; }
+      else if (currentPrice <= effectiveSL) { shouldExit = true; exitReason = trade.trailing_sl ? 'TRAILING_SL_HIT' : 'STOPLOSS_HIT'; }
 
       if (shouldExit) {
         if (mode === 'LIVE' && accessToken && trade.instrument_token) {
@@ -242,6 +266,14 @@ module.exports = function (db) {
 
         // Auto re-entry only if auto_entry is ON AND NOT emergency stopped AND target hit
         if (isAutoEntryOn && !isEmergencyStopped && exitReason === 'TARGET_HIT') {
+          // FEATURE 6: Max Daily Loss check before re-entry
+          const maxDailyLoss = db.data?.settings?.auto_trading?.max_daily_loss || db.data?.settings?.risk?.max_daily_loss || 5000;
+          const dayStart = new Date(); dayStart.setHours(0, 0, 0, 0);
+          const dayClosedTrades = (db.data.trades || []).filter(t => t.status === 'CLOSED' && (t.exit_time || '') >= dayStart.toISOString());
+          const dayLoss = dayClosedTrades.reduce((s, t) => s + Math.min(0, t.pnl || 0), 0);
+          if (Math.abs(dayLoss) >= maxDailyLoss) {
+            console.log(`[AutoExit] Re-entry BLOCKED - Daily loss ₹${Math.abs(dayLoss)} >= ₹${maxDailyLoss}`);
+          } else {
           const reentryMinConf = db.data?.settings?.news?.min_confidence || 70;
           const news = (db.data.news_articles || []).filter(n => n.sentiment_analysis && n.sentiment_analysis.confidence >= reentryMinConf && ['BUY_CALL', 'BUY_PUT'].includes(n.sentiment_analysis.trading_signal)).sort((a, b) => (b.created_at || '').localeCompare(a.created_at || ''));
           const latestNews = news[0] || (db.data.news_articles || []).sort((a, b) => (b.created_at || '').localeCompare(a.created_at || ''))[0];
@@ -249,6 +281,7 @@ module.exports = function (db) {
             const newSignal = signalGen.generateSignal(latestNews);
             if (newSignal) { db.data.signals.push(newSignal); if (mode === 'LIVE' && accessToken) { const r = await signalGen.executeLiveTrade(newSignal, accessToken); if (r?.success) newTradesCount++; } else { signalGen.executePaperTrade(newSignal); newTradesCount++; } }
           }
+          } // close daily loss check
         }
       }
     }
@@ -309,6 +342,62 @@ module.exports = function (db) {
 
   // ============ Historical Patterns ============
   router.get('/api/historical-patterns', (req, res) => { const patterns = db.data.historical_patterns || []; const total = patterns.length; const profitable = patterns.filter(p => p.was_profitable).length; const sectorStats = {}; for (const p of patterns) { const s = p.sector || 'BROAD_MARKET'; if (!sectorStats[s]) sectorStats[s] = { total: 0, profitable: 0, total_pnl: 0 }; sectorStats[s].total++; if (p.was_profitable) sectorStats[s].profitable++; sectorStats[s].total_pnl += p.pnl || 0; } const sentimentStats = {}; for (const p of patterns) { const s = p.sentiment || 'NEUTRAL'; if (!sentimentStats[s]) sentimentStats[s] = { total: 0, profitable: 0, total_pnl: 0 }; sentimentStats[s].total++; if (p.was_profitable) sentimentStats[s].profitable++; sentimentStats[s].total_pnl += p.pnl || 0; } res.json({ status: 'success', total_patterns: total, profitable_patterns: profitable, win_rate: total ? Math.round((profitable / total) * 1000) / 10 : 0, sector_stats: sectorStats, sentiment_stats: sentimentStats, recent: patterns.slice(-20).reverse() }); });
+
+  // ============ AI Guards Status & Config ============
+  router.get('/api/ai-guards/status', (req, res) => {
+    const guards = db.data?.settings?.ai_guards || {};
+    const ist = new Date(Date.now() + 5.5 * 60 * 60 * 1000);
+    const istMins = ist.getUTCHours() * 60 + ist.getUTCMinutes();
+    const istTimeStr = `${Math.floor(istMins / 60)}:${String(istMins % 60).padStart(2, '0')} IST`;
+    const isVolatileWindow = (istMins >= 555 && istMins <= 585) || (istMins >= 900 && istMins <= 930);
+
+    const todayStart = new Date(); todayStart.setHours(0, 0, 0, 0);
+    const todayClosed = (db.data.trades || []).filter(t => t.status === 'CLOSED' && (t.exit_time || '') >= todayStart.toISOString());
+    const todayLoss = todayClosed.reduce((s, t) => s + Math.min(0, t.pnl || 0), 0);
+    const maxDailyLoss = db.data?.settings?.auto_trading?.max_daily_loss || 5000;
+
+    const aiEngine = db._sharedAIEngine;
+    const regime = aiEngine?.getMarketRegime ? aiEngine.getMarketRegime() : { regime: 'UNKNOWN', confidence: 0 };
+
+    const recentNews = (db.data.news_articles || []).filter(n => n.created_at >= new Date(Date.now() - 15 * 60 * 1000).toISOString());
+    const sentimentSources = {};
+    for (const n of recentNews) {
+      const sa = n.sentiment_analysis;
+      if (sa) {
+        const dir = sa.sentiment || 'NEUTRAL';
+        if (!sentimentSources[dir]) sentimentSources[dir] = new Set();
+        sentimentSources[dir].add(n.source || 'unknown');
+      }
+    }
+    const sourceCount = {};
+    for (const [dir, sources] of Object.entries(sentimentSources)) sourceCount[dir] = sources.size;
+
+    res.json({
+      status: 'success',
+      current_time: istTimeStr,
+      guards: {
+        multi_timeframe: { enabled: guards.multi_timeframe !== false, description: 'Signal confirmed by 2+ timeframes' },
+        market_regime_filter: { enabled: guards.market_regime_filter !== false, current_regime: regime.regime, confidence: regime.confidence, blocked: ['SIDEWAYS', 'CHOPPY', 'RANGE_BOUND'].includes((regime.regime || '').toUpperCase()) && regime.confidence >= 60 },
+        trailing_stop: { enabled: guards.trailing_stop !== false, description: 'SL moves up as price rises' },
+        multi_source_verification: { enabled: guards.multi_source_verification !== false, recent_sources: sourceCount },
+        time_of_day_filter: { enabled: guards.time_of_day_filter !== false, current_window: isVolatileWindow ? 'HIGH VOLATILITY - BLOCKED' : 'NORMAL', ist_time: istTimeStr },
+        max_daily_loss: { enabled: true, today_loss: Math.round(Math.abs(todayLoss)), limit: maxDailyLoss, blocked: Math.abs(todayLoss) >= maxDailyLoss },
+      },
+    });
+  });
+
+  router.post('/api/ai-guards/update', (req, res) => {
+    const body = req.body || {};
+    if (!db.data.settings) db.data.settings = {};
+    if (!db.data.settings.ai_guards) db.data.settings.ai_guards = {};
+    const allowed = ['multi_timeframe', 'market_regime_filter', 'trailing_stop', 'multi_source_verification', 'time_of_day_filter'];
+    for (const key of allowed) {
+      if (key in body) db.data.settings.ai_guards[key] = !!body[key];
+    }
+    db.save();
+    res.json({ status: 'success', ai_guards: db.data.settings.ai_guards });
+  });
+
 
   // ============ Tax Report (MOVED to /app/desktop/routes/tax.js) ============
   // Old local-only tax routes removed - tax.js now handles Upstox integration

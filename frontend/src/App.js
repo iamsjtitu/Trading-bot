@@ -23,6 +23,7 @@ import OptionChain from '@/components/OptionChain';
 import TradeJournal from '@/components/TradeJournal';
 import UpdateBanner from '@/components/UpdateBanner';
 import MarketStatusBanner from '@/components/MarketStatusBanner';
+import AIGuards from '@/components/AIGuards';
 
 // Detect if running in desktop (localhost) or web mode
 const BACKEND_URL = (() => {
@@ -677,6 +678,7 @@ function App() {
 
         <RiskPanel riskMetrics={riskMetrics} emergencyStop={emergencyStop} onEmergencyStop={handleEmergencyStop} formatCurrency={formatCurrency} tradingMode={tradingMode} brokerConnected={brokerConnected} />
         <AutoTradingSettings autoSettings={autoSettings} showAutoSettings={showAutoSettings} setShowAutoSettings={setShowAutoSettings} updateAutoSettings={updateAutoSettings} onDebug={runAutoTradeDebug} onExecuteSignal={executeLatestSignal} debugResult={debugResult} />
+        <AIGuards />
 
         {/* Portfolio Summary Cards */}
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">

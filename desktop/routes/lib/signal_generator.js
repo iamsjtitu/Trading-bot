@@ -34,6 +34,39 @@ module.exports = function createSignalGenerator(db, aiEngine) {
       return null;
     }
 
+    // ===== FEATURE 5: TIME-OF-DAY FILTER =====
+    // Block trading during high-volatility open/close windows
+    const ist = new Date(Date.now() + 5.5 * 60 * 60 * 1000);
+    const istMins = ist.getUTCHours() * 60 + ist.getUTCMinutes();
+    const istDay = ist.getUTCDay();
+    const todFilter = db.data?.settings?.ai_guards?.time_of_day_filter !== false; // default ON
+    if (todFilter) {
+      const openStart = 555;  // 9:15 IST
+      const openEnd = 585;    // 9:45 IST
+      const closeStart = 900; // 15:00 IST
+      const closeEnd = 930;   // 15:30 IST
+      if ((istMins >= openStart && istMins <= openEnd) || (istMins >= closeStart && istMins <= closeEnd)) {
+        console.log(`[Signal] BLOCKED by Time-of-Day Filter - IST ${Math.floor(istMins/60)}:${String(istMins%60).padStart(2,'0')} is in high-volatility window`);
+        return null;
+      }
+      // Also block weekends
+      if (istDay === 0 || istDay === 6) {
+        console.log('[Signal] BLOCKED - Weekend, market closed');
+        return null;
+      }
+    }
+
+    // ===== FEATURE 6: MAX DAILY LOSS AUTO-STOP =====
+    const maxDailyLoss = db.data?.settings?.auto_trading?.max_daily_loss || db.data?.settings?.risk?.max_daily_loss || 5000;
+    const dayStartForLoss = new Date(); dayStartForLoss.setHours(0, 0, 0, 0);
+    const todayClosedTrades = (db.data.trades || []).filter(t => t.status === 'CLOSED' && (t.exit_time || '') >= dayStartForLoss.toISOString());
+    const todayRealizedLoss = todayClosedTrades.reduce((sum, t) => sum + Math.min(0, t.pnl || 0), 0);
+    if (Math.abs(todayRealizedLoss) >= maxDailyLoss) {
+      console.log(`[Signal] BLOCKED by Max Daily Loss - Today's loss: ₹${Math.abs(todayRealizedLoss)} >= limit ₹${maxDailyLoss}. Auto-stopped.`);
+      if (db.notify) db.notify('risk', 'Daily Loss Limit Hit', `Today's loss ₹${Math.abs(Math.round(todayRealizedLoss))} >= ₹${maxDailyLoss}. Trading paused.`);
+      return null;
+    }
+
     // PROPER Call/Put mapping - only trade when signal is clear
     // SAFETY: Validate sentiment matches signal direction
     if (sentiment.trading_signal === 'BUY_CALL') {
@@ -58,6 +91,45 @@ module.exports = function createSignalGenerator(db, aiEngine) {
       console.log(`[Signal] BLOCKED - Confidence ${sentiment.confidence}% < min_confidence ${minConfidence}%. Skipping.`);
       return null;
     }
+
+    // ===== FEATURE 2: AI MARKET REGIME FILTER =====
+    // Block trades in SIDEWAYS/CHOPPY markets (options premium decays fast)
+    const regimeFilter = db.data?.settings?.ai_guards?.market_regime_filter !== false; // default ON
+    if (regimeFilter && aiEngine) {
+      const regime = aiEngine.getMarketRegime ? aiEngine.getMarketRegime() : null;
+      if (regime) {
+        const regimeName = regime.regime || regime.name || 'UNKNOWN';
+        const regimeConf = regime.confidence || 0;
+        if (['SIDEWAYS', 'CHOPPY', 'RANGE_BOUND'].includes(regimeName.toUpperCase()) && regimeConf >= 60) {
+          console.log(`[Signal] BLOCKED by Market Regime - ${regimeName} (${regimeConf}% confidence). Options lose value in sideways markets.`);
+          if (db.notify) db.notify('risk', 'Sideways Market', `Trading paused - ${regimeName} regime detected (${regimeConf}%)`);
+          return null;
+        }
+      }
+    }
+
+    // ===== FEATURE 4: MULTI-SOURCE NEWS VERIFICATION =====
+    // Signal only when 2+ news sources agree on the same direction within 15 minutes
+    const multiSourceCheck = db.data?.settings?.ai_guards?.multi_source_verification !== false; // default ON
+    if (multiSourceCheck) {
+      const fifteenMinsAgo = new Date(Date.now() - 15 * 60 * 1000).toISOString();
+      const recentNews = (db.data.news_articles || []).filter(n =>
+        n.created_at >= fifteenMinsAgo &&
+        n.id !== newsDoc.id &&
+        n.sentiment_analysis &&
+        n.sentiment_analysis.sentiment === sentiment.sentiment &&
+        n.sentiment_analysis.confidence >= 50
+      );
+      // Count unique sources
+      const sources = new Set(recentNews.map(n => n.source || 'unknown'));
+      const currentSource = newsDoc.source || 'unknown';
+      sources.add(currentSource);
+      if (sources.size < 2 && (db.data.news_articles || []).length > 3) {
+        console.log(`[Signal] BLOCKED by Multi-Source Check - Only ${sources.size} source(s) agree: [${[...sources].join(', ')}]. Need 2+.`);
+        return null;
+      }
+    }
+
     const signalType = sentiment.trading_signal === 'BUY_CALL' ? 'CALL' : 'PUT';
 
     const activeInst = db.data?.settings?.trading_instrument || db.data?.settings?.active_instrument || 'NIFTY50';
@@ -365,5 +437,85 @@ module.exports = function createSignalGenerator(db, aiEngine) {
     return false;
   }
 
-  return { generateSignal, executePaperTrade, executeLiveTrade, INSTRUMENTS, INST_KEY_MAP, LOT_SIZE_MAP };
+  // ===== FEATURE 1: MULTI-TIMEFRAME CONFIRMATION =====
+  // Async check: verify signal direction matches 2+ timeframes
+  async function validateMultiTimeframe(signal) {
+    const multiTF = db.data?.settings?.ai_guards?.multi_timeframe !== false; // default ON
+    if (!multiTF) return { valid: true, reason: 'Multi-TF check disabled' };
+
+    const settings = db.data?.settings || {};
+    const activeBroker = settings.active_broker || settings.broker?.name || 'upstox';
+    const token = settings.broker?.[`${activeBroker}_token`] || settings.broker?.access_token;
+    if (!token) return { valid: true, reason: 'No broker token - skipping TF check' };
+
+    const inst = signal.symbol || 'NIFTY50';
+    const instKey = INST_KEY_MAP[inst] || INST_KEY_MAP.NIFTY50;
+    const headers = { Accept: 'application/json', Authorization: `Bearer ${token}`, 'Api-Version': '2.0' };
+    const signalDir = signal.signal_type; // 'CALL' = bullish, 'PUT' = bearish
+
+    const timeframes = [
+      { name: '5min', type: 'intraday', upstox: '1minute', aggregate: 5 },
+      { name: '30min', type: 'intraday', upstox: '30minute', aggregate: 0 },
+    ];
+
+    let bullishCount = 0, bearishCount = 0;
+    for (const tf of timeframes) {
+      try {
+        let url;
+        if (tf.type === 'intraday') {
+          url = `https://api.upstox.com/v2/historical-candle/intraday/${encodeURIComponent(instKey)}/${tf.upstox}`;
+        } else {
+          const now = new Date();
+          const toDate = now.toISOString().substring(0, 10);
+          const fromDate = new Date(now.getTime() - 90 * 86400000).toISOString().substring(0, 10);
+          url = `https://api.upstox.com/v2/historical-candle/${encodeURIComponent(instKey)}/${tf.upstox}/${toDate}/${fromDate}`;
+        }
+        const resp = await axios.get(url, { headers, timeout: 8000 });
+        const raw = resp.data?.data?.candles || [];
+        if (raw.length < 10) continue;
+
+        // Simple trend detection: compare recent close vs EMA
+        // Latest candle is first in Upstox response
+        const closes = raw.slice(0, 20).map(c => c[4]).reverse(); // chronological
+        if (closes.length < 5) continue;
+
+        const ema5 = _calcEMA(closes, 5);
+        const ema10 = closes.length >= 10 ? _calcEMA(closes, 10) : ema5;
+        const latestClose = closes[closes.length - 1];
+
+        if (latestClose > ema5 && ema5 > ema10) bullishCount++;
+        else if (latestClose < ema5 && ema5 < ema10) bearishCount++;
+        // neutral = no count for either
+      } catch (e) {
+        console.log(`[MultiTF] ${tf.name} fetch failed: ${e.message}`);
+      }
+    }
+
+    const directionMatch = signalDir === 'CALL' ? bullishCount : bearishCount;
+    const oppositeCount = signalDir === 'CALL' ? bearishCount : bullishCount;
+
+    if (directionMatch >= 2) {
+      console.log(`[MultiTF] CONFIRMED - ${signalDir} matches ${directionMatch} timeframes`);
+      return { valid: true, reason: `${directionMatch} timeframes confirm ${signalDir}`, bullish: bullishCount, bearish: bearishCount };
+    }
+    if (oppositeCount >= 2) {
+      console.log(`[MultiTF] REJECTED - ${oppositeCount} timeframes OPPOSE ${signalDir}`);
+      return { valid: false, reason: `${oppositeCount} timeframes oppose ${signalDir}. Signal direction mismatch.`, bullish: bullishCount, bearish: bearishCount };
+    }
+    // 1 match or mixed → allow with warning
+    console.log(`[MultiTF] MIXED - B:${bullishCount} vs Bear:${bearishCount}. Allowing ${signalDir} with caution.`);
+    return { valid: true, reason: `Mixed timeframes (B:${bullishCount}, Bear:${bearishCount})`, bullish: bullishCount, bearish: bearishCount };
+  }
+
+  function _calcEMA(data, period) {
+    if (data.length < period) return data[data.length - 1];
+    const k = 2 / (period + 1);
+    let ema = data.slice(0, period).reduce((a, b) => a + b, 0) / period;
+    for (let i = period; i < data.length; i++) {
+      ema = data[i] * k + ema * (1 - k);
+    }
+    return ema;
+  }
+
+  return { generateSignal, executePaperTrade, executeLiveTrade, validateMultiTimeframe, INSTRUMENTS, INST_KEY_MAP, LOT_SIZE_MAP };
 };
