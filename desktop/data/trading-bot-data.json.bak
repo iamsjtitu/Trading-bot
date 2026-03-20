@@ -67,7 +67,10 @@
     "ai_guards": {
       "multi_timeframe": true,
       "trailing_stop": true,
-      "multi_source_verification": true
+      "multi_source_verification": true,
+      "position_sizing_mode": "conservative",
+      "kelly_sizing": true,
+      "greeks_filter": false
     }
   },
   "portfolio": {
@@ -1239,7 +1242,7 @@
         "changePct": 0.86
       }
     },
-    "last_updated": "2026-03-20T18:50:45.678Z"
+    "last_updated": "2026-03-20T19:14:43.304Z"
   },
   "historical_patterns": [
     {
