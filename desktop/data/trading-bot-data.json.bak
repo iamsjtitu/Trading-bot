@@ -22,7 +22,7 @@
       "stop_loss_pct": 30,
       "target_pct": 15,
       "risk_tolerance": "medium",
-      "max_open_trades": 4
+      "max_open_trades": 5
     },
     "auto_trading": {
       "auto_exit": true,
