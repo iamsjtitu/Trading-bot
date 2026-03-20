@@ -18,16 +18,18 @@
     "risk": {
       "initial_capital": 500000,
       "daily_limit": 100000,
-      "max_per_trade": 20000,
-      "stop_loss_pct": 25,
-      "target_pct": 50,
+      "max_per_trade": 40000,
+      "stop_loss_pct": 2,
+      "target_pct": 5,
       "risk_tolerance": "medium"
     },
     "auto_trading": {
       "auto_exit": true,
       "auto_entry": false,
       "auto_analysis": true,
-      "analysis_interval_minutes": 5
+      "analysis_interval_minutes": 5,
+      "target_pct": 5,
+      "stoploss_pct": 2
     },
     "schedule": {
       "enabled": true,
@@ -94,7 +96,8 @@
       "exit_time": null,
       "exit_price": null,
       "pnl": 0,
-      "pnl_percentage": 0
+      "pnl_percentage": 0,
+      "_simPrice": 149.95157151148115
     },
     {
       "id": "81b3c059-c51c-4ed0-aabf-4b3bc9deec8a",
@@ -112,7 +115,8 @@
       "exit_time": null,
       "exit_price": null,
       "pnl": 0,
-      "pnl_percentage": 0
+      "pnl_percentage": 0,
+      "_simPrice": 149.9467366143041
     },
     {
       "id": "test_trade_1",
@@ -130,7 +134,8 @@
       "sentiment": "BULLISH",
       "sector": "BROAD_MARKET",
       "instrument": "NIFTY50",
-      "signal_id": "test_sig_1"
+      "signal_id": "test_sig_1",
+      "_simPrice": 188.09318352927917
     },
     {
       "id": "test_trade_2",
@@ -148,7 +153,8 @@
       "sentiment": "BULLISH",
       "sector": "BROAD_MARKET",
       "instrument": "NIFTY50",
-      "signal_id": "test_sig_2"
+      "signal_id": "test_sig_2",
+      "_simPrice": 345.022133545911
     }
   ],
   "signals": [

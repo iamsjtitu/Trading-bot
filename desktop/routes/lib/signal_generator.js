@@ -41,6 +41,13 @@ module.exports = function createSignalGenerator(db, aiEngine) {
     const tolerance = riskCfg.risk_tolerance || 'medium';
     const riskParams = { low: { stop_loss_pct: 15, target_pct: 30, max_position_size: 0.03 }, medium: { stop_loss_pct: 25, target_pct: 50, max_position_size: 0.05 }, high: { stop_loss_pct: 35, target_pct: 70, max_position_size: 0.07 } };
     const rp = riskParams[tolerance] || riskParams.medium;
+    // Override with user's custom SL/Target if set in risk settings
+    if (riskCfg.stop_loss_pct != null && riskCfg.stop_loss_pct > 0) rp.stop_loss_pct = riskCfg.stop_loss_pct;
+    if (riskCfg.target_pct != null && riskCfg.target_pct > 0) rp.target_pct = riskCfg.target_pct;
+    // Also check auto_trading settings (synced from UI)
+    const autoTrading = db.data?.settings?.auto_trading || {};
+    if (autoTrading.stoploss_pct != null && autoTrading.stoploss_pct > 0) rp.stop_loss_pct = autoTrading.stoploss_pct;
+    if (autoTrading.target_pct != null && autoTrading.target_pct > 0) rp.target_pct = autoTrading.target_pct;
     const maxTrade = riskCfg.max_per_trade || 20000;
     const dailyLimit = riskCfg.daily_limit || 100000;
 
