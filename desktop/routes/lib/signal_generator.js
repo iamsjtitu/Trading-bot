@@ -31,9 +31,9 @@ module.exports = function createSignalGenerator(db, aiEngine) {
     const activeInst = db.data?.settings?.trading_instrument || db.data?.settings?.active_instrument || 'NIFTY50';
     const currentMode = db.data?.settings?.trading_mode || 'PAPER';
 
-    // Duplicate protection
-    const existingOpen = (db.data.trades || []).find(t => t.status === 'OPEN' && t.trade_type === signalType && t.symbol === activeInst && t.mode === currentMode);
-    if (existingOpen) { console.log(`[Signal] Skipping ${signalType} ${activeInst} - already OPEN`); return null; }
+    // Duplicate protection - check by instrument, not symbol (which includes strike/expiry)
+    const existingOpen = (db.data.trades || []).find(t => t.status === 'OPEN' && t.trade_type === signalType && (t.instrument === activeInst || t.symbol === activeInst) && t.mode === currentMode);
+    if (existingOpen) { console.log(`[Signal] Skipping ${signalType} ${activeInst} - already OPEN (${existingOpen.symbol})`); return null; }
 
     const portfolio = db.data.portfolio || {};
     const available = portfolio.available_capital || 500000;
@@ -125,8 +125,8 @@ module.exports = function createSignalGenerator(db, aiEngine) {
     try {
       const activeInst = signal.symbol || 'NIFTY50';
       // Duplicate protection
-      const existingOpen = (db.data.trades || []).find(t => t.status === 'OPEN' && t.trade_type === signal.signal_type && t.symbol === activeInst && t.mode === 'LIVE');
-      if (existingOpen) { console.log(`[LiveTrade] Skipping - already OPEN`); return { success: false, error: 'Duplicate position blocked' }; }
+      const existingOpen = (db.data.trades || []).find(t => t.status === 'OPEN' && t.trade_type === signal.signal_type && (t.instrument === activeInst || t.symbol === activeInst) && t.mode === 'LIVE');
+      if (existingOpen) { console.log(`[LiveTrade] Skipping - already OPEN (${existingOpen.symbol})`); return { success: false, error: `Duplicate position blocked - already have ${existingOpen.symbol} open` }; }
 
       const optionType = signal.signal_type === 'CALL' ? 'CE' : 'PE';
       const instKey = INST_KEY_MAP[activeInst] || 'NSE_INDEX|Nifty 50';
