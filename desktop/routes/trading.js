@@ -384,8 +384,9 @@ module.exports = function (db) {
     const sourceCount = {};
     for (const [dir, sources] of Object.entries(sentimentSources)) sourceCount[dir] = sources.size;
 
-    // Kelly stats
-    const closedTrades = (db.data.trades || []).filter(t => t.status === 'CLOSED' && t.pnl != null);
+    // Kelly stats - filtered by current trading mode
+    const currentTradingMode = db.data?.settings?.trading_mode || 'PAPER';
+    const closedTrades = (db.data.trades || []).filter(t => t.status === 'CLOSED' && t.pnl != null && (t.mode || 'PAPER') === currentTradingMode);
     const wins = closedTrades.filter(t => t.pnl > 0);
     const winRate = closedTrades.length > 0 ? Math.round(wins.length / closedTrades.length * 100) : 0;
     const kellyMode = guards.position_sizing_mode || 'balanced';

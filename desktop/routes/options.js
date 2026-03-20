@@ -162,8 +162,9 @@ module.exports = function (db) {
 
   // GET /api/position-sizing - Kelly Criterion position sizing
   router.get('/api/position-sizing', (req, res) => {
-    const sizing = calculatePositionSize(db);
-    res.json({ status: 'success', ...sizing });
+    const currentMode = db.data?.settings?.trading_mode || 'PAPER';
+    const sizing = calculatePositionSize(db, currentMode);
+    res.json({ status: 'success', trading_mode: currentMode, ...sizing });
   });
 
   // POST /api/position-sizing/mode - Update sizing mode
@@ -177,7 +178,7 @@ module.exports = function (db) {
     db.data.settings.ai_guards.position_sizing_mode = mode;
     db.save();
 
-    const sizing = calculatePositionSize(db);
+    const sizing = calculatePositionSize(db, db.data?.settings?.trading_mode || 'PAPER');
     res.json({ status: 'success', mode, ...sizing });
   });
 

@@ -19,13 +19,17 @@ function kellyFraction(winRate, avgWin, avgLoss) {
 /**
  * Calculate position sizing recommendation
  */
-function calculatePositionSize(db) {
+function calculatePositionSize(db, tradingMode) {
   const trades = db.data?.trades || [];
-  const closedTrades = trades.filter(t => t.status === 'CLOSED' && t.pnl != null);
+  // BUG FIX: Filter trades by current trading mode (PAPER/LIVE)
+  // So Kelly stats are accurate for the mode being traded
+  const currentMode = tradingMode || db.data?.settings?.trading_mode || 'PAPER';
+  const closedTrades = trades.filter(t => t.status === 'CLOSED' && t.pnl != null && (t.mode || 'PAPER') === currentMode);
   const capital = db.data?.settings?.risk?.capital || db.data?.settings?.risk?.max_portfolio_value || 200000;
   const riskCfg = db.data?.settings?.risk || {};
   const maxPerTrade = riskCfg.max_per_trade || 20000;
   const mode = db.data?.settings?.ai_guards?.position_sizing_mode || 'balanced';
+  console.log(`[Kelly] Mode: ${currentMode}, Closed trades in mode: ${closedTrades.length}`);
 
   // Calculate stats from closed trades
   const wins = closedTrades.filter(t => (t.pnl || 0) > 0);
@@ -146,8 +150,8 @@ function calculatePositionSize(db) {
 /**
  * Get position size for a specific signal (called from signal_generator)
  */
-function getSignalPositionSize(db, signal) {
-  const sizing = calculatePositionSize(db);
+function getSignalPositionSize(db, signal, tradingMode) {
+  const sizing = calculatePositionSize(db, tradingMode);
   const amount = sizing.suggestion.amount;
   const entryPrice = signal.entry_price || 150;
   const lotSize = signal.lot_size || 1;

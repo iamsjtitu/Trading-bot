@@ -201,7 +201,7 @@ module.exports = function createSignalGenerator(db, aiEngine) {
     let kellySizing = null;
     if (kellyEnabled) {
       try {
-        const kellyResult = getSignalPositionSize(db, { entry_price: optionPremium, lot_size: 1 });
+        const kellyResult = getSignalPositionSize(db, { entry_price: optionPremium, lot_size: 1 }, currentMode);
         if (kellyResult && kellyResult.investment > 0) {
           const kellyQty = Math.max(1, Math.floor(kellyResult.investment / optionPremium));
           // Only reduce, never increase beyond existing logic (safety)
@@ -210,7 +210,7 @@ module.exports = function createSignalGenerator(db, aiEngine) {
             quantity = kellyQty;
             positionSize = quantity * optionPremium;
           }
-          kellySizing = { kelly_pct: kellyResult.kelly_pct, mode: kellyResult.mode, streak: kellyResult.streak_status, drawdown_mult: kellyResult.drawdown_multiplier };
+          kellySizing = { kelly_pct: kellyResult.kelly_pct, mode: kellyResult.mode, streak: kellyResult.streak_status, drawdown_mult: kellyResult.drawdown_multiplier, suggested_amount: kellyResult.investment };
         }
       } catch (e) { console.log(`[Kelly] Error: ${e.message} - using default sizing`); }
     }
@@ -222,7 +222,14 @@ module.exports = function createSignalGenerator(db, aiEngine) {
       try {
         const instConfig = INSTRUMENTS[activeInst] || INSTRUMENTS.NIFTY50;
         let spotPrice = instConfig.base_price;
-        if (db.data.market_data?.indices) { const idx = db.data.market_data.indices[activeInst.toLowerCase()]; if (idx?.value > 0) spotPrice = idx.value; }
+        // Try cached market data first
+        if (db.data.market_data?.indices) {
+          const idx = db.data.market_data.indices[activeInst.toLowerCase()];
+          if (idx?.value > 0) spotPrice = idx.value;
+          else console.log(`[Greeks] WARNING: No live spot for ${activeInst}, using fallback ${spotPrice}`);
+        } else {
+          console.log(`[Greeks] WARNING: No market data cached, using fallback spot ${spotPrice} for ${activeInst}`);
+        }
         const strikeStep = instConfig.strike_step || 50;
         const atmStrike = Math.round(spotPrice / strikeStep) * strikeStep;
         const strikeOffset = signalType === 'CALL' ? strikeStep * 2 : -(strikeStep * 2);
@@ -230,10 +237,27 @@ module.exports = function createSignalGenerator(db, aiEngine) {
         const optType = signalType === 'CALL' ? 'CE' : 'PE';
         const daysToExpiry = getDaysToExpiry();
         const T = daysToExpiry / 365;
-        const iv = 0.15; // default IV estimate
+
+        // Smart IV estimation instead of hardcoded 15%
+        // Use historical IV from recent signals if available, else use instrument-specific defaults
+        let iv = 0.15;
+        const recentSignalIVs = (db.data.signals || []).filter(s => s.greeks?.iv > 0).map(s => s.greeks.iv / 100).slice(-10);
+        if (recentSignalIVs.length >= 3) {
+          iv = recentSignalIVs.reduce((a, b) => a + b, 0) / recentSignalIVs.length;
+          console.log(`[Greeks] Using avg IV from ${recentSignalIVs.length} recent signals: ${(iv * 100).toFixed(1)}%`);
+        } else {
+          // Instrument-specific default IVs (more realistic than flat 15%)
+          const defaultIVs = { NIFTY50: 0.14, BANKNIFTY: 0.18, FINNIFTY: 0.16, MIDCPNIFTY: 0.20, SENSEX: 0.14, BANKEX: 0.18 };
+          iv = defaultIVs[activeInst] || 0.15;
+          // OTM options have higher IV (volatility smile)
+          const moneyness = Math.abs(strike - spotPrice) / spotPrice;
+          if (moneyness > 0.02) iv *= 1.15; // 2%+ OTM: add 15% IV premium
+          if (moneyness > 0.04) iv *= 1.10; // 4%+ OTM: add another 10%
+        }
+
         const greeks = blackScholes(optType, spotPrice, strike, T, 0.07, iv);
         const analysis = analyzeOption(greeks, iv, 50);
-        greeksAnalysis = { delta: greeks.delta, gamma: greeks.gamma, theta: greeks.theta, vega: greeks.vega, iv: Math.round(iv * 10000) / 100, score: analysis.score, iv_signal: analysis.iv_signal, theta_signal: analysis.theta_signal };
+        greeksAnalysis = { delta: greeks.delta, gamma: greeks.gamma, theta: greeks.theta, vega: greeks.vega, iv: Math.round(iv * 10000) / 100, score: analysis.score, iv_signal: analysis.iv_signal, theta_signal: analysis.theta_signal, spot_used: spotPrice };
 
         // Block if Greeks score is too low (option is terrible)
         if (analysis.score < 25) {
@@ -330,7 +354,18 @@ module.exports = function createSignalGenerator(db, aiEngine) {
 
       // STRICT max_per_trade enforcement
       const riskCfg = db.data?.settings?.risk || {};
-      const maxTrade = riskCfg.max_per_trade || 20000;
+      let maxTrade = riskCfg.max_per_trade || 20000;
+
+      // BUG FIX: Apply Kelly Criterion to LIVE trades
+      // If Kelly sizing is enabled and signal has Kelly data, use Kelly's suggested amount as budget cap
+      const kellyEnabled = db.data?.settings?.ai_guards?.kelly_sizing !== false;
+      if (kellyEnabled && signal.kelly_sizing?.suggested_amount > 0) {
+        const kellyBudget = signal.kelly_sizing.suggested_amount;
+        if (kellyBudget < maxTrade) {
+          console.log(`[LiveTrade] Kelly reducing budget from ₹${maxTrade} to ₹${kellyBudget} (${signal.kelly_sizing.kelly_pct}% kelly, streak: ${signal.kelly_sizing.streak})`);
+          maxTrade = kellyBudget;
+        }
+      }
 
       const optionType = signal.signal_type === 'CALL' ? 'CE' : 'PE';
       const instKey = INST_KEY_MAP[activeInst] || 'NSE_INDEX|Nifty 50';
