@@ -4,6 +4,8 @@
  */
 const axios = require('axios');
 const crypto = require('crypto');
+const { getSignalPositionSize } = require('./position_sizing');
+const { blackScholes, calcIV, getDaysToExpiry, analyzeOption } = require('./greeks');
 function uuid() { return crypto.randomUUID(); }
 
 const INSTRUMENTS = {
@@ -187,12 +189,63 @@ module.exports = function createSignalGenerator(db, aiEngine) {
     if (basePositionSize < 1000) return null;
 
     const dynamicSize = aiEngine.calculateDynamicPositionSize(basePositionSize, adjustedConfidence, sentiment.sector || 'BROAD_MARKET');
-    const positionSize = Math.min(dynamicSize.size, basePositionSize);
+    let positionSize = Math.min(dynamicSize.size, basePositionSize);
     if (positionSize < 1000) return null;
 
     const optionPremium = 150;
-    const quantity = Math.floor(positionSize / optionPremium);
+    let quantity = Math.floor(positionSize / optionPremium);
     if (quantity === 0) return null;
+
+    // ===== KELLY CRITERION POSITION SIZING (toggleable) =====
+    const kellyEnabled = db.data?.settings?.ai_guards?.kelly_sizing !== false; // default ON
+    let kellySizing = null;
+    if (kellyEnabled) {
+      try {
+        const kellyResult = getSignalPositionSize(db, { entry_price: optionPremium, lot_size: 1 });
+        if (kellyResult && kellyResult.investment > 0) {
+          const kellyQty = Math.max(1, Math.floor(kellyResult.investment / optionPremium));
+          // Only reduce, never increase beyond existing logic (safety)
+          if (kellyQty < quantity) {
+            console.log(`[Kelly] Reducing qty from ${quantity} to ${kellyQty} (${kellyResult.kelly_pct}% kelly, ${kellyResult.streak_status})`);
+            quantity = kellyQty;
+            positionSize = quantity * optionPremium;
+          }
+          kellySizing = { kelly_pct: kellyResult.kelly_pct, mode: kellyResult.mode, streak: kellyResult.streak_status, drawdown_mult: kellyResult.drawdown_multiplier };
+        }
+      } catch (e) { console.log(`[Kelly] Error: ${e.message} - using default sizing`); }
+    }
+
+    // ===== GREEKS IV FILTER (toggleable) =====
+    const greeksEnabled = db.data?.settings?.ai_guards?.greeks_filter !== false; // default ON
+    let greeksAnalysis = null;
+    if (greeksEnabled) {
+      try {
+        const instConfig = INSTRUMENTS[activeInst] || INSTRUMENTS.NIFTY50;
+        let spotPrice = instConfig.base_price;
+        if (db.data.market_data?.indices) { const idx = db.data.market_data.indices[activeInst.toLowerCase()]; if (idx?.value > 0) spotPrice = idx.value; }
+        const strikeStep = instConfig.strike_step || 50;
+        const atmStrike = Math.round(spotPrice / strikeStep) * strikeStep;
+        const strikeOffset = signalType === 'CALL' ? strikeStep * 2 : -(strikeStep * 2);
+        const strike = atmStrike + strikeOffset;
+        const optType = signalType === 'CALL' ? 'CE' : 'PE';
+        const daysToExpiry = getDaysToExpiry();
+        const T = daysToExpiry / 365;
+        const iv = 0.15; // default IV estimate
+        const greeks = blackScholes(optType, spotPrice, strike, T, 0.07, iv);
+        const analysis = analyzeOption(greeks, iv, 50);
+        greeksAnalysis = { delta: greeks.delta, gamma: greeks.gamma, theta: greeks.theta, vega: greeks.vega, iv: Math.round(iv * 10000) / 100, score: analysis.score, iv_signal: analysis.iv_signal, theta_signal: analysis.theta_signal };
+
+        // Block if Greeks score is too low (option is terrible)
+        if (analysis.score < 25) {
+          console.log(`[Greeks] BLOCKED - Score ${analysis.score}/100 too low. ${analysis.warnings.join('; ')}`);
+          return null;
+        }
+        // Warn but allow if score is mediocre
+        if (analysis.score < 40) {
+          console.log(`[Greeks] WARNING - Score ${analysis.score}/100 mediocre. Proceeding with caution.`);
+        }
+      } catch (e) { console.log(`[Greeks] Error: ${e.message} - skipping Greeks filter`); }
+    }
 
     let enhancedReason = sentiment.reason || '';
     if (sentiment.correlation_score) enhancedReason += ` | Correlation: ${sentiment.correlation_score}%`;
@@ -225,7 +278,8 @@ module.exports = function createSignalGenerator(db, aiEngine) {
       sector: sentiment.sector || 'BROAD_MARKET', secondary_sector: sentiment.secondary_sector || 'NONE',
       volatility: sentiment.volatility || 'STABLE', time_horizon: sentiment.time_horizon || 'SHORT_TERM',
       risk_level: sentiment.risk_level || 'MEDIUM', freshness_score: sentiment.freshness_score || 50,
-      position_sizing: dynamicSize.factors, reason: enhancedReason, news_id: newsDoc.id, status: 'ACTIVE',
+      position_sizing: dynamicSize.factors, kelly_sizing: kellySizing, greeks: greeksAnalysis,
+      reason: enhancedReason, news_id: newsDoc.id, status: 'ACTIVE',
       mode: currentMode, created_at: new Date().toISOString(), expires_at: new Date(Date.now() + 7 * 86400000).toISOString(),
     };
   }

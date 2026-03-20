@@ -11,7 +11,7 @@ import requests
 import os
 import time
 
-BASE_URL = os.environ.get('REACT_APP_BACKEND_URL', 'https://nifty-ai-signals-1.preview.emergentagent.com').rstrip('/')
+BASE_URL = os.environ.get('REACT_APP_BACKEND_URL', 'https://nifty-options-auto.preview.emergentagent.com').rstrip('/')
 
 class TestAIGuardsStatus:
     """Test GET /api/ai-guards/status - All 6 guards with correct structure"""

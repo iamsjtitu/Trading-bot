@@ -384,6 +384,15 @@ module.exports = function (db) {
     const sourceCount = {};
     for (const [dir, sources] of Object.entries(sentimentSources)) sourceCount[dir] = sources.size;
 
+    // Kelly stats
+    const closedTrades = (db.data.trades || []).filter(t => t.status === 'CLOSED' && t.pnl != null);
+    const wins = closedTrades.filter(t => t.pnl > 0);
+    const winRate = closedTrades.length > 0 ? Math.round(wins.length / closedTrades.length * 100) : 0;
+    const kellyMode = guards.position_sizing_mode || 'balanced';
+    let consecutiveLosses = 0;
+    const recent = closedTrades.slice(-10);
+    for (let i = recent.length - 1; i >= 0; i--) { if ((recent[i].pnl || 0) < 0) consecutiveLosses++; else break; }
+
     res.json({
       status: 'success',
       current_time: istTimeStr,
@@ -394,6 +403,8 @@ module.exports = function (db) {
         multi_source_verification: { enabled: guards.multi_source_verification !== false, recent_sources: sourceCount },
         time_of_day_filter: { enabled: guards.time_of_day_filter !== false, current_window: isVolatileWindow ? 'HIGH VOLATILITY - BLOCKED' : 'NORMAL', ist_time: istTimeStr },
         max_daily_loss: { enabled: true, today_loss: Math.round(Math.abs(todayLoss)), limit: maxDailyLoss, blocked: Math.abs(todayLoss) >= maxDailyLoss },
+        kelly_sizing: { enabled: guards.kelly_sizing !== false, mode: kellyMode, win_rate: winRate, total_trades: closedTrades.length, consecutive_losses: consecutiveLosses, description: 'AI decides how much to invest per trade' },
+        greeks_filter: { enabled: guards.greeks_filter !== false, description: 'Options Greeks & IV analysis filters bad options' },
       },
     });
   });
@@ -402,7 +413,7 @@ module.exports = function (db) {
     const body = req.body || {};
     if (!db.data.settings) db.data.settings = {};
     if (!db.data.settings.ai_guards) db.data.settings.ai_guards = {};
-    const allowed = ['multi_timeframe', 'market_regime_filter', 'trailing_stop', 'multi_source_verification', 'time_of_day_filter'];
+    const allowed = ['multi_timeframe', 'market_regime_filter', 'trailing_stop', 'multi_source_verification', 'time_of_day_filter', 'kelly_sizing', 'greeks_filter'];
     for (const key of allowed) {
       if (key in body) db.data.settings.ai_guards[key] = !!body[key];
     }

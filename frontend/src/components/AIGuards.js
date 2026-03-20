@@ -13,12 +13,14 @@ const BACKEND_URL = (() => {
 const API = `${BACKEND_URL}/api`;
 
 const GUARD_INFO = {
-  multi_timeframe: { label: 'Multi-Timeframe Confirmation', icon: FaLayerGroup, desc: 'Signal tab hi trade hoga jab 2+ timeframes (5min + 30min) same direction confirm karein. Fake signals 60-70% kam.' },
+  multi_timeframe: { label: 'Multi-Timeframe Confirmation', icon: FaLayerGroup, desc: 'Signal tab hi trade hoga jab 2+ timeframes (5min + 30min) same direction confirm karein.' },
   market_regime_filter: { label: 'Market Regime Filter', icon: FaChartLine, desc: 'Sideways/Choppy market mein auto trading pause. Options premium decay se loss bacha.' },
   trailing_stop: { label: 'Trailing Stop Loss', icon: FaArrowUp, desc: 'Jaise price upar jaye, SL bhi upar move kare. Winning trades ka profit lock hota hai.' },
-  multi_source_verification: { label: 'Multi-Source News Verification', icon: FaNewspaper, desc: 'Trade tab ho jab 2+ alag news sources same direction (BULLISH/BEARISH) dikha rahe ho 15 min mein.' },
+  multi_source_verification: { label: 'Multi-Source News Verification', icon: FaNewspaper, desc: 'Trade tab ho jab 2+ alag news sources same direction dikha rahe ho 15 min mein.' },
   time_of_day_filter: { label: 'Time-of-Day Filter', icon: FaClock, desc: 'Market open (9:15-9:45) aur close (3:00-3:30) pe high volatility window mein trading pause.' },
-  max_daily_loss: { label: 'Max Daily Loss Auto-Stop', icon: FaExclamationTriangle, desc: 'Agar din ka total loss limit cross kare toh baaki din trading band. Capital protection.' },
+  max_daily_loss: { label: 'Max Daily Loss Auto-Stop', icon: FaExclamationTriangle, desc: 'Agar din ka total loss limit cross kare toh baaki din trading band.' },
+  kelly_sizing: { label: 'Smart Position Sizing (Kelly)', icon: FaChartLine, desc: 'AI decide kare kitna invest karna hai - win rate, streak, drawdown sab dekhke. Losing streak mein size reduce.' },
+  greeks_filter: { label: 'Options Greeks & IV Filter', icon: FaLayerGroup, desc: 'Delta, Theta, IV check karke bekar options avoid. High theta decay ya expensive IV wale options block.' },
 };
 
 export default function AIGuards() {

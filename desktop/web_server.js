@@ -93,6 +93,7 @@ const routeModules = [
   { name: 'broker_router', load: () => require('./routes/broker_router')(db) },
   { name: 'technical', load: () => require('./routes/technical')(db) },
   { name: 'journal', load: () => require('./routes/journal')(db) },
+  { name: 'options', load: () => require('./routes/options')(db) },
 ];
 
 let loaded = 0;
