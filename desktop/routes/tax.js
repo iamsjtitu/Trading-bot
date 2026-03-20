@@ -18,15 +18,42 @@ module.exports = function (db) {
     return { Accept: 'application/json', Authorization: `Bearer ${token}`, 'Api-Version': '2.0' };
   }
 
+  /** Parse FY from various frontend formats: "2025-26", "2526", "25-26" -> "2526" */
+  function parseFY(raw) {
+    if (!raw) return '2526';
+    const s = String(raw).replace(/\s/g, '');
+    // "2025-26" -> "2526"
+    const m4 = s.match(/^(\d{4})-(\d{2})$/);
+    if (m4) return m4[1].slice(2) + m4[2];
+    // "25-26" -> "2526"
+    const m2 = s.match(/^(\d{2})-(\d{2})$/);
+    if (m2) return m2[1] + m2[2];
+    // Already "2526"
+    if (/^\d{4}$/.test(s)) return s;
+    return '2526';
+  }
+
+  /** Get FY date range in dd-mm-yyyy format for Upstox API */
+  function getFYDateRange(fyCode) {
+    const startYear = 2000 + parseInt(fyCode.substring(0, 2));
+    const endYear = 2000 + parseInt(fyCode.substring(2, 4));
+    return {
+      from_date: `01-04-${startYear}`,
+      to_date: `31-03-${endYear}`,
+      startYear,
+      endYear,
+    };
+  }
+
   // GET /api/tax/report - Full tax report from Upstox
   router.get('/api/tax/report', async (req, res) => {
     const token = getActiveBrokerToken();
-    const fy = req.query.fy || '2526'; // FY 2025-26
+    const fy = parseFY(req.query.fy || req.query.fy_year || req.query.financial_year);
     const segment = req.query.segment || 'FO';
+    const { from_date, to_date, startYear, endYear } = getFYDateRange(fy);
 
-    console.log(`[Tax] Token present: ${!!token}, len: ${(token||'').length}, mode: ${db.data?.settings?.trading_mode}`);
+    console.log(`[Tax] Token present: ${!!token}, len: ${(token || '').length}, FY: ${fy}, dates: ${from_date} to ${to_date}`);
 
-    // If no token, fallback to local data
     if (!token) {
       console.log('[Tax] No broker token found - using local fallback');
       return getLocalTaxReport(req, res, fy, segment);
@@ -35,103 +62,61 @@ module.exports = function (db) {
     try {
       const headers = getHeaders(token);
 
-      // Step 1: Get metadata for page_size
-      let pageSize = 40;
+      // Step 1: Get metadata to know total trades and page size limit
+      let totalTradesExpected = 0;
+      let pageSizeLimit = 500;
       try {
-        const metaResp = await axios.get(`https://api.upstox.com/v2/trade/profit-loss/metadata`, {
+        const metaResp = await axios.get('https://api.upstox.com/v2/trade/profit-loss/metadata', {
           headers, params: { segment, financial_year: fy }, timeout: 15000
         });
         if (metaResp.data?.status === 'success' && metaResp.data?.data) {
-          pageSize = metaResp.data.data.page_size_limit || 40;
-          console.log(`[Tax] Metadata: pageSize=${pageSize}, trades=${metaResp.data.data.trades_count || '?'}`);
+          pageSizeLimit = metaResp.data.data.page_size_limit || 500;
+          totalTradesExpected = metaResp.data.data.trades_count || 0;
+          console.log(`[Tax] Metadata: pageSizeLimit=${pageSizeLimit}, trades_count=${totalTradesExpected}`);
         }
-      } catch (e) { console.log(`[Tax] Metadata fetch failed: ${e.message}, using default pageSize=40`); }
+      } catch (e) { console.log(`[Tax] Metadata fetch failed: ${e.message}`); }
 
-      // Step 2: Fetch ALL P&L data pages
+      // Use max allowed page size to minimize API calls
+      const pageSize = Math.min(pageSizeLimit, 5000);
+
+      // Step 2: Fetch ALL P&L data pages with from_date/to_date
       let allTrades = [];
       let page = 1;
       let hasMore = true;
       while (hasMore) {
         try {
-          const dataResp = await axios.get(`https://api.upstox.com/v2/trade/profit-loss/data`, {
-            headers, params: { segment, financial_year: fy, page_number: page, page_size: pageSize }, timeout: 15000
+          const dataResp = await axios.get('https://api.upstox.com/v2/trade/profit-loss/data', {
+            headers,
+            params: {
+              segment,
+              financial_year: fy,
+              page_number: String(page),
+              page_size: String(pageSize),
+              from_date,
+              to_date,
+            },
+            timeout: 30000
           });
           if (dataResp.data?.status === 'success' && dataResp.data?.data) {
             const trades = Array.isArray(dataResp.data.data) ? dataResp.data.data : [];
             allTrades = allTrades.concat(trades);
-            console.log(`[Tax] Page ${page}: ${trades.length} trades fetched`);
+            console.log(`[Tax] Page ${page}: ${trades.length} trades (total so far: ${allTrades.length})`);
             hasMore = trades.length >= pageSize;
             page++;
           } else {
+            console.log(`[Tax] Page ${page}: no success response`, dataResp.data?.status);
             hasMore = false;
           }
         } catch (e) {
           console.error(`[Tax] P&L data page ${page} failed: ${e.message}`);
           hasMore = false;
         }
-        // Safety: max 50 pages
-        if (page > 50) break;
+        if (page > 100) break;
       }
 
-      // Step 3: Fetch charges OR calculate manually
-      let charges = { brokerage: 0, stt: 0, transaction_charges: 0, gst: 0, stamp_duty: 0, sebi_charges: 0, ipft: 0, total: 0 };
-      let chargesSource = 'calculated';
-      try {
-        const chargesResp = await axios.get(`https://api.upstox.com/v2/trade/profit-loss/charges`, {
-          headers, params: { segment, financial_year: fy }, timeout: 15000
-        });
-        if (chargesResp.data?.status === 'success' && chargesResp.data?.data) {
-          const cd = chargesResp.data.data;
-          const apiTotal = cd.total || cd.charges_breakdown?.total || 0;
-          if (apiTotal > 0) {
-            charges = {
-              brokerage: cd.brokerage || cd.charges_breakdown?.brokerage || 0,
-              stt: cd.stt_total || cd.stt || cd.charges_breakdown?.stt || 0,
-              transaction_charges: cd.exchange_turnover_charge || cd.transaction_charges || cd.charges_breakdown?.exchange_turnover_charge || 0,
-              gst: cd.gst || cd.charges_breakdown?.gst || 0,
-              stamp_duty: cd.stamp_duty || cd.charges_breakdown?.stamp_duty || 0,
-              sebi_charges: cd.sebi_charges || cd.sebi_turnover_fee || cd.charges_breakdown?.sebi_turnover_fee || 0,
-              ipft: cd.ipft || cd.charges_breakdown?.ipft || 0,
-              total: apiTotal,
-            };
-            chargesSource = 'upstox_api';
-            console.log(`[Tax] Charges from API: Total = ₹${charges.total}`);
-          }
-        }
-      } catch (e) { console.error(`[Tax] Charges fetch failed: ${e.message}`); }
+      console.log(`[Tax] Total trades fetched: ${allTrades.length} (expected: ${totalTradesExpected})`);
 
-      // If Upstox API returned 0 charges, calculate manually (₹20 per order)
-      if (charges.total === 0 && allTrades.length > 0) {
-        const brokeragePerOrder = db.data?.settings?.risk?.brokerage_per_order || 20;
-        // Each trade = buy order + sell order = 2 orders
-        const totalOrders = allTrades.length * 2;
-        // Add today's positions orders
-        const todayOrders = todayPositions.length * 2;
-
-        const brokerage = (totalOrders + todayOrders) * brokeragePerOrder;
-        // F&O Options regulatory charges (on premium turnover)
-        const totalTurnoverForCharges = totalBuyValue + totalSellValue + todayPositions.reduce((s, p) => s + Math.abs(p.pnl || 0), 0) * 2;
-        const stt = Math.round(totalSellValue * 0.000625 * 100) / 100; // 0.0625% on sell side (options)
-        const txnCharges = Math.round(totalTurnoverForCharges * 0.0005 * 100) / 100; // ~0.05% NSE
-        const gst = Math.round((brokerage + txnCharges) * 0.18 * 100) / 100; // 18% GST
-        const stampDuty = Math.round(totalBuyValue * 0.00003 * 100) / 100; // 0.003% buy side
-        const sebi = Math.round(totalTurnoverForCharges * 0.000001 * 100) / 100; // SEBI
-
-        charges = {
-          brokerage: Math.round(brokerage * 100) / 100,
-          stt,
-          transaction_charges: txnCharges,
-          gst,
-          stamp_duty: stampDuty,
-          sebi_charges: sebi,
-          ipft: 0,
-          total: Math.round((brokerage + stt + txnCharges + gst + stampDuty + sebi) * 100) / 100,
-        };
-        chargesSource = `calculated (₹${brokeragePerOrder}/order × ${totalOrders + todayOrders} orders)`;
-        console.log(`[Tax] Charges calculated manually: ₹${charges.total} (${totalOrders + todayOrders} orders × ₹${brokeragePerOrder})`);
-      }
-
-      // Step 4: Fetch today's live positions P&L (may not be in P&L report yet)
+      // Step 3: Fetch today's live positions (may not be in settled P&L yet)
       let todayRealizedPnl = 0;
       let todayPositions = [];
       try {
@@ -150,7 +135,7 @@ module.exports = function (db) {
         }
       } catch (e) { console.log(`[Tax] Today positions fetch: ${e.message}`); }
 
-      // Step 5: Calculate P&L from Upstox trade data (settled trades)
+      // Step 4: Calculate P&L from settled trades
       let totalProfit = 0;
       let totalLoss = 0;
       let totalTurnover = 0;
@@ -160,10 +145,9 @@ module.exports = function (db) {
       const tradeDetails = [];
 
       for (const trade of allTrades) {
-        // Upstox may return 0 in profit_and_loss field - calculate from buy/sell amounts
         const buyVal = trade.buy_amount || trade.buy_value || 0;
         const sellVal = trade.sell_amount || trade.sell_value || 0;
-        const pnl = (trade.profit_and_loss && trade.profit_and_loss !== 0) ? trade.profit_and_loss : (sellVal - buyVal);
+        const pnl = (trade.profit_and_loss != null && trade.profit_and_loss !== 0) ? trade.profit_and_loss : (sellVal - buyVal);
         const absProfit = Math.abs(pnl);
 
         totalTurnover += absProfit;
@@ -187,45 +171,103 @@ module.exports = function (db) {
         });
       }
 
-      // Step 5: Tax calculation (Indian F&O rules)
-      // Include today's realized P&L if not already in settled data
+      // Step 5: Fetch charges from Upstox API
+      let charges = { brokerage: 0, stt: 0, transaction_charges: 0, gst: 0, stamp_duty: 0, sebi_charges: 0, ipft: 0, total: 0 };
+      let chargesSource = 'calculated';
+      try {
+        const chargesResp = await axios.get('https://api.upstox.com/v2/trade/profit-loss/charges', {
+          headers, params: { segment, financial_year: fy }, timeout: 15000
+        });
+        if (chargesResp.data?.status === 'success' && chargesResp.data?.data) {
+          const cd = chargesResp.data.data;
+          const cb = cd.charges_breakdown || cd;
+          const taxes = cb.taxes || {};
+          const chg = cb.charges || {};
+          const apiTotal = cb.total || cd.total || 0;
+          if (apiTotal > 0) {
+            charges = {
+              brokerage: cb.brokerage || 0,
+              stt: taxes.stt || cd.stt_total || 0,
+              transaction_charges: chg.transaction || cd.exchange_turnover_charge || 0,
+              gst: taxes.gst || cd.gst || 0,
+              stamp_duty: taxes.stamp_duty || cd.stamp_duty || 0,
+              sebi_charges: chg.sebi_turnover || cd.sebi_turnover_fee || 0,
+              ipft: chg.ipft || 0,
+              other_charges: chg.others || 0,
+              total: apiTotal,
+            };
+            chargesSource = 'upstox_api';
+            console.log(`[Tax] Charges from API: Total=${charges.total}, Brokerage=${charges.brokerage}, STT=${charges.stt}, GST=${charges.gst}`);
+          }
+        }
+      } catch (e) { console.error(`[Tax] Charges fetch failed: ${e.message}`); }
+
+      // If Upstox API returned 0 charges, calculate manually
+      if (charges.total === 0 && allTrades.length > 0) {
+        const brokeragePerOrder = db.data?.settings?.risk?.brokerage_per_order || 20;
+        const totalOrders = allTrades.length * 2;
+        const todayOrders = todayPositions.length * 2;
+        const brokerage = (totalOrders + todayOrders) * brokeragePerOrder;
+        const totalTurnoverForCharges = totalBuyValue + totalSellValue;
+        const stt = Math.round(totalSellValue * 0.000625 * 100) / 100;
+        const txnCharges = Math.round(totalTurnoverForCharges * 0.0005 * 100) / 100;
+        const gst = Math.round((brokerage + txnCharges) * 0.18 * 100) / 100;
+        const stampDuty = Math.round(totalBuyValue * 0.00003 * 100) / 100;
+        const sebi = Math.round(totalTurnoverForCharges * 0.000001 * 100) / 100;
+
+        charges = {
+          brokerage: Math.round(brokerage * 100) / 100,
+          stt,
+          transaction_charges: txnCharges,
+          gst,
+          stamp_duty: stampDuty,
+          sebi_charges: sebi,
+          ipft: 0,
+          total: Math.round((brokerage + stt + txnCharges + gst + stampDuty + sebi) * 100) / 100,
+        };
+        chargesSource = `calculated (${brokeragePerOrder}/order x ${totalOrders + todayOrders} orders)`;
+        console.log(`[Tax] Charges calculated: ${charges.total}`);
+      }
+
+      // Step 6: Tax calculation
       const todayDateStr = new Date().toLocaleDateString('en-GB', { day: '2-digit', month: '2-digit', year: 'numeric' }).split('/').join('-');
       const lastTradeDate = allTrades.length > 0 ? (allTrades[allTrades.length - 1].sell_date || '') : '';
       const isTodayInSettled = lastTradeDate === todayDateStr;
       const unsettledTodayPnl = isTodayInSettled ? 0 : Math.round(todayRealizedPnl * 100) / 100;
       const combinedGrossPnl = Math.round((totalPnl + unsettledTodayPnl) * 100) / 100;
 
-      const totalCharges = charges.total || (charges.brokerage + charges.stt + charges.transaction_charges + charges.gst + charges.stamp_duty + charges.sebi_charges);
-      const netPnl = combinedGrossPnl - totalCharges;
+      const totalCharges = charges.total || 0;
+      const netPnl = Math.round((combinedGrossPnl - totalCharges) * 100) / 100;
       const taxableIncome = Math.max(0, netPnl);
-      const taxAt30Pct = Math.round(taxableIncome * 0.30 * 100) / 100;
-      const cess = Math.round(taxAt30Pct * 0.04 * 100) / 100;
-      const surcharge = taxableIncome > 5000000 ? Math.round(taxAt30Pct * 0.10 * 100) / 100 : 0;
-      const totalTax = Math.round((taxAt30Pct + cess + surcharge) * 100) / 100;
+
+      // F&O = non-speculative business income, taxed at slab rates
+      // Using 30% as default highest slab (user can override)
+      const taxRate = 0.30;
+      const taxAmount = Math.round(taxableIncome * taxRate * 100) / 100;
+      const cess = Math.round(taxAmount * 0.04 * 100) / 100;
+      const surcharge = taxableIncome > 5000000 ? Math.round(taxAmount * 0.10 * 100) / 100 : 0;
+      const totalTax = Math.round((taxAmount + cess + surcharge) * 100) / 100;
 
       // Advance tax schedule
-      const fyStartYear = 2000 + parseInt(fy.substring(0, 2));
       const advanceTax = [
-        { due_date: `15 Jun ${fyStartYear}`, pct: 15, amount: Math.round(totalTax * 0.15) },
-        { due_date: `15 Sep ${fyStartYear}`, pct: 45, amount: Math.round(totalTax * 0.45) },
-        { due_date: `15 Dec ${fyStartYear}`, pct: 75, amount: Math.round(totalTax * 0.75) },
-        { due_date: `15 Mar ${fyStartYear + 1}`, pct: 100, totalTax },
+        { due_date: `15 Jun ${startYear}`, pct: 15, amount: Math.round(totalTax * 0.15) },
+        { due_date: `15 Sep ${startYear}`, pct: 45, amount: Math.round(totalTax * 0.45) },
+        { due_date: `15 Dec ${startYear}`, pct: 75, amount: Math.round(totalTax * 0.75) },
+        { due_date: `15 Mar ${endYear}`, pct: 100, amount: totalTax },
       ];
 
-      // Audit requirement
-      const auditRequired = totalTurnover > 100000000; // 10 crore
-
-      // ITR form
+      const auditRequired = totalTurnover > 100000000;
       const itrForm = totalTurnover > 0 ? 'ITR-3' : 'ITR-2';
 
       res.json({
         status: 'success',
         source: 'upstox',
         report: {
-          financial_year: `FY ${fyStartYear}-${fyStartYear + 1}`,
+          financial_year: `FY ${startYear}-${endYear}`,
           fy_code: fy,
           segment,
           total_trades: allTrades.length,
+          expected_trades: totalTradesExpected,
           summary: {
             total_buy_value: Math.round(totalBuyValue * 100) / 100,
             total_sell_value: Math.round(totalSellValue * 100) / 100,
@@ -246,12 +288,13 @@ module.exports = function (db) {
             stamp_duty: Math.round((charges.stamp_duty || 0) * 100) / 100,
             sebi_charges: Math.round((charges.sebi_charges || 0) * 100) / 100,
             ipft: Math.round((charges.ipft || 0) * 100) / 100,
+            other_charges: Math.round((charges.other_charges || 0) * 100) / 100,
             total_charges: Math.round(totalCharges * 100) / 100,
           },
-          net_pnl_after_charges: Math.round(netPnl * 100) / 100,
+          net_pnl_after_charges: netPnl,
           tax: {
             taxable_income: Math.round(taxableIncome * 100) / 100,
-            tax_at_30_pct: taxAt30Pct,
+            tax_at_30_pct: taxAmount,
             health_cess_4_pct: cess,
             surcharge_if_applicable: surcharge,
             total_tax_liability: totalTax,
@@ -262,9 +305,9 @@ module.exports = function (db) {
             itr_form: itrForm,
             audit_required: auditRequired,
             section_44AD_presumptive: totalTurnover <= 30000000 && totalPnl >= totalTurnover * 0.06,
-            due_date: auditRequired ? `31 Oct ${fyStartYear + 1}` : `31 Jul ${fyStartYear + 1}`,
+            due_date: auditRequired ? `31 Oct ${endYear}` : `31 Jul ${endYear}`,
           },
-          trade_details: tradeDetails.slice(0, 200), // Limit response size
+          trade_details: tradeDetails.slice(0, 200),
           total_trade_details: tradeDetails.length,
         },
       });
@@ -276,9 +319,10 @@ module.exports = function (db) {
 
   // Fallback: Local data tax report (when Upstox not connected)
   function getLocalTaxReport(req, res, fy, segment) {
-    const fyStartYear = 2000 + parseInt(fy.substring(0, 2));
-    const startDate = new Date(fyStartYear, 3, 1).toISOString();
-    const endDate = new Date(fyStartYear + 1, 2, 31, 23, 59, 59).toISOString();
+    const startYear = 2000 + parseInt(fy.substring(0, 2));
+    const endYear = 2000 + parseInt(fy.substring(2, 4));
+    const startDate = new Date(startYear, 3, 1).toISOString();
+    const endDate = new Date(endYear, 2, 31, 23, 59, 59).toISOString();
     const closedTrades = (db.data.trades || []).filter(t => t.status === 'CLOSED' && t.status !== 'FAILED');
     const fyTrades = closedTrades.filter(t => {
       const exitTime = t.exit_time || t.updated_at || '';
@@ -309,8 +353,8 @@ module.exports = function (db) {
     const gst = Math.round((txnCharges + stt) * 0.18 * 100) / 100;
     const stampDuty = Math.round(totalTurnover * 0.00003 * 100) / 100;
     const sebi = Math.round(totalTurnover * 0.000001 * 100) / 100;
-    const totalCharges = stt + txnCharges + gst + stampDuty + sebi;
-    const netPnl = totalPnl - totalCharges;
+    const totalCharges = Math.round((stt + txnCharges + gst + stampDuty + sebi) * 100) / 100;
+    const netPnl = Math.round((totalPnl - totalCharges) * 100) / 100;
     const taxableIncome = Math.max(0, netPnl);
     const taxAt30 = Math.round(taxableIncome * 0.30 * 100) / 100;
     const cess = Math.round(taxAt30 * 0.04 * 100) / 100;
@@ -321,13 +365,45 @@ module.exports = function (db) {
       source: 'local',
       message: 'Upstox not connected - using local trade data (may not match broker)',
       report: {
-        financial_year: `FY ${fyStartYear}-${fyStartYear + 1}`,
+        financial_year: `FY ${startYear}-${endYear}`,
         fy_code: fy, segment,
         total_trades: fyTrades.length,
-        summary: { total_turnover: Math.round(totalTurnover * 100) / 100, total_profit: Math.round(totalProfit * 100) / 100, total_loss: Math.round(totalLoss * 100) / 100, gross_pnl: Math.round(totalPnl * 100) / 100 },
-        charges: { stt, transaction_charges: txnCharges, gst, stamp_duty: stampDuty, sebi_charges: sebi, total_charges: Math.round(totalCharges * 100) / 100 },
-        net_pnl_after_charges: Math.round(netPnl * 100) / 100,
-        tax: { taxable_income: Math.round(taxableIncome * 100) / 100, tax_at_30_pct: taxAt30, health_cess_4_pct: cess, total_tax_liability: totalTax },
+        expected_trades: fyTrades.length,
+        summary: {
+          total_buy_value: 0,
+          total_sell_value: 0,
+          total_turnover: Math.round(totalTurnover * 100) / 100,
+          total_profit: Math.round(totalProfit * 100) / 100,
+          total_loss: Math.round(totalLoss * 100) / 100,
+          gross_pnl_settled: Math.round(totalPnl * 100) / 100,
+          today_pnl: 0,
+          combined_gross_pnl: Math.round(totalPnl * 100) / 100,
+        },
+        charges: {
+          source: 'calculated',
+          brokerage: 0,
+          stt,
+          transaction_charges: txnCharges,
+          gst,
+          stamp_duty: stampDuty,
+          sebi_charges: sebi,
+          ipft: 0,
+          total_charges: totalCharges,
+        },
+        net_pnl_after_charges: netPnl,
+        tax: {
+          taxable_income: Math.round(taxableIncome * 100) / 100,
+          tax_at_30_pct: taxAt30,
+          health_cess_4_pct: cess,
+          surcharge_if_applicable: 0,
+          total_tax_liability: totalTax,
+          effective_tax_rate: taxableIncome > 0 ? Math.round((totalTax / taxableIncome) * 10000) / 100 : 0,
+        },
+        compliance: {
+          itr_form: totalTurnover > 0 ? 'ITR-3' : 'ITR-2',
+          audit_required: totalTurnover > 100000000,
+          due_date: totalTurnover > 100000000 ? `31 Oct ${endYear}` : `31 Jul ${endYear}`,
+        },
         trade_details: tradeDetails,
         total_trade_details: tradeDetails.length,
       },
@@ -341,10 +417,9 @@ module.exports = function (db) {
 
     try {
       const headers = getHeaders(token);
-      const fy = req.query.fy || '2526';
+      const fy = parseFY(req.query.fy || req.query.fy_year);
 
-      // Fetch charges (has summary P&L data)
-      const chargesResp = await axios.get(`https://api.upstox.com/v2/trade/profit-loss/charges`, {
+      const chargesResp = await axios.get('https://api.upstox.com/v2/trade/profit-loss/charges', {
         headers, params: { segment: 'FO', financial_year: fy }, timeout: 15000
       });
 
