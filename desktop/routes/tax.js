@@ -73,28 +73,63 @@ module.exports = function (db) {
         if (page > 50) break;
       }
 
-      // Step 3: Fetch charges
-      let charges = { brokerage: 0, taxes_and_charges: 0, total: 0, details: {} };
+      // Step 3: Fetch charges OR calculate manually
+      let charges = { brokerage: 0, stt: 0, transaction_charges: 0, gst: 0, stamp_duty: 0, sebi_charges: 0, ipft: 0, total: 0 };
+      let chargesSource = 'calculated';
       try {
         const chargesResp = await axios.get(`https://api.upstox.com/v2/trade/profit-loss/charges`, {
           headers, params: { segment, financial_year: fy }, timeout: 15000
         });
         if (chargesResp.data?.status === 'success' && chargesResp.data?.data) {
           const cd = chargesResp.data.data;
-          charges = {
-            brokerage: cd.brokerage || 0,
-            stt: cd.stt_total || cd.stt || 0,
-            transaction_charges: cd.exchange_turnover_charge || cd.transaction_charges || 0,
-            gst: cd.gst || 0,
-            stamp_duty: cd.stamp_duty || 0,
-            sebi_charges: cd.sebi_charges || cd.sebi_turnover_fee || 0,
-            ipft: cd.ipft || 0,
-            total: cd.total || 0,
-            raw: cd,
-          };
-          console.log(`[Tax] Charges: Total = ₹${charges.total}`);
+          const apiTotal = cd.total || cd.charges_breakdown?.total || 0;
+          if (apiTotal > 0) {
+            charges = {
+              brokerage: cd.brokerage || cd.charges_breakdown?.brokerage || 0,
+              stt: cd.stt_total || cd.stt || cd.charges_breakdown?.stt || 0,
+              transaction_charges: cd.exchange_turnover_charge || cd.transaction_charges || cd.charges_breakdown?.exchange_turnover_charge || 0,
+              gst: cd.gst || cd.charges_breakdown?.gst || 0,
+              stamp_duty: cd.stamp_duty || cd.charges_breakdown?.stamp_duty || 0,
+              sebi_charges: cd.sebi_charges || cd.sebi_turnover_fee || cd.charges_breakdown?.sebi_turnover_fee || 0,
+              ipft: cd.ipft || cd.charges_breakdown?.ipft || 0,
+              total: apiTotal,
+            };
+            chargesSource = 'upstox_api';
+            console.log(`[Tax] Charges from API: Total = ₹${charges.total}`);
+          }
         }
       } catch (e) { console.error(`[Tax] Charges fetch failed: ${e.message}`); }
+
+      // If Upstox API returned 0 charges, calculate manually (₹20 per order)
+      if (charges.total === 0 && allTrades.length > 0) {
+        const brokeragePerOrder = db.data?.settings?.risk?.brokerage_per_order || 20;
+        // Each trade = buy order + sell order = 2 orders
+        const totalOrders = allTrades.length * 2;
+        // Add today's positions orders
+        const todayOrders = todayPositions.length * 2;
+
+        const brokerage = (totalOrders + todayOrders) * brokeragePerOrder;
+        // F&O Options regulatory charges (on premium turnover)
+        const totalTurnoverForCharges = totalBuyValue + totalSellValue + todayPositions.reduce((s, p) => s + Math.abs(p.pnl || 0), 0) * 2;
+        const stt = Math.round(totalSellValue * 0.000625 * 100) / 100; // 0.0625% on sell side (options)
+        const txnCharges = Math.round(totalTurnoverForCharges * 0.0005 * 100) / 100; // ~0.05% NSE
+        const gst = Math.round((brokerage + txnCharges) * 0.18 * 100) / 100; // 18% GST
+        const stampDuty = Math.round(totalBuyValue * 0.00003 * 100) / 100; // 0.003% buy side
+        const sebi = Math.round(totalTurnoverForCharges * 0.000001 * 100) / 100; // SEBI
+
+        charges = {
+          brokerage: Math.round(brokerage * 100) / 100,
+          stt,
+          transaction_charges: txnCharges,
+          gst,
+          stamp_duty: stampDuty,
+          sebi_charges: sebi,
+          ipft: 0,
+          total: Math.round((brokerage + stt + txnCharges + gst + stampDuty + sebi) * 100) / 100,
+        };
+        chargesSource = `calculated (₹${brokeragePerOrder}/order × ${totalOrders + todayOrders} orders)`;
+        console.log(`[Tax] Charges calculated manually: ₹${charges.total} (${totalOrders + todayOrders} orders × ₹${brokeragePerOrder})`);
+      }
 
       // Step 4: Fetch today's live positions P&L (may not be in P&L report yet)
       let todayRealizedPnl = 0;
@@ -203,6 +238,7 @@ module.exports = function (db) {
           },
           today_positions: todayPositions,
           charges: {
+            source: chargesSource,
             brokerage: Math.round(charges.brokerage * 100) / 100,
             stt: Math.round((charges.stt || 0) * 100) / 100,
             transaction_charges: Math.round((charges.transaction_charges || 0) * 100) / 100,
