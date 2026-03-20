@@ -115,10 +115,22 @@ export default function SettingsPanel({ onClose, onSave }) {
   const saveSettings = async () => {
     setSaving(true);
     try {
-      const response = await axios.post(`${API}/settings/update`, settings);
+      // Sync risk SL/Target to auto_trading as well
+      const syncedSettings = { ...settings };
+      if (syncedSettings.risk && syncedSettings.auto_trading) {
+        syncedSettings.auto_trading.stoploss_pct = syncedSettings.risk.stop_loss_pct;
+        syncedSettings.auto_trading.target_pct = syncedSettings.risk.target_pct;
+      }
+      const response = await axios.post(`${API}/settings/update`, syncedSettings);
       if (response.data.status === 'success') {
+        // Also update auto-settings separately to ensure sync
+        await axios.post(`${API}/auto-settings/update`, {
+          target_pct: syncedSettings.risk.target_pct,
+          stoploss_pct: syncedSettings.risk.stop_loss_pct,
+        }).catch(() => {});
+        setSettings(syncedSettings);
         alert('Settings saved successfully!');
-        if (onSave) onSave(settings);
+        if (onSave) onSave(syncedSettings);
       } else {
         alert('Failed to save: ' + response.data.message);
       }
@@ -392,13 +404,62 @@ export default function SettingsPanel({ onClose, onSave }) {
                 </div>
                 <div className="bg-white p-4 rounded-lg border border-gray-200">
                   <label className="block text-sm font-medium text-gray-700 mb-1">Stop Loss (%)</label>
-                  <input type="number" value={settings.risk.stop_loss_pct} onChange={(e) => updateField('risk', 'stop_loss_pct', parseInt(e.target.value))} className="w-full px-3 py-2 border border-gray-300 rounded-lg" min="5" max="50" />
+                  <input type="number" value={settings.risk.stop_loss_pct} onChange={(e) => updateField('risk', 'stop_loss_pct', parseInt(e.target.value))} className="w-full px-3 py-2 border border-gray-300 rounded-lg" min="5" max="50" data-testid="stop-loss-input" />
                 </div>
                 <div className="bg-white p-4 rounded-lg border border-gray-200">
                   <label className="block text-sm font-medium text-gray-700 mb-1">Target Profit (%)</label>
-                  <input type="number" value={settings.risk.target_pct} onChange={(e) => updateField('risk', 'target_pct', parseInt(e.target.value))} className="w-full px-3 py-2 border border-gray-300 rounded-lg" min="5" max="100" />
+                  <input type="number" value={settings.risk.target_pct} onChange={(e) => updateField('risk', 'target_pct', parseInt(e.target.value))} className="w-full px-3 py-2 border border-gray-300 rounded-lg" min="5" max="100" data-testid="target-profit-input" />
                 </div>
               </div>
+
+              {/* Risk Ratio Alert */}
+              {settings.risk.stop_loss_pct > 0 && settings.risk.target_pct > 0 && (
+                settings.risk.target_pct < settings.risk.stop_loss_pct ? (
+                  <div className="p-4 rounded-lg border-2 border-red-400 bg-red-50" data-testid="risk-ratio-alert-bad">
+                    <div className="flex items-start gap-3">
+                      <span className="text-red-600 text-xl mt-0.5">&#9888;</span>
+                      <div>
+                        <p className="font-bold text-red-700">Loss-Making Risk Ratio Detected!</p>
+                        <p className="text-sm text-red-600 mt-1">
+                          Aapka Target ({settings.risk.target_pct}%) Stop Loss ({settings.risk.stop_loss_pct}%) se kam hai.
+                          Iska matlab har winning trade se {settings.risk.target_pct}% milega, lekin har losing trade mein {settings.risk.stop_loss_pct}% jayega.
+                        </p>
+                        <p className="text-sm text-red-600 mt-1">
+                          Even with 60% win rate: <strong>Net = {Math.round(0.6 * settings.risk.target_pct - 0.4 * settings.risk.stop_loss_pct)}%</strong> (should be positive!)
+                        </p>
+                        <p className="text-sm font-semibold text-red-700 mt-2">
+                          Suggested fix: Target = {Math.max(settings.risk.stop_loss_pct * 2, 20)}%, Stop Loss = {Math.min(settings.risk.stop_loss_pct, 15)}% (2:1 ratio)
+                        </p>
+                        <button
+                          onClick={() => {
+                            const safeSL = Math.min(settings.risk.stop_loss_pct, 15);
+                            const safeTgt = safeSL * 2;
+                            updateField('risk', 'stop_loss_pct', safeSL);
+                            updateField('risk', 'target_pct', safeTgt);
+                          }}
+                          className="mt-2 px-4 py-1.5 bg-red-600 text-white rounded-lg text-sm font-medium hover:bg-red-700 transition"
+                          data-testid="fix-risk-ratio-btn"
+                        >
+                          Apply Safe 2:1 Ratio
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                ) : settings.risk.target_pct === settings.risk.stop_loss_pct ? (
+                  <div className="p-3 rounded-lg border border-yellow-300 bg-yellow-50" data-testid="risk-ratio-alert-neutral">
+                    <p className="text-sm text-yellow-800">
+                      <span className="font-semibold">1:1 Ratio</span> - Target ({settings.risk.target_pct}%) = Stop Loss ({settings.risk.stop_loss_pct}%). Acceptable, but 2:1 is better for long-term profitability.
+                    </p>
+                  </div>
+                ) : (
+                  <div className="p-3 rounded-lg border border-green-300 bg-green-50" data-testid="risk-ratio-alert-good">
+                    <p className="text-sm text-green-700">
+                      <span className="font-semibold">Good Risk Ratio!</span> Target ({settings.risk.target_pct}%) &gt; Stop Loss ({settings.risk.stop_loss_pct}%) = <strong>{(settings.risk.target_pct / settings.risk.stop_loss_pct).toFixed(1)}:1</strong> ratio.
+                      {settings.risk.target_pct >= settings.risk.stop_loss_pct * 2 ? ' Excellent!' : ' Consider 2:1 for even better results.'}
+                    </p>
+                  </div>
+                )
+              )}
             </TabsContent>
 
             {/* ===== Schedule Tab ===== */}
