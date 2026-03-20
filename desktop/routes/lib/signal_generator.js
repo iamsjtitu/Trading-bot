@@ -462,16 +462,21 @@ module.exports = function createSignalGenerator(db, aiEngine) {
     for (const tf of timeframes) {
       try {
         let url;
+        let resp;
         if (tf.type === 'intraday') {
           url = `https://api.upstox.com/v2/historical-candle/intraday/${encodeURIComponent(instKey)}/${tf.upstox}`;
-        } else {
+          resp = await axios.get(url, { headers, timeout: 8000 });
+        }
+        // If intraday returned 0 candles (market closed), fallback to daily
+        const intradayRaw = resp?.data?.data?.candles || [];
+        if (tf.type !== 'intraday' || intradayRaw.length === 0) {
           const now = new Date();
           const toDate = now.toISOString().substring(0, 10);
           const fromDate = new Date(now.getTime() - 90 * 86400000).toISOString().substring(0, 10);
-          url = `https://api.upstox.com/v2/historical-candle/${encodeURIComponent(instKey)}/${tf.upstox}/${toDate}/${fromDate}`;
+          url = `https://api.upstox.com/v2/historical-candle/${encodeURIComponent(instKey)}/day/${toDate}/${fromDate}`;
+          resp = await axios.get(url, { headers, timeout: 8000 });
         }
-        const resp = await axios.get(url, { headers, timeout: 8000 });
-        const raw = resp.data?.data?.candles || [];
+        const raw = resp?.data?.data?.candles || [];
         if (raw.length < 10) continue;
 
         // Simple trend detection: compare recent close vs EMA

@@ -67,13 +67,19 @@ module.exports = function (db) {
             // Intraday endpoint: no date params needed
             const url = `https://api.upstox.com/v2/historical-candle/intraday/${encodeURIComponent(instKey)}/${mapping.upstox}`;
             resp = await axios.get(url, { headers, timeout: 10000 });
-          } else {
-            // Historical endpoint: needs to_date and from_date
+          }
+
+          // If intraday returned 0 candles (market closed), fallback to daily historical
+          const intradayCandles = resp?.data?.data?.candles || [];
+          if (mapping.type !== 'intraday' || intradayCandles.length === 0) {
             const now = new Date();
             const toDate = now.toISOString().substring(0, 10);
             const fromDate = new Date(now.getTime() - 90 * 86400000).toISOString().substring(0, 10);
-            const url = `https://api.upstox.com/v2/historical-candle/${encodeURIComponent(instKey)}/${mapping.upstox}/${toDate}/${fromDate}`;
-            resp = await axios.get(url, { headers, timeout: 10000 });
+            const dailyUrl = `https://api.upstox.com/v2/historical-candle/${encodeURIComponent(instKey)}/day/${toDate}/${fromDate}`;
+            resp = await axios.get(dailyUrl, { headers, timeout: 10000 });
+            if (intradayCandles.length === 0 && mapping.type === 'intraday') {
+              console.log(`[TechAnalysis] Intraday empty (market closed), using daily candles`);
+            }
           }
 
           if (resp?.data?.data?.candles?.length) {

@@ -8,7 +8,7 @@
       "provider": "openai"
     },
     "broker": {
-      "name": "zerodha",
+      "name": "upstox",
       "api_key": "",
       "api_secret": "",
       "redirect_uri": "",
@@ -74,19 +74,19 @@
     "type": "paper",
     "initial_capital": 500000,
     "current_capital": 500000,
-    "invested_amount": 27900,
-    "available_capital": 472100,
-    "total_pnl": 0,
+    "invested_amount": -34645,
+    "available_capital": 529118.4105063991,
+    "total_pnl": -5526.58949360089,
     "daily_pnl": 0,
-    "total_trades": 0,
-    "winning_trades": 0,
-    "losing_trades": 0,
+    "total_trades": 4,
+    "winning_trades": 1,
+    "losing_trades": 3,
     "active_positions": [
       "8e9dd30d-28d2-4ffb-a444-89be1caedb6e",
       "81b3c059-c51c-4ed0-aabf-4b3bc9deec8a"
     ],
     "created_at": "2026-03-19T16:54:46.498Z",
-    "last_updated": "2026-03-19T17:26:47.753Z"
+    "last_updated": "2026-03-20T18:49:02.511Z"
   },
   "trades": [
     {
@@ -100,15 +100,16 @@
       "investment": 17400,
       "stop_loss": 112.5,
       "target": 225,
-      "status": "OPEN",
+      "status": "CLOSED",
       "mode": "PAPER",
-      "exit_time": null,
-      "exit_price": null,
-      "pnl": 0,
-      "pnl_percentage": 0,
+      "exit_time": "2026-03-20T18:49:02.511Z",
+      "exit_price": 131.3,
+      "pnl": -2169.5,
+      "pnl_percentage": -12.47,
       "_simPrice": 149.9989324588769,
       "peak_price": 172.17404623628184,
-      "trailing_sl": 127.5
+      "trailing_sl": 161.09,
+      "exit_reason": "TRAILING_SL_HIT"
     },
     {
       "id": "81b3c059-c51c-4ed0-aabf-4b3bc9deec8a",
@@ -121,15 +122,16 @@
       "investment": 10500,
       "stop_loss": 112.5,
       "target": 225,
-      "status": "OPEN",
+      "status": "CLOSED",
       "mode": "PAPER",
-      "exit_time": null,
-      "exit_price": null,
-      "pnl": 0,
-      "pnl_percentage": 0,
+      "exit_time": "2026-03-20T18:49:02.511Z",
+      "exit_price": 128.74,
+      "pnl": -1487.95,
+      "pnl_percentage": -14.17,
       "_simPrice": 150.01850908128154,
       "peak_price": 171.00368258719197,
-      "trailing_sl": 127.5
+      "trailing_sl": 160.5,
+      "exit_reason": "TRAILING_SL_HIT"
     },
     {
       "id": "test_trade_1",
@@ -140,7 +142,7 @@
       "investment": 12220,
       "stop_loss": 141,
       "target": 282,
-      "status": "OPEN",
+      "status": "CLOSED",
       "mode": "PAPER",
       "entry_time": "2026-03-20T04:00:56.594Z",
       "confidence": 78,
@@ -150,7 +152,12 @@
       "signal_id": "test_sig_1",
       "_simPrice": 188.3314093315706,
       "peak_price": 215.74010591378075,
-      "trailing_sl": 159.79999999999998
+      "trailing_sl": 201.87,
+      "exit_time": "2026-03-20T18:48:30.117Z",
+      "exit_price": 189.65,
+      "pnl": 107.37,
+      "pnl_percentage": 0.88,
+      "exit_reason": "TRAILING_SL_HIT"
     },
     {
       "id": "test_trade_2",
@@ -161,7 +168,7 @@
       "investment": 22425,
       "stop_loss": 259,
       "target": 517,
-      "status": "OPEN",
+      "status": "CLOSED",
       "mode": "PAPER",
       "entry_time": "2026-03-20T04:00:56.594Z",
       "confidence": 72,
@@ -171,7 +178,12 @@
       "signal_id": "test_sig_2",
       "_simPrice": 345.4005549440479,
       "peak_price": 395.00170925067937,
-      "trailing_sl": 293.25
+      "trailing_sl": 370,
+      "exit_time": "2026-03-20T18:49:02.511Z",
+      "exit_price": 314.59,
+      "pnl": -1976.52,
+      "pnl_percentage": -8.81,
+      "exit_reason": "TRAILING_SL_HIT"
     }
   ],
   "signals": [
@@ -207,7 +219,7 @@
       },
       "reason": "Bullish signals [BANKING]: rally, surge, positive, inflows (keyword analysis) | Correlation: 50%",
       "news_id": "ddf04d97-f21e-4e28-9b8f-baf1741b54be",
-      "status": "ACTIVE",
+      "status": "CLOSED",
       "mode": "PAPER",
       "created_at": "2026-03-19T17:26:47.639Z",
       "expires_at": "2026-03-26T17:26:47.639Z"
@@ -244,7 +256,7 @@
       },
       "reason": "Bearish signals [IT]: pressure (keyword analysis) | Correlation: 65%",
       "news_id": "208cafbe-1c61-4860-aa04-8c803b3df6a5",
-      "status": "ACTIVE",
+      "status": "CLOSED",
       "mode": "PAPER",
       "created_at": "2026-03-19T17:26:47.752Z",
       "expires_at": "2026-03-26T17:26:47.752Z"
@@ -1062,6 +1074,227 @@
       "created_at": "2026-03-20T14:57:59.215Z"
     }
   ],
-  "journal_entries": [],
-  "journal_insights": []
+  "journal_entries": [
+    {
+      "id": "181a5158-9ffb-4737-a5e9-a5ace9021d19",
+      "trade_id": "test_trade_1",
+      "symbol": "NIFTY2632423150PE",
+      "trade_type": "BUY",
+      "entry_price": 188,
+      "exit_price": 189.65,
+      "pnl": 107.37,
+      "pnl_percentage": 0.88,
+      "investment": 12220,
+      "hold_duration_mins": 888,
+      "entry_time": "2026-03-20T04:00:56.594Z",
+      "exit_time": "2026-03-20T18:48:30.117Z",
+      "exit_reason": "TRAILING_SL_HIT",
+      "sentiment": "BULLISH",
+      "confidence": 78,
+      "sector": "BROAD_MARKET",
+      "instrument": "NIFTY50",
+      "mode": "PAPER",
+      "rating": 7,
+      "verdict": "AVERAGE",
+      "what_went_right": "The trade was closed with a small profit, and the trailing stop loss helped secure gains.",
+      "what_went_wrong": "The target was not reached, indicating potential overestimation of the move.",
+      "improvement": "Consider adjusting the target to more realistic levels based on market conditions.",
+      "pattern_tags": [
+        "trailing_stop",
+        "broad_market",
+        "bullish"
+      ],
+      "risk_assessment": "Risk management was decent with a trailing stop loss in place.",
+      "emotion_flag": "DISCIPLINED",
+      "ai_source": "gpt-4o",
+      "created_at": "2026-03-20T18:48:33.108Z"
+    },
+    {
+      "id": "33363544-278e-487b-a42a-acbde8fbf35d",
+      "trade_id": "test_trade_2",
+      "symbol": "NIFTY2632423100CE",
+      "trade_type": "BUY",
+      "entry_price": 345,
+      "exit_price": 314.59,
+      "pnl": -1976.52,
+      "pnl_percentage": -8.81,
+      "investment": 22425,
+      "hold_duration_mins": 888,
+      "entry_time": "2026-03-20T04:00:56.594Z",
+      "exit_time": "2026-03-20T18:49:02.511Z",
+      "exit_reason": "TRAILING_SL_HIT",
+      "sentiment": "BULLISH",
+      "confidence": 72,
+      "sector": "BROAD_MARKET",
+      "instrument": "NIFTY50",
+      "mode": "PAPER",
+      "rating": 4,
+      "verdict": "POOR",
+      "what_went_right": "The use of a trailing stop loss helped limit further losses.",
+      "what_went_wrong": "The entry point was not optimal as the market moved against the bullish sentiment.",
+      "improvement": "Consider waiting for stronger confirmation signals before entering a trade.",
+      "pattern_tags": [
+        "trend_following",
+        "trailing_stop",
+        "stop_loss_hit"
+      ],
+      "risk_assessment": "Risk management was fair due to the use of a trailing stop loss.",
+      "emotion_flag": "DISCIPLINED",
+      "ai_source": "gpt-4o",
+      "created_at": "2026-03-20T18:49:04.946Z"
+    },
+    {
+      "id": "f118e61d-761c-4efb-87a6-89b549f30786",
+      "trade_id": "8e9dd30d-28d2-4ffb-a444-89be1caedb6e",
+      "symbol": "BANKNIFTY",
+      "trade_type": "CALL",
+      "entry_price": 150,
+      "exit_price": 131.3,
+      "pnl": -2169.5,
+      "pnl_percentage": -12.47,
+      "investment": 17400,
+      "hold_duration_mins": 1522,
+      "entry_time": "2026-03-19T17:26:47.639Z",
+      "exit_time": "2026-03-20T18:49:02.511Z",
+      "exit_reason": "TRAILING_SL_HIT",
+      "sentiment": "BULLISH",
+      "confidence": 90,
+      "sector": "BANKING",
+      "instrument": "N/A",
+      "mode": "PAPER",
+      "rating": 4,
+      "verdict": "POOR",
+      "what_went_right": "The trade had a clear exit strategy with a trailing stop loss.",
+      "what_went_wrong": "The entry point was not optimal as the price moved against the bullish sentiment.",
+      "improvement": "Consider re-evaluating entry signals to ensure alignment with market conditions.",
+      "pattern_tags": [
+        "trend_following",
+        "trailing_sl_hit"
+      ],
+      "risk_assessment": "Risk management was acceptable with a trailing stop loss but could improve with better entry timing.",
+      "emotion_flag": "DISCIPLINED",
+      "ai_source": "gpt-4o",
+      "created_at": "2026-03-20T18:49:04.985Z"
+    },
+    {
+      "id": "19686836-ed5f-4ef2-8e12-5c01ebf08ff0",
+      "trade_id": "81b3c059-c51c-4ed0-aabf-4b3bc9deec8a",
+      "symbol": "BANKNIFTY",
+      "trade_type": "PUT",
+      "entry_price": 150,
+      "exit_price": 128.74,
+      "pnl": -1487.95,
+      "pnl_percentage": -14.17,
+      "investment": 10500,
+      "hold_duration_mins": 1522,
+      "entry_time": "2026-03-19T17:26:47.753Z",
+      "exit_time": "2026-03-20T18:49:02.511Z",
+      "exit_reason": "TRAILING_SL_HIT",
+      "sentiment": "BEARISH",
+      "confidence": 70,
+      "sector": "IT",
+      "instrument": "N/A",
+      "mode": "PAPER",
+      "rating": 4,
+      "verdict": "POOR",
+      "what_went_right": "The use of a trailing stop loss helped limit further losses.",
+      "what_went_wrong": "The trade was held for too long without achieving the target, leading to a significant loss.",
+      "improvement": "Consider reassessing the entry point and market conditions more thoroughly before committing to a trade.",
+      "pattern_tags": [
+        "trend_following",
+        "stop_loss_hit"
+      ],
+      "risk_assessment": "Risk management was partially effective due to the trailing stop loss, but initial stop loss placement was too wide.",
+      "emotion_flag": "NONE",
+      "ai_source": "gpt-4o",
+      "created_at": "2026-03-20T18:49:05.145Z"
+    }
+  ],
+  "journal_insights": [],
+  "market_data": {
+    "indices": {
+      "nifty50": {
+        "value": 23114.5,
+        "change": 112.35,
+        "changePct": 0.49
+      },
+      "sensex": {
+        "value": 74532.96,
+        "change": 325.72,
+        "changePct": 0.44
+      },
+      "banknifty": {
+        "value": 53427.05,
+        "change": -23.95,
+        "changePct": -0.04
+      },
+      "finnifty": {
+        "value": 24781.15,
+        "change": -170.65,
+        "changePct": -0.69
+      },
+      "midcpnifty": {
+        "value": 12625.9,
+        "change": 108.9,
+        "changePct": 0.86
+      }
+    },
+    "last_updated": "2026-03-20T18:50:45.678Z"
+  },
+  "historical_patterns": [
+    {
+      "id": "b8c1f4ab-2dfe-4fee-8b6d-344df12619da",
+      "sentiment": "BULLISH",
+      "sector": "BROAD_MARKET",
+      "trade_type": "BUY",
+      "pnl": 107.37,
+      "pnl_percentage": 0.88,
+      "exit_reason": "TRAILING_SL_HIT",
+      "entry_time": "2026-03-20T04:00:56.594Z",
+      "exit_time": "2026-03-20T18:48:30.117Z",
+      "was_profitable": true,
+      "created_at": "2026-03-20T18:48:30.117Z"
+    },
+    {
+      "id": "ff7cad43-fd33-486c-bb86-d4866cccf66f",
+      "sentiment": "BULLISH",
+      "sector": "BANKING",
+      "trade_type": "CALL",
+      "pnl": -2169.5,
+      "pnl_percentage": -12.47,
+      "exit_reason": "TRAILING_SL_HIT",
+      "entry_time": "2026-03-19T17:26:47.639Z",
+      "exit_time": "2026-03-20T18:49:02.511Z",
+      "confidence": 90,
+      "was_profitable": false,
+      "created_at": "2026-03-20T18:49:02.511Z"
+    },
+    {
+      "id": "15d0cc9c-964c-4978-b3e7-e9d1d504c4c3",
+      "sentiment": "BEARISH",
+      "sector": "IT",
+      "trade_type": "PUT",
+      "pnl": -1487.95,
+      "pnl_percentage": -14.17,
+      "exit_reason": "TRAILING_SL_HIT",
+      "entry_time": "2026-03-19T17:26:47.753Z",
+      "exit_time": "2026-03-20T18:49:02.511Z",
+      "confidence": 70,
+      "was_profitable": false,
+      "created_at": "2026-03-20T18:49:02.511Z"
+    },
+    {
+      "id": "390e9d5e-36e6-4d62-8cca-bc7caff83cca",
+      "sentiment": "BULLISH",
+      "sector": "BROAD_MARKET",
+      "trade_type": "BUY",
+      "pnl": -1976.52,
+      "pnl_percentage": -8.81,
+      "exit_reason": "TRAILING_SL_HIT",
+      "entry_time": "2026-03-20T04:00:56.594Z",
+      "exit_time": "2026-03-20T18:49:02.511Z",
+      "was_profitable": false,
+      "created_at": "2026-03-20T18:49:02.511Z"
+    }
+  ]
 }

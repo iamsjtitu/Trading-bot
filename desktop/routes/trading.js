@@ -231,7 +231,7 @@ module.exports = function (db) {
         const trailActivation = finalTargetPct * 0.5;
         if (profitPct >= trailActivation) {
           // Trail SL at 50% of peak profit
-          const trailedSL = Math.round(trade.entry_price + (trade.peak_price - trade.entry_price) * 0.5 * 100) / 100;
+          const trailedSL = Math.round((trade.entry_price + (trade.peak_price - trade.entry_price) * 0.5) * 100) / 100;
           const originalSL = trade.entry_price * (1 - finalStoplossPct / 100);
           const newSL = Math.max(trailedSL, originalSL);
           if (newSL > (trade.trailing_sl || 0)) {
@@ -279,7 +279,19 @@ module.exports = function (db) {
           const latestNews = news[0] || (db.data.news_articles || []).sort((a, b) => (b.created_at || '').localeCompare(a.created_at || ''))[0];
           if (latestNews) {
             const newSignal = signalGen.generateSignal(latestNews);
-            if (newSignal) { db.data.signals.push(newSignal); if (mode === 'LIVE' && accessToken) { const r = await signalGen.executeLiveTrade(newSignal, accessToken); if (r?.success) newTradesCount++; } else { signalGen.executePaperTrade(newSignal); newTradesCount++; } }
+            if (newSignal) {
+              // Multi-TF check on re-entry too
+              const tfResult = await signalGen.validateMultiTimeframe(newSignal);
+              if (!tfResult.valid) {
+                console.log(`[AutoExit] Re-entry BLOCKED by Multi-TF: ${tfResult.reason}`);
+                newSignal.status = 'BLOCKED_TF';
+                newSignal.block_reason = tfResult.reason;
+                db.data.signals.push(newSignal);
+              } else {
+                db.data.signals.push(newSignal);
+                if (mode === 'LIVE' && accessToken) { const r = await signalGen.executeLiveTrade(newSignal, accessToken); if (r?.success) newTradesCount++; } else { signalGen.executePaperTrade(newSignal); newTradesCount++; }
+              }
+            }
           }
           } // close daily loss check
         }
