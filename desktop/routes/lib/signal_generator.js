@@ -51,6 +51,13 @@ module.exports = function createSignalGenerator(db, aiEngine) {
       console.log(`[Signal] Skipping - trading_signal is ${sentiment.trading_signal} (not BUY_CALL or BUY_PUT)`);
       return null;
     }
+
+    // MIN CONFIDENCE CHECK - Only trade when AI confidence meets user's threshold
+    const minConfidence = db.data?.settings?.news?.min_confidence || 70;
+    if ((sentiment.confidence || 0) < minConfidence) {
+      console.log(`[Signal] BLOCKED - Confidence ${sentiment.confidence}% < min_confidence ${minConfidence}%. Skipping.`);
+      return null;
+    }
     const signalType = sentiment.trading_signal === 'BUY_CALL' ? 'CALL' : 'PUT';
 
     const activeInst = db.data?.settings?.trading_instrument || db.data?.settings?.active_instrument || 'NIFTY50';

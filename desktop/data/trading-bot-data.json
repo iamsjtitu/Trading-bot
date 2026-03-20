@@ -52,7 +52,7 @@
       ],
       "newsapi_key": "",
       "alphavantage_key": "",
-      "min_confidence": 60
+      "min_confidence": 70
     },
     "notifications": {
       "enabled": true,

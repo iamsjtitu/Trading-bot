@@ -42,7 +42,8 @@ module.exports = function (db) {
         db.data.news_articles.push(newsDoc);
 
         let signalGenerated = false;
-        if (sentimentResult.confidence >= 60 && sentimentResult.trading_signal !== 'HOLD') {
+        const minConfidence = db.data?.settings?.news?.min_confidence || 70;
+        if (sentimentResult.confidence >= minConfidence && sentimentResult.trading_signal !== 'HOLD') {
           // EMERGENCY STOP CHECK
           if (db.data?.settings?.emergency_stop) {
             console.log(`[News] Trade BLOCKED - Emergency Stop active for ${article.title}`);

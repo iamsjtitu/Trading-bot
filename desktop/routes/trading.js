@@ -242,7 +242,8 @@ module.exports = function (db) {
 
         // Auto re-entry only if auto_entry is ON AND NOT emergency stopped AND target hit
         if (isAutoEntryOn && !isEmergencyStopped && exitReason === 'TARGET_HIT') {
-          const news = (db.data.news_articles || []).filter(n => n.sentiment_analysis && n.sentiment_analysis.confidence >= 60 && ['BUY_CALL', 'BUY_PUT'].includes(n.sentiment_analysis.trading_signal)).sort((a, b) => (b.created_at || '').localeCompare(a.created_at || ''));
+          const reentryMinConf = db.data?.settings?.news?.min_confidence || 70;
+          const news = (db.data.news_articles || []).filter(n => n.sentiment_analysis && n.sentiment_analysis.confidence >= reentryMinConf && ['BUY_CALL', 'BUY_PUT'].includes(n.sentiment_analysis.trading_signal)).sort((a, b) => (b.created_at || '').localeCompare(a.created_at || ''));
           const latestNews = news[0] || (db.data.news_articles || []).sort((a, b) => (b.created_at || '').localeCompare(a.created_at || ''))[0];
           if (latestNews) {
             const newSignal = signalGen.generateSignal(latestNews);
