@@ -35,10 +35,17 @@ module.exports = function createSignalGenerator(db, aiEngine) {
     }
 
     // PROPER Call/Put mapping - only trade when signal is clear
+    // SAFETY: Validate sentiment matches signal direction
     if (sentiment.trading_signal === 'BUY_CALL') {
-      // Bullish → CALL
+      if (sentiment.sentiment === 'BEARISH') {
+        console.log(`[Signal] MISMATCH BLOCKED - Sentiment is BEARISH but signal is BUY_CALL. Skipping.`);
+        return null;
+      }
     } else if (sentiment.trading_signal === 'BUY_PUT') {
-      // Bearish → PUT
+      if (sentiment.sentiment === 'BULLISH') {
+        console.log(`[Signal] MISMATCH BLOCKED - Sentiment is BULLISH but signal is BUY_PUT. Skipping.`);
+        return null;
+      }
     } else {
       // HOLD or unknown → skip, don't trade
       console.log(`[Signal] Skipping - trading_signal is ${sentiment.trading_signal} (not BUY_CALL or BUY_PUT)`);

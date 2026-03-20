@@ -370,6 +370,28 @@ ANALYSIS FRAMEWORK:
 7. TIME DECAY RISK: How quickly will this news be priced in?
 8. CONTRARIAN CHECK: Is the obvious trade too crowded? Any contrarian signals?
 
+INDIA-SPECIFIC MARKET CONTEXT (CRITICAL):
+- Falling crude oil prices = BULLISH for India (India is net importer, lower oil = lower input costs, better fiscal deficit)
+- Rising crude oil prices = BEARISH for India (higher inflation, weaker rupee, fiscal pressure)
+- Strong US Dollar / USD-INR rising = BEARISH for Indian markets (FII outflow, import costs up)
+- Weak US Dollar / USD-INR falling = BULLISH for Indian markets (FII inflow likely)
+- Global rate cuts = BULLISH (capital flows to emerging markets like India)
+- Global rate hikes = BEARISH (capital outflows from India to developed markets)
+- FII buying = BULLISH, FII selling = BEARISH (foreign investors drive major moves)
+- DII buying during FII selling = MIXED/NEUTRAL (domestic support but foreign pessimism)
+- RBI rate cut = BULLISH for banking, real estate; RBI rate hike = BEARISH for banking
+- China slowdown = CAN BE BULLISH for India (FII rotation from China to India)
+- Monsoon expectations: good monsoon = BULLISH for FMCG, Auto; bad monsoon = BEARISH
+
+TRADING SIGNAL RULES (VERY IMPORTANT):
+- BUY_CALL means expecting market/index to GO UP (BULLISH view only)
+- BUY_PUT means expecting market/index to GO DOWN (BEARISH view only)
+- HOLD means uncertain/mixed/low confidence
+- NEVER give BUY_CALL for BEARISH news, NEVER give BUY_PUT for BULLISH news
+- If sentiment is NEUTRAL, signal MUST be HOLD
+- Be VERY conservative with BUY_CALL/BUY_PUT - only when you are genuinely confident
+- Consider that options decay rapidly - wrong direction = fast losses
+
 ${context}
 
 OUTPUT FORMAT (EXACT):
@@ -398,7 +420,8 @@ CRITICAL RULES:
 - In VOLATILE regime, require confidence >= 75
 - In SIDEWAYS market, require confidence >= 70
 - During CLOSING_HOUR, avoid new trades unless confidence >= 80
-- Factor in the recent P&L: if losses are mounting, be more conservative`;
+- Factor in the recent P&L: if losses are mounting, be more conservative
+- A BULLISH sentiment with BUY_PUT is WRONG. Double-check your signal before responding.`;
   }
 
   // ==================== AI-POWERED TRADE REVIEW ====================
@@ -421,7 +444,7 @@ Confidence: ${trade.confidence || 'N/A'}%
 Sector: ${trade.sector || 'N/A'}`;
 
       const completion = await client.chat.completions.create({
-        model: 'openai/gpt-4.1-mini',
+        model: 'gpt-4o',
         messages: [
           { role: 'system', content: 'You are a trading performance analyst. Review this completed trade and provide 2-3 bullet points of insights: what went right, what went wrong, and one actionable takeaway for future trades. Be specific and concise.' },
           { role: 'user', content: tradeInfo },
@@ -439,13 +462,23 @@ Sector: ${trade.sector || 'N/A'}`;
   // ==================== FINAL DECISION SCORING ====================
 
   computeFinalScore(sentiment, correlation, confluence, freshness, historicalAdj) {
-    // Weighted scoring
-    const weights = {
-      aiConfidence: 0.35,      // AI sentiment confidence
-      correlation: 0.20,       // Signal correlation with recent signals
-      confluence: 0.20,        // Multi-timeframe alignment
-      freshness: 0.15,         // News freshness
-      historical: 0.10,        // Historical pattern performance
+    // When data is sparse (bot just started), trust AI analysis more
+    const hasEnoughData = this.signalBuffer.length >= 3 &&
+                          this.sentimentWindows['1h'].length >= 3 &&
+                          (this.db.data?.historical_patterns || []).length >= 5;
+
+    const weights = hasEnoughData ? {
+      aiConfidence: 0.35,
+      correlation: 0.20,
+      confluence: 0.20,
+      freshness: 0.15,
+      historical: 0.10,
+    } : {
+      aiConfidence: 0.55,  // Trust AI more when data is sparse
+      correlation: 0.10,
+      confluence: 0.10,
+      freshness: 0.20,
+      historical: 0.05,
     };
 
     const score = Math.round(
@@ -453,7 +486,7 @@ Sector: ${trade.sector || 'N/A'}`;
       correlation.score * weights.correlation +
       confluence.score * weights.confluence +
       freshness * weights.freshness +
-      (50 + historicalAdj * 5) * weights.historical // Convert adj to 0-100 scale
+      (50 + historicalAdj * 5) * weights.historical
     );
 
     return Math.max(20, Math.min(98, score));
