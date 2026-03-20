@@ -18,9 +18,9 @@
     "risk": {
       "initial_capital": 500000,
       "daily_limit": 100000,
-      "max_per_trade": 40000,
-      "stop_loss_pct": 2,
-      "target_pct": 5,
+      "max_per_trade": 20000,
+      "stop_loss_pct": 25,
+      "target_pct": 50,
       "risk_tolerance": "medium"
     },
     "auto_trading": {
@@ -28,8 +28,8 @@
       "auto_entry": false,
       "auto_analysis": true,
       "analysis_interval_minutes": 5,
-      "target_pct": 5,
-      "stoploss_pct": 2
+      "target_pct": 50,
+      "stoploss_pct": 25
     },
     "schedule": {
       "enabled": true,

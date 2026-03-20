@@ -138,12 +138,25 @@ function App() {
         if (data.portfolio) {
           const lp = data.portfolio;
           const completedOrders = data.orders || [];
+          const riskSettings = {};
+          try {
+            const setRes = await axios.get(`${API}/settings`);
+            Object.assign(riskSettings, setRes.data?.settings?.risk || {});
+          } catch (_) {}
+          // Fetch today's actual P&L (realized + unrealized)
+          let todayPnlVal = 0;
+          try {
+            const todayRes = await axios.get(`${API}/trades/today`);
+            todayPnlVal = todayRes.data?.today_pnl || 0;
+          } catch (_) {
+            todayPnlVal = lp.total_pnl || 0;
+          }
           setRiskMetrics({
             dailyUsed: lp.funds?.used_margin || 0,
-            dailyLimit: (lp.funds?.total || 0) > 0 ? lp.funds.total : 100000,
-            maxPerTrade: 20000,
+            dailyLimit: (lp.funds?.total || 0) > 0 ? lp.funds.total : riskSettings.daily_limit || 100000,
+            maxPerTrade: riskSettings.max_per_trade || 20000,
             todayTrades: completedOrders.length,
-            todayPnL: lp.total_pnl || 0,
+            todayPnL: todayPnlVal,
             isLive: true,
           });
         }
@@ -192,10 +205,11 @@ function App() {
       // In LIVE mode, loadUpstoxData() will set live risk metrics
       if (mode !== 'LIVE') {
         const todayData = todayRes.data;
+        const riskCfg = settingsRes.data?.settings?.risk || {};
         setRiskMetrics({
           dailyUsed: todayData.today_invested || 0,
-          dailyLimit: 100000,
-          maxPerTrade: 20000,
+          dailyLimit: riskCfg.daily_limit || 100000,
+          maxPerTrade: riskCfg.max_per_trade || 20000,
           todayTrades: todayData.total_trades_today || 0,
           todayPnL: todayData.today_pnl || 0,
           isLive: false,
@@ -367,8 +381,14 @@ function App() {
     if (activeTab === 'trades') {
       const fetchActiveTrades = async () => {
         try {
-          const res = await axios.get(`${API}/trades/active`);
-          if (res.data?.trades) setTrades(res.data.trades);
+          const [tradeRes, todayRes] = await Promise.all([
+            axios.get(`${API}/trades/active`),
+            axios.get(`${API}/trades/today`),
+          ]);
+          if (tradeRes.data?.trades) setTrades(tradeRes.data.trades);
+          if (todayRes.data?.today_pnl != null) {
+            setRiskMetrics(prev => ({ ...prev, todayPnL: todayRes.data.today_pnl }));
+          }
         } catch (_) {}
       };
       fetchActiveTrades(); // Immediate first load
