@@ -6,7 +6,7 @@ import pytest
 import requests
 import os
 
-BASE_URL = os.environ.get('REACT_APP_BACKEND_URL', 'https://live-pnl-dashboard.preview.emergentagent.com')
+BASE_URL = os.environ.get('REACT_APP_BACKEND_URL', 'https://nifty-ai-signals-1.preview.emergentagent.com')
 
 class TestTodayPnL:
     """Tests for Today's P&L bug fix - should return non-zero unrealized P&L"""
