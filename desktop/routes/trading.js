@@ -171,12 +171,20 @@ module.exports = function (db) {
 
   // ============ Auto-Exit ============
   router.post('/api/auto-exit/check', async (req, res) => {
-    if (!autoExitEnabled) return res.json({ status: 'success', exits_executed: 0, new_trades_generated: 0 });
+    // ALWAYS read from DB for current state (not cached variables)
+    const isAutoExitOn = db.data?.settings?.auto_trading?.auto_exit ?? true;
+    const isAutoEntryOn = db.data?.settings?.auto_trading?.auto_entry ?? false;
+    const isEmergencyStopped = db.data?.settings?.emergency_stop || false;
+
+    if (!isAutoExitOn) return res.json({ status: 'success', exits_executed: 0, new_trades_generated: 0 });
     const trades = db.data.trades || []; const openTrades = trades.filter(t => t.status === 'OPEN');
     let exitsCount = 0, newTradesCount = 0; const exitDetails = [];
     const rp = riskParams[getRiskTolerance()] || riskParams.medium;
-    const targetPct = customTargetPct != null ? customTargetPct : rp.target_pct;
-    const stoplossPct = customStoplossPct != null ? customStoplossPct : rp.stop_loss_pct;
+    // Read SL/Target from DB directly
+    const riskCfg = db.data?.settings?.risk || {};
+    const autoT = db.data?.settings?.auto_trading || {};
+    const targetPct = autoT.target_pct || riskCfg.target_pct || rp.target_pct;
+    const stoplossPct = autoT.stoploss_pct || riskCfg.stop_loss_pct || rp.stop_loss_pct;
     const mode = db.data.settings?.trading_mode || 'PAPER';
     const accessToken = getActiveBrokerToken();
 
@@ -212,8 +220,8 @@ module.exports = function (db) {
         if (db.notify) db.notify('exit', `${exitReason === 'TARGET_HIT' ? 'Target Hit' : 'Stoploss Hit'}`, `${trade.symbol} | P&L: ${pnl >= 0 ? '+' : ''}${Math.round(pnl)} (${Math.round(pnlPct)}%)`);
         if (db._autoReviewTrade) db._autoReviewTrade(trade.id).catch(e => console.error('[Journal] Auto-review error:', e.message));
 
-        // Auto re-entry only if NOT emergency stopped
-        if (autoEntryEnabled && !db.data?.settings?.emergency_stop && exitReason === 'TARGET_HIT') {
+        // Auto re-entry only if auto_entry is ON AND NOT emergency stopped AND target hit
+        if (isAutoEntryOn && !isEmergencyStopped && exitReason === 'TARGET_HIT') {
           const news = (db.data.news_articles || []).filter(n => n.sentiment_analysis && n.sentiment_analysis.confidence >= 60 && ['BUY_CALL', 'BUY_PUT'].includes(n.sentiment_analysis.trading_signal)).sort((a, b) => (b.created_at || '').localeCompare(a.created_at || ''));
           const latestNews = news[0] || (db.data.news_articles || []).sort((a, b) => (b.created_at || '').localeCompare(a.created_at || ''))[0];
           if (latestNews) {

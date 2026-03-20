@@ -43,7 +43,7 @@ export default function AutoTradingSettings({ autoSettings, showAutoSettings, se
             <div className="flex items-center justify-between p-3 bg-white rounded-lg border border-gray-200">
               <div>
                 <p className="font-semibold text-gray-800">Auto-Entry</p>
-                <p className="text-xs text-gray-600">Open new trade after profitable exit</p>
+                <p className="text-xs text-gray-600">Automatically execute trades from AI signals</p>
               </div>
               <Button
                 onClick={() => updateAutoSettings({ ...autoSettings, auto_entry: !autoSettings.auto_entry })}
@@ -102,7 +102,7 @@ export default function AutoTradingSettings({ autoSettings, showAutoSettings, se
           <div className="md:col-span-2 p-3 bg-yellow-50 rounded-lg border border-yellow-200">
             <p className="text-sm text-gray-700">
               <strong>How it works:</strong> When auto-exit is ON, trades automatically close when they hit your target profit ({autoSettings.target_pct}%) or stop-loss ({autoSettings.stoploss_pct}%).
-              {autoSettings.auto_entry && ' With auto-entry ON, a new trade will open automatically after a profitable exit.'}
+              {autoSettings.auto_entry ? ' With auto-entry ON, AI signals are automatically executed as trades.' : ' Auto-entry is OFF - signals are saved but trades must be executed manually via "Execute Latest Signal".'}
             </p>
           </div>
 

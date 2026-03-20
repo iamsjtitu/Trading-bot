@@ -41,7 +41,7 @@ module.exports = function (db) {
 
         let signalGenerated = false;
         if (sentimentResult.confidence >= 60 && sentimentResult.trading_signal !== 'HOLD') {
-          // EMERGENCY STOP CHECK - block trade execution
+          // EMERGENCY STOP CHECK
           if (db.data?.settings?.emergency_stop) {
             console.log(`[News] Trade BLOCKED - Emergency Stop active for ${article.title}`);
           } else {
@@ -51,35 +51,43 @@ module.exports = function (db) {
             if (db.notify) db.notify('signal', `${signal.signal_type} Signal`, `${signal.symbol} | ${sentimentResult.sentiment} ${sentimentResult.confidence}% | ${sentimentResult.reason}`);
 
             const mode = db.data.settings?.trading_mode || 'PAPER';
-            const activeBroker = db.data.settings?.active_broker || db.data.settings?.broker?.name || 'upstox';
-            const token = db.data.settings?.broker?.[`${activeBroker}_token`] || db.data.settings?.broker?.access_token;
-            signal.mode = mode;
+            const autoEntryEnabled = db.data.settings?.auto_trading?.auto_entry || false;
 
-            if (mode === 'LIVE' && token) {
-              const ist = new Date(Date.now() + 5.5 * 60 * 60 * 1000);
-              const istDay = ist.getUTCDay();
-              const istMins = ist.getUTCHours() * 60 + ist.getUTCMinutes();
-              const marketOpen = !(istDay === 0 || istDay === 6 || istMins < 555 || istMins > 930);
+            // AUTO_ENTRY CHECK - Only execute trades if auto_entry is ON
+            if (!autoEntryEnabled) {
+              console.log(`[News] Signal saved but NOT executed - Auto Entry is OFF (${signal.signal_type} ${signal.symbol})`);
+              if (db.notify) db.notify('signal', 'Signal Saved (Auto Entry OFF)', `${signal.signal_type} ${signal.symbol} - Turn on Auto Entry to execute`);
+            } else {
+              const activeBroker = db.data.settings?.active_broker || db.data.settings?.broker?.name || 'upstox';
+              const token = db.data.settings?.broker?.[`${activeBroker}_token`] || db.data.settings?.broker?.access_token;
+              signal.mode = mode;
 
-              if (!marketOpen) {
-                if (db.notify) db.notify('signal', 'Signal Saved', `${signal.signal_type} ${signal.symbol} - Market closed`);
-              } else {
-                const openSameType = (db.data.trades || []).find(t => t.status === 'OPEN' && t.trade_type === signal.signal_type && (t.instrument === signal.symbol || t.symbol === signal.symbol) && t.mode === 'LIVE');
-                if (!openSameType) {
-                  try {
-                    const result = await signals.executeLiveTrade(signal, token);
-                    if (db.notify) db.notify('entry', `LIVE ${signal.signal_type} Entry`, `${signal.symbol} | ${result.success ? 'Order: ' + result.order_id : 'FAILED: ' + (result.error || '')}`);
-                  } catch (tradeErr) {
-                    if (!db.data.trades) db.data.trades = [];
-                    db.data.trades.push({ id: uuid(), signal_id: signal.id, trade_type: signal.signal_type, symbol: signal.symbol, entry_time: new Date().toISOString(), entry_price: signal.entry_price, quantity: signal.quantity, investment: signal.investment_amount, status: 'FAILED', mode: 'LIVE', error: tradeErr.message });
-                    if (db.notify) db.notify('error', 'Trade Failed', `${signal.symbol} ${signal.signal_type}: ${tradeErr.message}`);
+              if (mode === 'LIVE' && token) {
+                const ist = new Date(Date.now() + 5.5 * 60 * 60 * 1000);
+                const istDay = ist.getUTCDay();
+                const istMins = ist.getUTCHours() * 60 + ist.getUTCMinutes();
+                const marketOpen = !(istDay === 0 || istDay === 6 || istMins < 555 || istMins > 930);
+
+                if (!marketOpen) {
+                  if (db.notify) db.notify('signal', 'Signal Saved', `${signal.signal_type} ${signal.symbol} - Market closed`);
+                } else {
+                  const openSameType = (db.data.trades || []).find(t => t.status === 'OPEN' && t.trade_type === signal.signal_type && (t.instrument === signal.symbol || t.symbol === signal.symbol) && t.mode === 'LIVE');
+                  if (!openSameType) {
+                    try {
+                      const result = await signals.executeLiveTrade(signal, token);
+                      if (db.notify) db.notify('entry', `LIVE ${signal.signal_type} Entry`, `${signal.symbol} | ${result.success ? 'Order: ' + result.order_id : 'FAILED: ' + (result.error || '')}`);
+                    } catch (tradeErr) {
+                      if (!db.data.trades) db.data.trades = [];
+                      db.data.trades.push({ id: uuid(), signal_id: signal.id, trade_type: signal.signal_type, symbol: signal.symbol, entry_time: new Date().toISOString(), entry_price: signal.entry_price, quantity: signal.quantity, investment: signal.investment_amount, status: 'FAILED', mode: 'LIVE', error: tradeErr.message });
+                      if (db.notify) db.notify('error', 'Trade Failed', `${signal.symbol} ${signal.signal_type}: ${tradeErr.message}`);
+                    }
                   }
                 }
+              } else if (mode === 'PAPER') {
+                signal.mode = 'PAPER';
+                signals.executePaperTrade(signal);
+                if (db.notify) db.notify('entry', `Paper ${signal.signal_type} Entry`, `${signal.symbol} | Qty: ${signal.quantity}`);
               }
-            } else {
-              signal.mode = 'PAPER';
-              signals.executePaperTrade(signal);
-              if (db.notify) db.notify('entry', `Paper ${signal.signal_type} Entry`, `${signal.symbol} | Qty: ${signal.quantity}`);
             }
             signalGenerated = true;
           }
