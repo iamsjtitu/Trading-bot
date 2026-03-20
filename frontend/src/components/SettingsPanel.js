@@ -378,6 +378,11 @@ export default function SettingsPanel({ onClose, onSave }) {
                   <input type="number" value={settings.risk.max_per_trade} onChange={(e) => updateField('risk', 'max_per_trade', parseInt(e.target.value))} className="w-full px-3 py-2 border border-gray-300 rounded-lg" min="1000" step="1000" />
                 </div>
                 <div className="bg-white p-4 rounded-lg border border-gray-200">
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Max Open Trades (Total)</label>
+                  <input type="number" value={settings.risk.max_open_trades || 5} onChange={(e) => updateField('risk', 'max_open_trades', parseInt(e.target.value))} className="w-full px-3 py-2 border border-gray-300 rounded-lg" min="1" max="20" data-testid="max-open-trades-input" />
+                  <p className="text-xs text-gray-500 mt-1">Max simultaneous open trades across all instruments</p>
+                </div>
+                <div className="bg-white p-4 rounded-lg border border-gray-200">
                   <label className="block text-sm font-medium text-gray-700 mb-1">Risk Tolerance</label>
                   <select value={settings.risk.risk_tolerance} onChange={(e) => updateField('risk', 'risk_tolerance', e.target.value)} className="w-full px-3 py-2 border border-gray-300 rounded-lg">
                     <option value="low">Low (15% SL, 30% Target)</option>
