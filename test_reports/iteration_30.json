@@ -1,0 +1,166 @@
+{
+  "summary": "Iteration 30 - Comprehensive Bug Fix Verification COMPLETE. All 16 backend tests PASSED. All frontend tabs verified working. CRITICAL FIXES CONFIRMED: 1) Technical Analysis uses Upstox live data (source='upstox', 75 candles for NIFTY50 5min), 2) BANKNIFTY 30minute also uses Upstox (13 candles), 3) Risk ratio guard working (signals show Target > StopLoss), 4) Auto-settings update works, 5) All indicators (RSI/MACD/VWAP/EMA/SMA) present, 6) Tax Reports, Journal, AI Brain, Signals tabs all functional.",
+  "backend_issues": {
+    "critical": [],
+    "minor": [
+      {
+        "endpoint": "GET /api/auto-settings",
+        "issue": "Initially shows target_pct=15, stoploss_pct=30 (inverted ratio in DB), but the signal generator has guard to enforce target >= stoploss during signal creation"
+      }
+    ]
+  },
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": [
+      {
+        "screen": "Tax Reports FY selector",
+        "issues": ["Minor: React hydration warning (span inside option) - cosmetic only, functionality works"]
+      },
+      {
+        "screen": "WebSocket",
+        "issues": ["WebSocket connection to wss://...api/ws/market-data fails with 403 - uses REST fallback (not critical, data still loads)"]
+      }
+    ]
+  },
+  "test_report_links": [
+    "/app/test_reports/pytest/iteration30_v430_results.xml",
+    "/app/backend/tests/test_v430_bug_fixes.py"
+  ],
+  "action_items": [],
+  "critical_code_review_comments": [
+    "VERIFIED FIX 1: technical.js uses correct Upstox interval mapping (1minute, 30minute, day instead of 5minute, 1day)",
+    "VERIFIED FIX 2: signal_generator.js line 88-93 has risk ratio guard - if target_pct < stop_loss_pct, enforces 1:1 minimum",
+    "VERIFIED FIX 3: trading.js line 18 uses db._sharedAIEngine for shared AI Engine instance",
+    "VERIFIED FIX 4: news.js line 17 creates shared AI Engine and stores on db._sharedAIEngine",
+    "VERIFIED FIX 5: signal_generator.js line 62 uses count check (openInInstrument.length >= maxTotalTrades) for max_open_trades",
+    "VERIFIED FIX 6: signal_generator.js line 294-295 uses signal's pre-calculated stop_loss and target values for live trade execution",
+    "VERIFIED: Signals show correct risk ratio (Entry: ₹150, Target: ₹195, Stop Loss: ₹105 - Target > StopLoss)",
+    "VERIFIED: Technical Analysis shows 'Live Data' button and real NIFTY50 price (23,134.65)",
+    "VERIFIED: All 5 indicators visible: RSI, MACD, VWAP, EMA, SMA"
+  ],
+  "updated_files": [
+    "/app/backend/tests/test_v430_bug_fixes.py"
+  ],
+  "success_rate": {
+    "backend": "100% (16/16 tests passed)",
+    "frontend": "100% (All tabs verified working)"
+  },
+  "test_credentials": "None required - Uses Upstox token from database",
+  "seed_data_creation": "None - uses live Upstox data",
+  "retest_needed": false,
+  "main_agent_can_self_test": false,
+  "context_for_next_testing_agent": "All v4.3.0 bug fixes verified working. Technical Analysis uses Upstox live data (confirmed source='upstox'). Risk ratio guard working - signals correctly show target > stoploss. 77 orders today with -₹951 P&L (real loss from user's trades). Auto-entry is OFF (user setting), Auto-exit is ON. Market closed during testing (weekend). Tax Reports feature shows correct data from Upstox (7 trades, ₹3,076 gross P&L).",
+  "verified_features": {
+    "technical_analysis_upstox": {
+      "status": "PASS",
+      "endpoints": [
+        "GET /api/technical/analysis?instrument=NIFTY50&interval=5minute → source=upstox, 75 candles",
+        "GET /api/technical/analysis?instrument=BANKNIFTY&interval=30minute → source=upstox, 13 candles"
+      ],
+      "fix_location": "/app/desktop/routes/technical.js INTERVAL_MAP"
+    },
+    "risk_ratio_guard": {
+      "status": "PASS",
+      "evidence": "Signals show Entry: ₹150, Target: ₹195, Stop Loss: ₹105 (Target > StopLoss)",
+      "fix_location": "/app/desktop/routes/lib/signal_generator.js lines 88-93"
+    },
+    "shared_ai_engine": {
+      "status": "PASS",
+      "evidence": "db._sharedAIEngine created in news.js and reused in trading.js",
+      "fix_locations": [
+        "/app/desktop/routes/news.js line 17",
+        "/app/desktop/routes/trading.js line 18"
+      ]
+    },
+    "max_open_trades_check": {
+      "status": "PASS",
+      "evidence": "Uses count check (openInInstrument.length >= maxTotalTrades)",
+      "fix_location": "/app/desktop/routes/lib/signal_generator.js line 62"
+    },
+    "live_trade_uses_signal_values": {
+      "status": "PASS",
+      "evidence": "Line 294-295 uses signal.stop_loss and signal.target instead of recalculating",
+      "fix_location": "/app/desktop/routes/lib/signal_generator.js lines 294-295"
+    },
+    "signals_endpoint": {
+      "status": "PASS",
+      "endpoint": "GET /api/signals/latest",
+      "result": "Returns signals with proper stop_loss and target values"
+    },
+    "news_endpoint": {
+      "status": "PASS",
+      "endpoint": "GET /api/news/latest",
+      "result": "Returns news with sentiment analysis (BULLISH/BEARISH/NEUTRAL)"
+    },
+    "ai_insights_endpoint": {
+      "status": "PASS",
+      "endpoint": "GET /api/ai/insights",
+      "result": "Returns market_regime, sector_rotation data"
+    },
+    "auto_exit_check": {
+      "status": "PASS",
+      "endpoint": "POST /api/auto-exit/check",
+      "result": "Returns exits_executed count without errors"
+    },
+    "auto_settings_endpoints": {
+      "status": "PASS",
+      "endpoints": [
+        "GET /api/auto-settings → Returns current settings",
+        "POST /api/auto-settings/update → Updates target_pct, stoploss_pct"
+      ]
+    },
+    "trades_today": {
+      "status": "PASS",
+      "endpoint": "GET /api/trades/today",
+      "result": "Returns today_pnl=-950.95 (real loss from Upstox)"
+    },
+    "trades_active": {
+      "status": "PASS",
+      "endpoint": "GET /api/trades/active",
+      "result": "Returns 0 active positions (correct - no open positions on Upstox)"
+    },
+    "debug_auto_trade_test": {
+      "status": "PASS",
+      "endpoint": "GET /api/debug/auto-trade-test",
+      "result": "Returns 6 diagnostic steps with all details"
+    },
+    "journal_endpoints": {
+      "status": "PASS",
+      "endpoints": [
+        "GET /api/journal/entries → 0 entries (no closed trades)",
+        "GET /api/journal/stats → stats.total=0"
+      ]
+    },
+    "daily_summary": {
+      "status": "PASS",
+      "endpoint": "GET /api/daily-summary",
+      "result": "Returns date, total_trades, signals_generated"
+    },
+    "historical_patterns": {
+      "status": "PASS",
+      "endpoint": "GET /api/historical-patterns",
+      "result": "Returns total_patterns, sector_stats, sentiment_stats"
+    }
+  },
+  "frontend_verification": {
+    "dashboard": "PASS - Loads with LIVE TRADING MODE banner, Upstox connection shown",
+    "technical_tab": "PASS - Shows 'Live Data' button, all indicators visible, instrument/interval selectors work",
+    "signals_tab": "PASS - Shows signals with correct risk ratio (Target > StopLoss)",
+    "active_trades_tab": "PASS - Shows 'No active positions on Upstox'",
+    "tax_reports_tab": "PASS - Shows 7 trades, ₹3,076 gross P&L, ₹812 tax liability, 'Upstox Live' badge",
+    "ai_brain_tab": "PASS - Shows market regime, AI performance, sector rotation",
+    "settings_panel": "PASS - Shows broker selection, trading mode toggle"
+  },
+  "data_observed": {
+    "today_pnl": -950.95,
+    "portfolio_value": 203845,
+    "orders_today": 77,
+    "margin_used": 926,
+    "active_positions": 0,
+    "nifty50_price": 23134.65,
+    "banknifty_price": 53427.05,
+    "tax_report_trades": 7,
+    "tax_report_gross_pnl": 3076
+  }
+}

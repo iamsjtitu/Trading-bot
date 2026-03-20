@@ -14,7 +14,9 @@ function uuid() { return crypto.randomUUID(); }
 module.exports = function (db) {
   const router = Router();
   const AIDecisionEngine = require('./ai_engine');
-  const aiEngine = new AIDecisionEngine(db);
+  // Use shared AI Engine instance (created by news.js and stored on db)
+  if (!db._sharedAIEngine) db._sharedAIEngine = new AIDecisionEngine(db);
+  const aiEngine = db._sharedAIEngine;
   const signalGen = createSignalGenerator(db, aiEngine);
 
   const INSTRUMENTS = { NIFTY50: { exchange: 'NSE' }, BANKNIFTY: { exchange: 'NSE' }, FINNIFTY: { exchange: 'NSE' }, MIDCPNIFTY: { exchange: 'NSE' }, SENSEX: { exchange: 'BSE' }, BANKEX: { exchange: 'BSE' } };
@@ -200,12 +202,15 @@ module.exports = function (db) {
     const autoT = db.data?.settings?.auto_trading || {};
     const targetPct = autoT.target_pct || riskCfg.target_pct || rp.target_pct;
     const stoplossPct = autoT.stoploss_pct || riskCfg.stop_loss_pct || rp.stop_loss_pct;
+    // RISK RATIO GUARD: Target must be >= StopLoss
+    const finalTargetPct = Math.max(targetPct, stoplossPct);
+    const finalStoplossPct = stoplossPct;
     const mode = db.data.settings?.trading_mode || 'PAPER';
     const accessToken = getActiveBrokerToken();
 
     // Sync entry prices from Upstox (LIVE)
     if (mode === 'LIVE' && accessToken) {
-      try { const headers = { Accept: 'application/json', Authorization: `Bearer ${accessToken}`, 'Api-Version': '2.0' }; const posResp = await axios.get('https://api.upstox.com/v2/portfolio/short-term-positions', { headers, timeout: 10000 }); if (posResp.data?.status === 'success') { const posMap = {}; for (const p of (posResp.data.data || [])) { if (p.instrument_token) posMap[p.instrument_token] = p; } for (const trade of openTrades) { if (trade.mode === 'LIVE' && trade.instrument_token && posMap[trade.instrument_token]) { const pos = posMap[trade.instrument_token]; const realEntry = pos.average_price || pos.buy_price || (pos.buy_quantity > 0 ? pos.buy_value / pos.buy_quantity : 0); if (realEntry > 0 && (trade.entry_price === 0 || trade.entry_price === 150 || Math.abs(trade.entry_price - realEntry) > realEntry * 0.5)) { trade.entry_price = realEntry; trade.investment = realEntry * trade.quantity; trade.stop_loss = Math.round(realEntry * (1 - stoplossPct / 100) * 100) / 100; trade.target = Math.round(realEntry * (1 + targetPct / 100) * 100) / 100; } } } db.save(); } } catch (err) { console.error('[AutoExit] Positions sync error:', err.message); }
+      try { const headers = { Accept: 'application/json', Authorization: `Bearer ${accessToken}`, 'Api-Version': '2.0' }; const posResp = await axios.get('https://api.upstox.com/v2/portfolio/short-term-positions', { headers, timeout: 10000 }); if (posResp.data?.status === 'success') { const posMap = {}; for (const p of (posResp.data.data || [])) { if (p.instrument_token) posMap[p.instrument_token] = p; } for (const trade of openTrades) { if (trade.mode === 'LIVE' && trade.instrument_token && posMap[trade.instrument_token]) { const pos = posMap[trade.instrument_token]; const realEntry = pos.average_price || pos.buy_price || (pos.buy_quantity > 0 ? pos.buy_value / pos.buy_quantity : 0); if (realEntry > 0 && (trade.entry_price === 0 || trade.entry_price === 150 || Math.abs(trade.entry_price - realEntry) > realEntry * 0.5)) { trade.entry_price = realEntry; trade.investment = realEntry * trade.quantity; trade.stop_loss = Math.round(realEntry * (1 - finalStoplossPct / 100) * 100) / 100; trade.target = Math.round(realEntry * (1 + finalTargetPct / 100) * 100) / 100; } } } db.save(); } } catch (err) { console.error('[AutoExit] Positions sync error:', err.message); }
     }
 
     for (const trade of openTrades) {
@@ -214,7 +219,7 @@ module.exports = function (db) {
         try { const ltp = await axios.get(`https://api.upstox.com/v2/market-quote/ltp?instrument_key=${encodeURIComponent(trade.instrument_token)}`, { headers: { Accept: 'application/json', Authorization: `Bearer ${accessToken}`, 'Api-Version': '2.0' }, timeout: 10000 }); const quotes = ltp.data?.data || {}; const key = Object.keys(quotes)[0]; currentPrice = quotes[key]?.last_price || null; if (!currentPrice) continue; } catch (err) { continue; }
       } else { currentPrice = trade.entry_price * (1 + (Math.random() - 0.5) * 0.3); }
 
-      const targetPrice = trade.entry_price * (1 + targetPct / 100); const stoplossPrice = trade.entry_price * (1 - stoplossPct / 100);
+      const targetPrice = trade.entry_price * (1 + finalTargetPct / 100); const stoplossPrice = trade.entry_price * (1 - finalStoplossPct / 100);
       let shouldExit = false, exitReason = '';
       if (currentPrice >= targetPrice) { shouldExit = true; exitReason = 'TARGET_HIT'; }
       else if (currentPrice <= stoplossPrice) { shouldExit = true; exitReason = 'STOPLOSS_HIT'; }

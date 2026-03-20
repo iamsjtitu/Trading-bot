@@ -84,6 +84,14 @@ module.exports = function createSignalGenerator(db, aiEngine) {
     const autoTrading = db.data?.settings?.auto_trading || {};
     if (autoTrading.stoploss_pct != null && autoTrading.stoploss_pct > 0) rp.stop_loss_pct = autoTrading.stoploss_pct;
     if (autoTrading.target_pct != null && autoTrading.target_pct > 0) rp.target_pct = autoTrading.target_pct;
+
+    // RISK RATIO GUARD: Target MUST be >= Stop Loss for positive expectancy
+    // If user set inverted ratio (e.g., SL=30%, Target=15%), enforce minimum 1:1
+    if (rp.target_pct < rp.stop_loss_pct) {
+      console.warn(`[Signal] WARNING: Inverted risk ratio detected! Target(${rp.target_pct}%) < StopLoss(${rp.stop_loss_pct}%). Enforcing 1:1 minimum.`);
+      rp.target_pct = rp.stop_loss_pct; // At minimum, target = stoploss (1:1)
+    }
+
     const maxTrade = riskCfg.max_per_trade || 20000;
     const dailyLimit = riskCfg.daily_limit || 100000;
 
@@ -179,9 +187,13 @@ module.exports = function createSignalGenerator(db, aiEngine) {
     const headers = { Accept: 'application/json', Authorization: `Bearer ${accessToken}`, 'Api-Version': '2.0', 'Content-Type': 'application/json' };
     try {
       const activeInst = signal.symbol || 'NIFTY50';
-      // Duplicate protection
-      const existingOpen = (db.data.trades || []).find(t => t.status === 'OPEN' && t.trade_type === signal.signal_type && (t.instrument === activeInst || t.symbol === activeInst) && t.mode === 'LIVE');
-      if (existingOpen) { console.log(`[LiveTrade] Skipping - already OPEN (${existingOpen.symbol})`); return { success: false, error: `Duplicate position blocked - already have ${existingOpen.symbol} open` }; }
+      // Max open trades check (respects user's max_open_trades setting)
+      const maxTotalTrades = db.data?.settings?.risk?.max_open_trades || 5;
+      const openInInstrument = (db.data.trades || []).filter(t => t.status === 'OPEN' && (t.instrument === activeInst || t.symbol === activeInst) && t.mode === 'LIVE');
+      if (openInInstrument.length >= maxTotalTrades) {
+        console.log(`[LiveTrade] BLOCKED - ${activeInst} has ${openInInstrument.length}/${maxTotalTrades} open trades`);
+        return { success: false, error: `Max open trades reached (${openInInstrument.length}/${maxTotalTrades})` };
+      }
 
       // STRICT max_per_trade enforcement
       const riskCfg = db.data?.settings?.risk || {};
@@ -272,15 +284,15 @@ module.exports = function createSignalGenerator(db, aiEngine) {
       }
 
       if (!db.data.trades) db.data.trades = [];
-      const riskP = { target_pct: 50, stop_loss_pct: 25, ...(db.data?.settings?.auto_trading || {}) };
+      // Use signal's pre-calculated stop_loss and target (already set in generateSignal)
       const trade = {
         id: uuid(), signal_id: signal.id, trade_type: signal.signal_type,
         symbol: signal.option_symbol || signal.symbol,
         instrument: signal.symbol || 'NIFTY50',
         entry_time: new Date().toISOString(),
         entry_price: actualEntryPrice, quantity: qty, investment: qty * actualEntryPrice,
-        stop_loss: Math.round(actualEntryPrice * (1 - (riskP.stoploss_pct || riskP.stop_loss_pct || 25) / 100) * 100) / 100,
-        target: Math.round(actualEntryPrice * (1 + (riskP.target_pct || 50) / 100) * 100) / 100,
+        stop_loss: signal.stop_loss || Math.round(actualEntryPrice * 0.80 * 100) / 100,
+        target: signal.target || Math.round(actualEntryPrice * 1.20 * 100) / 100,
         status: orderSuccess ? 'OPEN' : 'FAILED', mode: 'LIVE', order_id: orderId, instrument_token: instrumentToken,
         sentiment: signal.sentiment || 'N/A',
         confidence: signal.confidence || 0,

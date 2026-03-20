@@ -13,7 +13,9 @@ let OpenAI; try { OpenAI = require('openai'); } catch (_) { OpenAI = null; }
 module.exports = function (db) {
   const router = Router();
   const AIDecisionEngine = require('./ai_engine');
-  const aiEngine = new AIDecisionEngine(db);
+  // Create shared AI Engine instance (shared with trading.js via db)
+  if (!db._sharedAIEngine) db._sharedAIEngine = new AIDecisionEngine(db);
+  const aiEngine = db._sharedAIEngine;
   const sentiment = createSentimentAnalyzer(db, aiEngine);
   const signals = createSignalGenerator(db, aiEngine);
 
@@ -71,8 +73,11 @@ module.exports = function (db) {
                 if (!marketOpen) {
                   if (db.notify) db.notify('signal', 'Signal Saved', `${signal.signal_type} ${signal.symbol} - Market closed`);
                 } else {
-                  const openSameType = (db.data.trades || []).find(t => t.status === 'OPEN' && t.trade_type === signal.signal_type && (t.instrument === signal.symbol || t.symbol === signal.symbol) && t.mode === 'LIVE');
-                  if (!openSameType) {
+                  const maxOpenTrades = db.data?.settings?.risk?.max_open_trades || 5;
+                  const openInInstrument = (db.data.trades || []).filter(t => t.status === 'OPEN' && (t.instrument === signal.symbol || t.symbol === signal.symbol) && t.mode === 'LIVE');
+                  if (openInInstrument.length >= maxOpenTrades) {
+                    if (db.notify) db.notify('signal', 'Signal Saved', `${signal.signal_type} ${signal.symbol} - Max ${maxOpenTrades} trades open`);
+                  } else {
                     try {
                       const result = await signals.executeLiveTrade(signal, token);
                       if (db.notify) db.notify('entry', `LIVE ${signal.signal_type} Entry`, `${signal.symbol} | ${result.success ? 'Order: ' + result.order_id : 'FAILED: ' + (result.error || '')}`);
