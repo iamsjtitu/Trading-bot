@@ -48,7 +48,22 @@ module.exports = function (db) {
       } catch (err) { console.error('[Trades] Live positions fetch error:', err.message); }
 
       const posMap = {}; for (const p of positions) { if (p.instrument_token) posMap[p.instrument_token] = p; }
-      for (const t of dbOpenTrades) { if (t.instrument_token && !posMap[t.instrument_token]) { t.status = 'CLOSED'; t.exit_time = new Date().toISOString(); t.exit_reason = 'POSITION_CLOSED_ON_BROKER'; const sig = (db.data.signals || []).find(s => s.id === t.signal_id); if (sig) sig.status = 'CLOSED'; } }
+      for (const t of dbOpenTrades) {
+        if (t.instrument_token && !posMap[t.instrument_token]) {
+          // Position closed on broker - estimate exit data from last known price
+          const lastPrice = t.current_price || t.entry_price || 0;
+          const qty = t.quantity || 1;
+          t.status = 'CLOSED';
+          t.exit_time = new Date().toISOString();
+          t.exit_reason = 'POSITION_CLOSED_ON_BROKER';
+          t.exit_price = lastPrice;
+          t.pnl = Math.round((lastPrice - (t.entry_price || 0)) * qty * 100) / 100;
+          t.pnl_percentage = t.entry_price > 0 ? Math.round(((lastPrice - t.entry_price) / t.entry_price) * 10000) / 100 : 0;
+          const sig = (db.data.signals || []).find(s => s.id === t.signal_id);
+          if (sig) sig.status = 'CLOSED';
+          if (db._autoReviewTrade) db._autoReviewTrade(t.id).catch(e => console.error('[Journal] Auto-review error:', e.message));
+        }
+      }
       db.save();
 
       const storedTradesMap = {}; for (const t of (db.data.trades || [])) { if (t.mode === 'LIVE' && t.status === 'OPEN' && t.instrument_token) storedTradesMap[t.instrument_token] = t; }

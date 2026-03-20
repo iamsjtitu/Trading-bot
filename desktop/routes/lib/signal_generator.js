@@ -84,9 +84,16 @@ module.exports = function createSignalGenerator(db, aiEngine) {
     const atmStrike = Math.round(spotPrice / strikeStep) * strikeStep;
     const strikeOffset = signalType === 'CALL' ? strikeStep * 2 : -(strikeStep * 2);
 
+    // Generate option symbol for display (e.g., NIFTY2632424200CE)
+    const now = new Date();
+    const expiryStr = `${now.getFullYear().toString().slice(-2)}${String(now.getMonth()+1).padStart(2,'0')}${String(now.getDate()).padStart(2,'0')}`;
+    const strike = atmStrike + strikeOffset;
+    const optionSymbol = `${activeInst}${expiryStr}${strike}${signalType === 'CALL' ? 'CE' : 'PE'}`;
+
     return {
       id: uuid(), signal_type: signalType, symbol: activeInst,
-      strike_price: atmStrike + strikeOffset, option_premium: optionPremium, quantity, investment_amount: quantity * optionPremium, entry_price: optionPremium,
+      option_symbol: optionSymbol,
+      strike_price: strike, option_premium: optionPremium, quantity, investment_amount: quantity * optionPremium, entry_price: optionPremium,
       stop_loss: Math.round(optionPremium * (1 - rp.stop_loss_pct / 100) * 100) / 100,
       target: Math.round(optionPremium * (1 + rp.target_pct / 100) * 100) / 100,
       confidence: adjustedConfidence, composite_score: sentiment.composite_score || adjustedConfidence,
@@ -103,10 +110,16 @@ module.exports = function createSignalGenerator(db, aiEngine) {
   function executePaperTrade(signal) {
     if (!db.data.trades) db.data.trades = [];
     const trade = {
-      id: uuid(), signal_id: signal.id, trade_type: signal.signal_type, symbol: signal.symbol,
+      id: uuid(), signal_id: signal.id, trade_type: signal.signal_type,
+      symbol: signal.option_symbol || signal.symbol,
+      instrument: signal.symbol || signal.instrument || 'NIFTY50',
       entry_time: new Date().toISOString(), entry_price: signal.entry_price, quantity: signal.quantity,
       investment: signal.investment_amount, stop_loss: signal.stop_loss, target: signal.target, status: 'OPEN',
-      mode: db.data?.settings?.trading_mode || 'PAPER', exit_time: null, exit_price: null, pnl: 0, pnl_percentage: 0,
+      mode: db.data?.settings?.trading_mode || 'PAPER',
+      sentiment: signal.sentiment || 'N/A',
+      confidence: signal.confidence || 0,
+      sector: signal.sector || 'BROAD_MARKET',
+      exit_time: null, exit_price: null, pnl: 0, pnl_percentage: 0,
     };
     db.data.trades.push(trade);
     const p = db.data.portfolio;
@@ -189,11 +202,17 @@ module.exports = function createSignalGenerator(db, aiEngine) {
       if (!db.data.trades) db.data.trades = [];
       const riskP = { target_pct: 50, stop_loss_pct: 25, ...(db.data?.settings?.auto_trading || {}) };
       const trade = {
-        id: uuid(), signal_id: signal.id, trade_type: signal.signal_type, symbol: signal.symbol, entry_time: new Date().toISOString(),
+        id: uuid(), signal_id: signal.id, trade_type: signal.signal_type,
+        symbol: signal.option_symbol || signal.symbol,
+        instrument: signal.symbol || 'NIFTY50',
+        entry_time: new Date().toISOString(),
         entry_price: actualEntryPrice, quantity: qty, investment: qty * actualEntryPrice,
         stop_loss: Math.round(actualEntryPrice * (1 - (riskP.stoploss_pct || riskP.stop_loss_pct || 25) / 100) * 100) / 100,
         target: Math.round(actualEntryPrice * (1 + (riskP.target_pct || 50) / 100) * 100) / 100,
         status: orderSuccess ? 'OPEN' : 'FAILED', mode: 'LIVE', order_id: orderId, instrument_token: instrumentToken,
+        sentiment: signal.sentiment || 'N/A',
+        confidence: signal.confidence || 0,
+        sector: signal.sector || 'BROAD_MARKET',
         exit_time: null, exit_price: null, pnl: 0, pnl_percentage: 0,
         upstox_status: orderResp.data?.status || 'unknown', upstox_message: orderResp.data?.message || '',
       };
