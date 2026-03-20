@@ -206,12 +206,16 @@ function App() {
       if (mode !== 'LIVE') {
         const todayData = todayRes.data;
         const riskCfg = settingsRes.data?.settings?.risk || {};
+        // Calculate today's P&L: realized (from closed trades) + unrealized (from active trades' live_pnl)
+        const activeTrades = tradesRes.data.trades || [];
+        const liveUnrealized = activeTrades.reduce((sum, t) => sum + (t.live_pnl || 0), 0);
+        const todayPnL = Math.round(((todayData.realized_pnl || 0) + liveUnrealized) * 100) / 100;
         setRiskMetrics({
           dailyUsed: todayData.today_invested || 0,
           dailyLimit: riskCfg.daily_limit || 100000,
           maxPerTrade: riskCfg.max_per_trade || 20000,
           todayTrades: todayData.total_trades_today || 0,
-          todayPnL: todayData.today_pnl || 0,
+          todayPnL: todayPnL,
           isLive: false,
         });
       }
@@ -385,8 +389,15 @@ function App() {
             axios.get(`${API}/trades/active`),
             axios.get(`${API}/trades/today`),
           ]);
-          if (tradeRes.data?.trades) setTrades(tradeRes.data.trades);
-          if (todayRes.data?.today_pnl != null) {
+          if (tradeRes.data?.trades) {
+            setTrades(tradeRes.data.trades);
+            // Calculate real-time today's P&L: realized (closed trades) + live unrealized (open trades)
+            const activeTrades = tradeRes.data.trades;
+            const liveUnrealized = activeTrades.reduce((sum, t) => sum + (t.live_pnl || 0), 0);
+            const realizedPnl = todayRes.data?.realized_pnl || 0;
+            const totalTodayPnl = Math.round((realizedPnl + liveUnrealized) * 100) / 100;
+            setRiskMetrics(prev => ({ ...prev, todayPnL: totalTodayPnl }));
+          } else if (todayRes.data?.today_pnl != null) {
             setRiskMetrics(prev => ({ ...prev, todayPnL: todayRes.data.today_pnl }));
           }
         } catch (_) {}
@@ -776,7 +787,7 @@ function App() {
       {/* Footer */}
       <footer className="border-t border-gray-200 bg-white/80 backdrop-blur-sm mt-8 py-4 shadow-sm">
         <div className="container mx-auto px-4 text-center text-sm text-gray-600">
-          <p>{tradingMode === 'LIVE' ? 'LIVE TRADING' : 'Paper Trading'} Mode | AI-Powered Options Trading Bot | v4.1.4</p>
+          <p>{tradingMode === 'LIVE' ? 'LIVE TRADING' : 'Paper Trading'} Mode | AI-Powered Options Trading Bot | v4.1.5</p>
           <p className="text-xs mt-1 text-gray-500">Trading involves risk. Past performance does not guarantee future results.</p>
         </div>
       </footer>

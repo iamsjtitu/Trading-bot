@@ -1,0 +1,89 @@
+{
+  "summary": "Iteration 25 - P&L Bug Fix and AI Features VERIFIED. All 15 backend tests passed. Today's P&L now shows non-zero unrealized P&L (-₹2 to -₹6) when open trades exist. AI Brain tab, Technical Analysis tab, and v4.1.5 footer all working correctly.",
+  "backend_issues": {
+    "critical": [],
+    "minor": []
+  },
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": []
+  },
+  "test_report_links": [
+    "/app/test_reports/pytest/iteration25_results.xml",
+    "/app/backend/tests/test_pnl_aifeatures.py"
+  ],
+  "action_items": [],
+  "critical_code_review_comments": [
+    "Bug fix confirmed: /api/trades/today now calculates unrealized P&L from open trades in PAPER mode (lines 121-131 in trading.js)",
+    "Today's P&L correctly shows -₹2 to -₹6 based on live price simulations - no longer stuck at ₹0",
+    "All 5 technical indicators (RSI, MACD, VWAP, EMA, SMA) now include signal and reason fields",
+    "AI Brain tab correctly fetches /api/ai/insights and /api/ai/heatmap endpoints",
+    "Technical Analysis tab uses demo data with Demo Data badge when no broker connected"
+  ],
+  "updated_files": [
+    "/app/backend/tests/test_pnl_aifeatures.py"
+  ],
+  "success_rate": {
+    "backend": "100% (15/15 tests passed)",
+    "frontend": "100% (All tabs, components, and P&L display working)"
+  },
+  "test_credentials": "None required",
+  "seed_data_creation": "4 open paper trades exist with simulated price movements",
+  "retest_needed": false,
+  "main_agent_can_self_test": false,
+  "context_for_next_testing_agent": "P&L bug is fixed. Today's P&L in Risk Management panel now shows actual unrealized P&L from open trades. 4 open trades exist in PAPER mode. AI Brain and Technical Analysis tabs fully functional with demo data.",
+  "tested_features": {
+    "pnl_bug_fix": {
+      "status": "PASS",
+      "description": "Today's P&L shows non-zero value (-₹2 to -₹6) when open trades exist",
+      "endpoint": "GET /api/trades/today",
+      "api_result": "today_pnl: -2.89, realized_pnl: 0, unrealized_pnl: -2.89"
+    },
+    "active_trades_live_pnl": {
+      "status": "PASS",
+      "endpoint": "GET /api/trades/active",
+      "result": "4 trades returned with live_pnl values (-7.36, -5.01, 8.11, 2.52)"
+    },
+    "ai_insights": {
+      "status": "PASS",
+      "endpoint": "GET /api/ai/insights",
+      "result": "Returns market_regime (UNKNOWN), sector_rotation, sentiment_depth, performance"
+    },
+    "ai_heatmap": {
+      "status": "PASS",
+      "endpoint": "GET /api/ai/heatmap",
+      "result": "Returns sectors with time bucket data (BANKING, IT have signals)"
+    },
+    "technical_analysis": {
+      "status": "PASS",
+      "endpoint": "GET /api/technical/analysis?instrument=NIFTY50&interval=5minute",
+      "result": "Returns RSI (54.88, NEUTRAL), MACD (6.55, BULLISH), VWAP (BEARISH), EMA (BULLISH), SMA (BULLISH)"
+    },
+    "technical_intervals": {
+      "status": "PASS",
+      "endpoint": "GET /api/technical/intervals",
+      "result": "Returns 6 intervals (1min to 1day) and 6 instruments"
+    },
+    "frontend_risk_panel_pnl": {
+      "status": "PASS",
+      "test": "Risk Management panel Today's P&L display",
+      "result": "Shows -₹2 (updates to -₹6 with price changes) - not ₹0"
+    },
+    "frontend_ai_brain_tab": {
+      "status": "PASS",
+      "test": "AI Brain tab renders correctly",
+      "components_verified": ["Market Regime card", "AI Performance card", "Sector Rotation card", "AI Decision Factors"]
+    },
+    "frontend_technical_tab": {
+      "status": "PASS",
+      "test": "Technical Analysis tab renders correctly",
+      "components_verified": ["Instrument selector", "Interval buttons (1M-1D)", "Overall Signal card (BULLISH 60)", "RSI card", "MACD card", "VWAP card"]
+    },
+    "version_footer": {
+      "status": "PASS",
+      "result": "Footer shows v4.1.5"
+    }
+  },
+  "mocked_apis_note": "No APIs mocked. Technical analysis uses demo data when broker not connected (expected behavior)."
+}

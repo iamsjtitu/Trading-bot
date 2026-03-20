@@ -166,7 +166,19 @@ function analyzeCandles(candles) {
     ema_long: ema21.length > 0 ? ema21[ema21.length - 1] : null,
   });
 
-  const signals = [rsiSig.signal, macdSig.signal, vwapSig.signal, emaSig.signal];
+  // SMA signal: price vs SMA 20 & SMA 20 vs SMA 50
+  const sma20Val = sma20.length > 0 ? sma20[sma20.length - 1] : null;
+  const sma50Val = sma50.length > 0 ? sma50[sma50.length - 1] : null;
+  let smaSig = { signal: 'NEUTRAL', reason: 'Insufficient SMA data' };
+  if (sma20Val && sma50Val && currentPrice) {
+    if (currentPrice > sma20Val && sma20Val > sma50Val) smaSig = { signal: 'BULLISH', reason: `Price above SMA20 (${sma20Val}), SMA20 above SMA50` };
+    else if (currentPrice < sma20Val && sma20Val < sma50Val) smaSig = { signal: 'BEARISH', reason: `Price below SMA20 (${sma20Val}), SMA20 below SMA50` };
+    else if (currentPrice > sma20Val) smaSig = { signal: 'BULLISH', reason: `Price above SMA20 (${sma20Val})` };
+    else if (currentPrice < sma20Val) smaSig = { signal: 'BEARISH', reason: `Price below SMA20 (${sma20Val})` };
+    else smaSig = { signal: 'NEUTRAL', reason: 'Price near SMA20' };
+  }
+
+  const signals = [rsiSig.signal, macdSig.signal, vwapSig.signal, emaSig.signal, smaSig.signal];
   const bullish = signals.filter(s => s === 'BULLISH').length;
   const bearish = signals.filter(s => s === 'BEARISH').length;
   let overall, strength;
@@ -184,7 +196,7 @@ function analyzeCandles(candles) {
       macd: { value: macd.current?.macd, signal_line: macd.current?.signal, histogram: macd.current?.histogram, signal: macdSig.signal, reason: macdSig.reason },
       vwap: { value: vwap.current, signal: vwapSig.signal, reason: vwapSig.reason },
       ema: { ema_9: ema9.length > 0 ? ema9[ema9.length - 1] : null, ema_21: ema21.length > 0 ? ema21[ema21.length - 1] : null, signal: emaSig.signal, reason: emaSig.reason },
-      sma: { sma_20: sma20.length > 0 ? sma20[sma20.length - 1] : null, sma_50: sma50.length > 0 ? sma50[sma50.length - 1] : null },
+      sma: { sma_20: sma20Val, sma_50: sma50Val, signal: smaSig.signal, reason: smaSig.reason },
     },
     overall: { signal: overall, strength, bullish_count: bullish, bearish_count: bearish, neutral_count: signals.filter(s => s === 'NEUTRAL').length },
     candle_count: candles.length,
