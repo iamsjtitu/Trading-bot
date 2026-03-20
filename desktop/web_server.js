@@ -103,23 +103,52 @@ for (const rm of routeModules) {
 }
 console.log(`[Routes] ${loaded}/${routeModules.length} loaded`);
 
+const { startBackgroundFetcher, getJobStatus, isMarketHours } = require('./routes/lib/market_data_fetcher');
+
 // ============ HEALTH & VERSION ============
 app.get('/api/health', (req, res) => {
   res.json({
     status: 'healthy', timestamp: new Date().toISOString(),
-    version: '4.8.0', routes_loaded: loaded,
+    version: '5.0.0', routes_loaded: loaded,
     services: { news: 'active', sentiment: 'active', trading: 'active' },
+    background_fetcher: getJobStatus(),
   });
 });
 
 app.get('/api/debug', (req, res) => {
   res.json({
-    version: '4.8.0', routes_loaded: loaded, backend: 'node.js',
+    version: '5.0.0', routes_loaded: loaded, backend: 'node.js',
     db_keys: Object.keys(db.data || {}),
     settings_sources: db.data?.settings?.news?.sources || [],
     news_count: (db.data?.news_articles || []).length,
     trades_count: (db.data?.trades || []).length,
     signals_count: (db.data?.signals || []).length,
+    market_data: {
+      cached: !!db.data?.market_data?.indices,
+      last_updated: db.data?.market_data?.last_updated || null,
+      source: db.data?.market_data?.source || null,
+      nifty: db.data?.market_data?.indices?.nifty50?.value || null,
+      banknifty: db.data?.market_data?.indices?.banknifty?.value || null,
+    },
+    background_fetcher: getJobStatus(),
+  });
+});
+
+// Background market data status endpoint
+app.get('/api/market-data/bg-status', (req, res) => {
+  const status = getJobStatus();
+  const cached = db.data?.market_data || {};
+  res.json({
+    status: 'success',
+    fetcher: status,
+    market_hours: isMarketHours(),
+    cached_data: {
+      last_updated: cached.last_updated || null,
+      source: cached.source || null,
+      indices: cached.indices ? Object.fromEntries(
+        Object.entries(cached.indices).map(([k, v]) => [k, v.value || 0])
+      ) : null,
+    },
   });
 });
 
@@ -131,6 +160,9 @@ app.use((err, req, res, next) => {
 
 // ============ START ============
 app.listen(PORT, HOST, () => {
-  console.log(`[AI Trading Bot] Web server running on ${HOST}:${PORT}`);
+  console.log(`[AI Trading Bot v5.0.0] Web server running on ${HOST}:${PORT}`);
   console.log(`[AI Trading Bot] Routes: ${loaded}/${routeModules.length} | DB: ${db.dbFile}`);
+
+  // Start background market data fetcher
+  startBackgroundFetcher(db);
 });
