@@ -200,6 +200,10 @@ function App() {
 
       const mode = settingsRes.data?.settings?.trading_mode || 'PAPER';
       setTradingMode(mode);
+      // Restore emergency stop state from backend
+      if (settingsRes.data?.settings?.emergency_stop) {
+        setEmergencyStop(true);
+      }
 
       // Only set risk metrics from paper data if NOT in LIVE mode
       // In LIVE mode, loadUpstoxData() will set live risk metrics
@@ -497,10 +501,19 @@ function App() {
     return `${Math.floor(seconds / 60)}:${(seconds % 60).toString().padStart(2, '0')}`;
   };
 
-  const handleEmergencyStop = () => {
-    setEmergencyStop(!emergencyStop);
-    if (!emergencyStop) { addNotification('warning', 'Emergency Stop Activated!'); setAutoAnalyze(false); }
-    else { addNotification('success', 'Trading resumed!'); }
+  const handleEmergencyStop = async () => {
+    const newState = !emergencyStop;
+    setEmergencyStop(newState);
+    if (newState) {
+      addNotification('warning', 'Emergency Stop Activated! All trading halted.');
+      setAutoAnalyze(false);
+    } else {
+      addNotification('success', 'Trading resumed!');
+    }
+    // Persist to backend so auto-exit/re-entry is also blocked
+    try {
+      await axios.post(`${API}/emergency-stop`, { active: newState });
+    } catch (e) { console.error('Failed to sync emergency stop:', e); }
   };
 
   const [debugResult, setDebugResult] = useState(null);
@@ -787,7 +800,7 @@ function App() {
       {/* Footer */}
       <footer className="border-t border-gray-200 bg-white/80 backdrop-blur-sm mt-8 py-4 shadow-sm">
         <div className="container mx-auto px-4 text-center text-sm text-gray-600">
-          <p>{tradingMode === 'LIVE' ? 'LIVE TRADING' : 'Paper Trading'} Mode | AI-Powered Options Trading Bot | v4.1.5</p>
+          <p>{tradingMode === 'LIVE' ? 'LIVE TRADING' : 'Paper Trading'} Mode | AI-Powered Options Trading Bot | v4.2.0</p>
           <p className="text-xs mt-1 text-gray-500">Trading involves risk. Past performance does not guarantee future results.</p>
         </div>
       </footer>

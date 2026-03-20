@@ -100,5 +100,21 @@ module.exports = function (db) {
     res.json({ status: 'success', allowed: true, reason: 'Trading time' });
   });
 
+  // POST /api/emergency-stop
+  router.post('/api/emergency-stop', (req, res) => {
+    const { active } = req.body || {};
+    const settings = ensureSettings();
+    settings.emergency_stop = !!active;
+    // When emergency stop is ON, also disable auto_entry
+    if (active) {
+      if (!settings.auto_trading) settings.auto_trading = {};
+      settings.auto_trading.auto_entry = false;
+    }
+    db.data.settings = settings;
+    db.save();
+    console.log(`[EMERGENCY STOP] ${active ? 'ACTIVATED' : 'DEACTIVATED'}`);
+    res.json({ status: 'success', emergency_stop: settings.emergency_stop });
+  });
+
   return router;
 };

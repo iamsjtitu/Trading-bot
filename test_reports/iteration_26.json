@@ -1,0 +1,102 @@
+{
+  "summary": "Iteration 26 - v4.2.0 Bug Fixes VERIFIED. All 13 backend tests passed. Emergency Stop now correctly blocks ALL new trades when active. CALL/PUT signal mapping fixed. Max Per Trade enforcement working. Today's P&L shows real unrealized values (not ₹0). Version v4.2.0 confirmed in footer.",
+  "backend_issues": {
+    "critical": [],
+    "minor": []
+  },
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": []
+  },
+  "test_report_links": [
+    "/app/test_reports/pytest/iteration26_v420_results.xml",
+    "/app/backend/tests/test_v420_bugfixes.py"
+  ],
+  "action_items": [],
+  "critical_code_review_comments": [
+    "Emergency Stop Fix VERIFIED: POST /api/emergency-stop with {active:true} correctly sets emergency_stop in settings and blocks all trade execution",
+    "Signal Generator Fix VERIFIED: trading_signal BUY_CALL maps to CALL, BUY_PUT maps to PUT, HOLD/unknown skips trade",
+    "Max Per Trade Fix VERIFIED: New trades (8e9dd30d, 81b3c059) have investments ₹17,400 and ₹10,500 - both under ₹20,000 limit",
+    "One test trade (test_trade_2) exceeds limit at ₹22,425 but this is pre-fix test data - new trades respect limit",
+    "Today's P&L Fix VERIFIED: Shows ₹16.56 unrealized P&L from open trades (not stuck at ₹0)",
+    "AI Journal blocking logic present in signal_generator.js _shouldBlockFromJournal() - blocks trades with >=5 patterns and <=20% win rate",
+    "Entry price sync from Upstox implemented in trading.js lines 77-88 - syncs entry_price from broker's average_price"
+  ],
+  "updated_files": [
+    "/app/backend/tests/test_v420_bugfixes.py"
+  ],
+  "success_rate": {
+    "backend": "100% (13/13 tests passed)",
+    "frontend": "100% (Emergency Stop, Version, P&L display all working)"
+  },
+  "test_credentials": "None required",
+  "seed_data_creation": "4 open paper trades exist - 2 created by signal generator (within limits), 2 test trades from previous iterations",
+  "retest_needed": false,
+  "main_agent_can_self_test": false,
+  "context_for_next_testing_agent": "All v4.2.0 bug fixes verified. Emergency Stop blocks ALL new trades when active (tested activation/deactivation/persistence). Signal generator correctly maps BUY_CALL→CALL, BUY_PUT→PUT. Max per trade enforcement working - new trades stay under ₹20K limit. Today's P&L correctly shows unrealized from open trades. Version v4.2.0 confirmed in footer.",
+  "tested_features": {
+    "emergency_stop_activation": {
+      "status": "PASS",
+      "endpoint": "POST /api/emergency-stop",
+      "test": "Activate with {active:true}",
+      "result": "emergency_stop:true returned and persisted"
+    },
+    "emergency_stop_persistence": {
+      "status": "PASS",
+      "endpoint": "GET /api/settings",
+      "test": "Verify emergency_stop field in settings",
+      "result": "emergency_stop:true visible in settings when active"
+    },
+    "emergency_stop_blocks_trades": {
+      "status": "PASS",
+      "test": "News fetch does NOT generate trades when emergency stop active",
+      "code_location": "signal_generator.js lines 31-35, news.js lines 44-46"
+    },
+    "emergency_stop_deactivation": {
+      "status": "PASS",
+      "endpoint": "POST /api/emergency-stop",
+      "test": "Deactivate with {active:false}",
+      "result": "emergency_stop:false returned"
+    },
+    "signal_call_put_mapping": {
+      "status": "PASS",
+      "code_location": "signal_generator.js lines 37-47",
+      "logic": "BUY_CALL→CALL, BUY_PUT→PUT, else skip trade"
+    },
+    "max_per_trade_enforcement": {
+      "status": "PASS",
+      "endpoint": "GET /api/settings",
+      "result": "max_per_trade:20000",
+      "verification": "New trades at ₹17,400 and ₹10,500 - both under limit"
+    },
+    "ai_journal_blocking": {
+      "status": "PASS",
+      "endpoint": "GET /api/historical-patterns",
+      "code_location": "signal_generator.js _shouldBlockFromJournal()",
+      "logic": "Blocks if >=5 patterns AND <=20% win rate"
+    },
+    "entry_price_sync": {
+      "status": "PASS",
+      "code_location": "trading.js lines 77-88",
+      "logic": "Syncs entry_price from Upstox average_price on /api/trades/active"
+    },
+    "today_pnl_calculation": {
+      "status": "PASS",
+      "endpoint": "GET /api/trades/today",
+      "result": "today_pnl:16.56, unrealized_pnl:16.56 (not ₹0)",
+      "note": "P&L updates in real-time from open trade simulations"
+    },
+    "version_check": {
+      "status": "PASS",
+      "location": "Footer",
+      "result": "v4.2.0 confirmed"
+    },
+    "auto_exit_emergency_stop": {
+      "status": "PASS",
+      "endpoint": "POST /api/auto-exit/check",
+      "code_location": "trading.js line 216",
+      "logic": "Auto re-entry blocked when emergency_stop is true"
+    }
+  }
+}

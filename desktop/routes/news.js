@@ -41,6 +41,10 @@ module.exports = function (db) {
 
         let signalGenerated = false;
         if (sentimentResult.confidence >= 60 && sentimentResult.trading_signal !== 'HOLD') {
+          // EMERGENCY STOP CHECK - block trade execution
+          if (db.data?.settings?.emergency_stop) {
+            console.log(`[News] Trade BLOCKED - Emergency Stop active for ${article.title}`);
+          } else {
           const signal = signals.generateSignal(newsDoc);
           if (signal) {
             db.data.signals.push(signal);
@@ -60,7 +64,7 @@ module.exports = function (db) {
               if (!marketOpen) {
                 if (db.notify) db.notify('signal', 'Signal Saved', `${signal.signal_type} ${signal.symbol} - Market closed`);
               } else {
-                const openSameType = (db.data.trades || []).find(t => t.status === 'OPEN' && t.trade_type === signal.signal_type && t.symbol === signal.symbol && t.mode === 'LIVE');
+                const openSameType = (db.data.trades || []).find(t => t.status === 'OPEN' && t.trade_type === signal.signal_type && (t.instrument === signal.symbol || t.symbol === signal.symbol) && t.mode === 'LIVE');
                 if (!openSameType) {
                   try {
                     const result = await signals.executeLiveTrade(signal, token);
@@ -79,17 +83,19 @@ module.exports = function (db) {
             }
             signalGenerated = true;
           }
+          }
         }
         processed.push({ id: articleId, title: article.title, description: article.description, source: article.source, url: article.url, published_at: article.published_at, sentiment_analysis: sentimentResult, created_at: newsDoc.created_at, signal_generated: signalGenerated });
       }
       db.save();
 
-      // Auto-entry for untraded signals
+      // Auto-entry for untraded signals (BLOCKED by emergency stop)
       const autoEntryOn = db.data.settings?.auto_trading?.auto_entry || false;
+      const isEmergencyStopped = db.data?.settings?.emergency_stop || false;
       const mode = db.data.settings?.trading_mode || 'PAPER';
       const activeBroker2 = db.data.settings?.active_broker || db.data.settings?.broker?.name || 'upstox';
       const token2 = db.data.settings?.broker?.[`${activeBroker2}_token`] || db.data.settings?.broker?.access_token;
-      if (autoEntryOn && mode === 'LIVE' && token2) {
+      if (autoEntryOn && !isEmergencyStopped && mode === 'LIVE' && token2) {
         const recentTradeSignalIds = new Set((db.data.trades || []).filter(t => t.mode === 'LIVE' && (t.status === 'OPEN' || (t.status === 'FAILED' && (t.entry_time || '') > new Date(Date.now() - 30 * 60 * 1000).toISOString()))).map(t => t.signal_id));
         const untradedSignals = (db.data.signals || []).filter(s => s.status === 'ACTIVE' && s.mode === 'LIVE' && !recentTradeSignalIds.has(s.id)).sort((a, b) => (b.created_at || '').localeCompare(a.created_at || '')).slice(0, 1);
         for (const sig of untradedSignals) {

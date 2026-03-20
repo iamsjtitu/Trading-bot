@@ -74,7 +74,20 @@ module.exports = function (db) {
         const livePnl = (currentPrice - entryPrice) * qty;
         const pnlPercentage = entryPrice > 0 ? Math.round(((currentPrice - entryPrice) / entryPrice) * 10000) / 100 : 0;
         const stored = storedTradesMap[pos.instrument_token] || {};
-        if (stored.id && entryPrice > 0 && (stored.entry_price === 0 || stored.entry_price === 150)) { stored.entry_price = entryPrice; stored.investment = investment; const riskCfg = db.data?.settings?.risk || {}; const autoT = db.data?.settings?.auto_trading || {}; const slPct = autoT.stoploss_pct || riskCfg.stop_loss_pct || rp.stop_loss_pct; const tgtPct = autoT.target_pct || riskCfg.target_pct || rp.target_pct; stored.stop_loss = Math.round(entryPrice * (1 - slPct / 100) * 100) / 100; stored.target = Math.round(entryPrice * (1 + tgtPct / 100) * 100) / 100; db.save(); }
+        if (stored.id && entryPrice > 0) {
+          // ALWAYS sync entry price from Upstox for accuracy
+          const needsUpdate = stored.entry_price === 0 || stored.entry_price === 150 || Math.abs(stored.entry_price - entryPrice) > 1;
+          if (needsUpdate) {
+            stored.entry_price = entryPrice; stored.investment = investment;
+            const riskCfg = db.data?.settings?.risk || {};
+            const autoT = db.data?.settings?.auto_trading || {};
+            const slPct = autoT.stoploss_pct || riskCfg.stop_loss_pct || rp.stop_loss_pct;
+            const tgtPct = autoT.target_pct || riskCfg.target_pct || rp.target_pct;
+            stored.stop_loss = Math.round(entryPrice * (1 - slPct / 100) * 100) / 100;
+            stored.target = Math.round(entryPrice * (1 + tgtPct / 100) * 100) / 100;
+            db.save();
+          }
+        }
         return { id: stored.id || pos.instrument_token, trade_type: pos.quantity > 0 ? 'BUY' : 'SELL', symbol: pos.trading_symbol || stored.symbol || 'N/A', quantity: qty, status: 'OPEN', entry_price: Math.round(entryPrice * 100) / 100, current_price: Math.round(currentPrice * 100) / 100, current_value: Math.round(currentValue * 100) / 100, investment: Math.round(investment * 100) / 100, live_pnl: Math.round(livePnl * 100) / 100, pnl_percentage: pnlPercentage, stop_loss: stored.stop_loss || 0, target: stored.target || 0, entry_time: stored.entry_time || new Date().toISOString(), isLive: true, instrument_token: pos.instrument_token || '', product: pos.product || '', signal_id: stored.signal_id || '' };
       });
       return res.json({ status: 'success', count: tradesFromPositions.length, trades: tradesFromPositions, isLive: true });
@@ -199,7 +212,8 @@ module.exports = function (db) {
         if (db.notify) db.notify('exit', `${exitReason === 'TARGET_HIT' ? 'Target Hit' : 'Stoploss Hit'}`, `${trade.symbol} | P&L: ${pnl >= 0 ? '+' : ''}${Math.round(pnl)} (${Math.round(pnlPct)}%)`);
         if (db._autoReviewTrade) db._autoReviewTrade(trade.id).catch(e => console.error('[Journal] Auto-review error:', e.message));
 
-        if (autoEntryEnabled && exitReason === 'TARGET_HIT') {
+        // Auto re-entry only if NOT emergency stopped
+        if (autoEntryEnabled && !db.data?.settings?.emergency_stop && exitReason === 'TARGET_HIT') {
           const news = (db.data.news_articles || []).filter(n => n.sentiment_analysis && n.sentiment_analysis.confidence >= 60 && ['BUY_CALL', 'BUY_PUT'].includes(n.sentiment_analysis.trading_signal)).sort((a, b) => (b.created_at || '').localeCompare(a.created_at || ''));
           const latestNews = news[0] || (db.data.news_articles || []).sort((a, b) => (b.created_at || '').localeCompare(a.created_at || ''))[0];
           if (latestNews) {

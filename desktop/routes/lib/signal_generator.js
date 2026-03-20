@@ -27,13 +27,38 @@ module.exports = function createSignalGenerator(db, aiEngine) {
 
   function generateSignal(newsDoc) {
     const sentiment = newsDoc.sentiment_analysis || {};
+
+    // EMERGENCY STOP CHECK - block ALL new signals
+    if (db.data?.settings?.emergency_stop) {
+      console.log('[Signal] BLOCKED - Emergency Stop is active');
+      return null;
+    }
+
+    // PROPER Call/Put mapping - only trade when signal is clear
+    if (sentiment.trading_signal === 'BUY_CALL') {
+      // Bullish → CALL
+    } else if (sentiment.trading_signal === 'BUY_PUT') {
+      // Bearish → PUT
+    } else {
+      // HOLD or unknown → skip, don't trade
+      console.log(`[Signal] Skipping - trading_signal is ${sentiment.trading_signal} (not BUY_CALL or BUY_PUT)`);
+      return null;
+    }
     const signalType = sentiment.trading_signal === 'BUY_CALL' ? 'CALL' : 'PUT';
+
     const activeInst = db.data?.settings?.trading_instrument || db.data?.settings?.active_instrument || 'NIFTY50';
     const currentMode = db.data?.settings?.trading_mode || 'PAPER';
 
     // Duplicate protection - check by instrument, not symbol (which includes strike/expiry)
     const existingOpen = (db.data.trades || []).find(t => t.status === 'OPEN' && t.trade_type === signalType && (t.instrument === activeInst || t.symbol === activeInst) && t.mode === currentMode);
     if (existingOpen) { console.log(`[Signal] Skipping ${signalType} ${activeInst} - already OPEN (${existingOpen.symbol})`); return null; }
+
+    // AI JOURNAL CHECK - block signals for consistently losing sector+sentiment combos
+    const historicalBlock = _shouldBlockFromJournal(sentiment.sector || 'BROAD_MARKET', sentiment.sentiment, signalType);
+    if (historicalBlock) {
+      console.log(`[Signal] BLOCKED by AI Journal - ${sentiment.sector} ${sentiment.sentiment} ${signalType} has poor track record`);
+      return null;
+    }
 
     const portfolio = db.data.portfolio || {};
     const available = portfolio.available_capital || 500000;
@@ -134,12 +159,22 @@ module.exports = function createSignalGenerator(db, aiEngine) {
   }
 
   async function executeLiveTrade(signal, accessToken) {
+    // EMERGENCY STOP CHECK
+    if (db.data?.settings?.emergency_stop) {
+      console.log('[LiveTrade] BLOCKED - Emergency Stop is active');
+      return { success: false, error: 'Emergency Stop is active - all trading halted' };
+    }
+
     const headers = { Accept: 'application/json', Authorization: `Bearer ${accessToken}`, 'Api-Version': '2.0', 'Content-Type': 'application/json' };
     try {
       const activeInst = signal.symbol || 'NIFTY50';
       // Duplicate protection
       const existingOpen = (db.data.trades || []).find(t => t.status === 'OPEN' && t.trade_type === signal.signal_type && (t.instrument === activeInst || t.symbol === activeInst) && t.mode === 'LIVE');
       if (existingOpen) { console.log(`[LiveTrade] Skipping - already OPEN (${existingOpen.symbol})`); return { success: false, error: `Duplicate position blocked - already have ${existingOpen.symbol} open` }; }
+
+      // STRICT max_per_trade enforcement
+      const riskCfg = db.data?.settings?.risk || {};
+      const maxTrade = riskCfg.max_per_trade || 20000;
 
       const optionType = signal.signal_type === 'CALL' ? 'CE' : 'PE';
       const instKey = INST_KEY_MAP[activeInst] || 'NSE_INDEX|Nifty 50';
@@ -183,7 +218,33 @@ module.exports = function createSignalGenerator(db, aiEngine) {
       }
 
       const lotSize = apiLotSize || LOT_SIZE_MAP[activeInst] || 65;
-      const qty = Math.max(lotSize, Math.round(signal.quantity / lotSize) * lotSize);
+
+      // Get actual option premium (LTP) before calculating quantity
+      let actualPremium = signal.entry_price || 150;
+      try {
+        if (instrumentToken) {
+          const ltpResp = await axios.get(`https://api.upstox.com/v2/market-quote/ltp?instrument_key=${encodeURIComponent(instrumentToken)}`, {
+            headers: { Accept: 'application/json', Authorization: `Bearer ${accessToken}`, 'Api-Version': '2.0' }, timeout: 10000
+          });
+          const quotes = ltpResp.data?.data || {};
+          const key = Object.keys(quotes)[0];
+          if (quotes[key]?.last_price > 0) actualPremium = quotes[key].last_price;
+        }
+      } catch (e) { console.log(`[LiveTrade] LTP fetch failed, using signal premium: ${e.message}`); }
+
+      // Calculate max quantity that fits within max_per_trade limit
+      const maxQtyByBudget = Math.floor(maxTrade / actualPremium);
+      // Round down to nearest lot size
+      const lotQty = Math.floor(maxQtyByBudget / lotSize) * lotSize;
+      // Must have at least one lot, but ONLY if it fits within budget
+      const oneLotCost = lotSize * actualPremium;
+      if (oneLotCost > maxTrade) {
+        console.log(`[LiveTrade] BLOCKED - 1 lot cost (${oneLotCost}) exceeds max_per_trade (${maxTrade})`);
+        return { success: false, error: `1 lot cost ₹${Math.round(oneLotCost)} exceeds max per trade limit ₹${maxTrade}. Increase limit or choose a cheaper option.` };
+      }
+      const qty = Math.max(lotSize, lotQty);
+      const estimatedInvestment = qty * actualPremium;
+      console.log(`[LiveTrade] Premium: ₹${actualPremium}, Lot: ${lotSize}, Qty: ${qty}, Est. Investment: ₹${Math.round(estimatedInvestment)}, Max: ₹${maxTrade}`);
       const orderBody = { quantity: qty, product: 'I', validity: 'DAY', price: 0, instrument_token: instrumentToken, order_type: 'MARKET', transaction_type: 'BUY', disclosed_quantity: 0, trigger_price: 0, is_amo: false };
       const orderResp = await axios.post('https://api.upstox.com/v2/order/place', orderBody, { headers, timeout: 15000 });
       const orderId = orderResp.data?.data?.order_id || '';
@@ -237,9 +298,41 @@ module.exports = function createSignalGenerator(db, aiEngine) {
     const matching = patterns.filter(p => p.sector === sector && p.sentiment === sentiment);
     if (matching.length < 3) return 0;
     const winRate = matching.filter(p => p.was_profitable).length / matching.length;
-    if (winRate >= 0.7) return 5;
-    if (winRate <= 0.3) return -8;
+    if (winRate >= 0.7) return 10;  // Strong positive history
+    if (winRate >= 0.5) return 3;   // Slightly positive
+    if (winRate <= 0.2) return -15;  // Very poor history, strongly discourage
+    if (winRate <= 0.3) return -10;  // Poor history
     return 0;
+  }
+
+  // AI JOURNAL-BASED TRADE BLOCKING
+  // If journal shows consistent losses (>= 5 trades, win rate <= 20%) for a sector+sentiment+type combo, block it
+  function _shouldBlockFromJournal(sector, sentimentDir, tradeType) {
+    const patterns = db.data.historical_patterns || [];
+    const journalEntries = db.data.journal_entries || [];
+    // Check historical patterns
+    const matching = patterns.filter(p =>
+      p.sector === sector &&
+      p.sentiment === sentimentDir &&
+      (tradeType ? p.trade_type === tradeType : true)
+    );
+    if (matching.length >= 5) {
+      const winRate = matching.filter(p => p.was_profitable).length / matching.length;
+      if (winRate <= 0.20) {
+        console.log(`[Journal] BLOCK: ${sector}/${sentimentDir}/${tradeType} - ${matching.length} trades, ${Math.round(winRate * 100)}% win rate`);
+        return true;
+      }
+    }
+    // Check AI journal reviews for repeat failures
+    const recentReviews = journalEntries.filter(j =>
+      j.sector === sector && j.trade_type === tradeType && j.created_at > new Date(Date.now() - 7 * 86400000).toISOString()
+    );
+    const failedReviews = recentReviews.filter(j => j.pnl < 0);
+    if (failedReviews.length >= 3 && failedReviews.length > recentReviews.length * 0.7) {
+      console.log(`[Journal] BLOCK: ${sector}/${tradeType} - ${failedReviews.length}/${recentReviews.length} recent reviews are losses`);
+      return true;
+    }
+    return false;
   }
 
   return { generateSignal, executePaperTrade, executeLiveTrade, INSTRUMENTS, INST_KEY_MAP, LOT_SIZE_MAP };
