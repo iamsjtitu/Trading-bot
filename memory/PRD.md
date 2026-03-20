@@ -16,16 +16,16 @@ Build an AI-powered automated options trading bot that:
 │   ├── package.json           # v4.2.0
 │   └── routes/
 │       ├── lib/
-│       │   ├── news_fetcher.js
+│       │   ├── signal_generator.js  # Emergency stop + max_per_trade + CALL/PUT + journal blocking + auto_entry check
+│       │   ├── technical_analysis.js
 │       │   ├── sentiment.js
-│       │   ├── signal_generator.js  # Emergency stop + max_per_trade + proper CALL/PUT + journal blocking
-│       │   ├── tax_calculator.js
-│       │   └── technical_analysis.js
-│       ├── news.js            # Emergency stop check before trade execution
-│       ├── trading.js         # Emergency stop in auto-exit re-entry, Upstox price sync
+│       │   ├── news_fetcher.js
+│       │   └── tax_calculator.js
+│       ├── news.js            # AUTO_ENTRY check before trade execution
+│       ├── trading.js         # DB-direct reads for auto_exit/auto_entry (no cached vars)
+│       ├── settings.js        # POST /api/emergency-stop endpoint
 │       ├── journal.js
 │       ├── portfolio.js
-│       ├── settings.js        # New: POST /api/emergency-stop endpoint
 │       ├── upstox.js
 │       ├── broker_router.js
 │       ├── extra_apis.js
@@ -35,8 +35,9 @@ Build an AI-powered automated options trading bot that:
 │       └── ai_engine.js
 ├── frontend/
 │   └── src/
-│       ├── App.js             # Emergency stop persists to backend, today's P&L from live trades
+│       ├── App.js
 │       └── components/
+│           ├── AutoTradingSettings.js  # Updated descriptions
 │           ├── RiskPanel.js
 │           ├── TradesList.js
 │           ├── TradeJournal.js
@@ -47,31 +48,45 @@ Build an AI-powered automated options trading bot that:
     └── server.py
 ```
 
-## What's Been Implemented (v4.2.0 - Critical Safety Fixes)
+## What's Been Implemented
 
-### v4.2.0 (Current - Safety & Trading Logic Fixes)
-- **Emergency Stop now persists to backend** - Blocks ALL trades across signals, news, auto-entry, auto-exit re-entry
-- **Max per trade strictly enforced** - Gets actual option LTP before order, calculates qty within budget, blocks if 1 lot exceeds limit
-- **Proper CALL/PUT decision** - BUY_CALL→CALL, BUY_PUT→PUT, HOLD/unknown→skip (no more everything-becomes-PUT bug)
-- **AI Journal influences decisions** - Blocks trades for sector+sentiment combos with >=5 trades and <=20% win rate
-- **P&L sync from Upstox** - Active trades always sync entry_price from broker's average_price (fixes investment mismatch)
-- **Entry price sync improved** - Syncs from Upstox whenever diff > ₹1 (not just when price is 0 or 150)
-- **SMA indicator** now includes signal and reason in Technical Analysis
+### v4.2.0 (Current - Critical Safety & Trading Fixes)
+**Safety Fixes:**
+- Emergency Stop persists to backend, blocks ALL trades
+- Max per trade strictly enforced (gets LTP, calculates qty within budget)
+- **Auto-entry OFF now PROPERLY blocks all trade execution** (was the root cause of trades executing despite OFF)
+- Auto-exit reads from DB directly (not cached variables)
 
-### v4.1.5 (Previous)
-- Fixed Today's P&L to show unrealized P&L in PAPER mode
-- Verified AI Brain and Technical Analysis features
+**Trading Logic Fixes:**
+- Proper CALL/PUT: BUY_CALL→CALL, BUY_PUT→PUT, HOLD→skip
+- AI Journal blocks consistently losing sector+type combos
+- Entry price always syncs from Upstox's average_price
+- SMA indicator includes signal and reason
 
-### Earlier Versions
-- Full news scraping from 11 sources
-- AI sentiment analysis (GPT-4o)
-- Automated signal generation with confidence scoring
-- Paper and Live trading modes
-- Multi-broker support framework (Upstox active)
-- Live Option Chain, Tax Reports
-- Technical Analysis (RSI, MACD, EMA, SMA, VWAP)
-- AI Trade Journal
-- 1-second live P&L auto-refresh
+**Code Changes:**
+- `news.js`: Added `auto_entry` check before trade execution (line 54-57)
+- `trading.js`: Replaced cached `autoExitEnabled`/`autoEntryEnabled` with DB reads
+- `signal_generator.js`: Emergency stop check, proper CALL/PUT mapping, journal blocking, max_per_trade with LTP
+- `settings.js`: New POST /api/emergency-stop endpoint
+- `AutoTradingSettings.js`: Clearer descriptions
+
+### v4.1.5
+- Today's P&L shows unrealized P&L in PAPER mode
+- AI Brain and Technical Analysis verified working
+
+### Earlier
+- Full news scraping (11 sources), AI sentiment (GPT-4o)
+- Paper/Live trading, Multi-broker framework
+- Live Option Chain, Tax Reports, Technical Analysis
+- AI Trade Journal, 1-second live P&L refresh
+
+## Key API Endpoints
+- `POST /api/emergency-stop` - Activate/deactivate emergency stop
+- `POST /api/auto-settings/update` - Toggle auto_entry/auto_exit
+- `GET /api/news/fetch` - Fetch + analyze news (respects auto_entry)
+- `POST /api/auto-exit/check` - Check SL/Target exits (respects auto_exit)
+- `GET /api/trades/active` - Active trades with live P&L
+- `GET /api/trades/today` - Today's realized + unrealized P&L
 
 ## Prioritized Backlog
 
@@ -82,13 +97,11 @@ Build an AI-powered automated options trading bot that:
 ### P2 - Medium Priority
 - Increase active trade limit (currently 1 CALL + 1 PUT per instrument)
 - Stock Options trading support
-- Telegram notifications integration
+- Telegram notifications
 - Strategy Backtesting
 - Dark Mode theme
 
 ### P3 - Future
-- Multi-strategy support
-- Mobile app
-- Social trading features
+- Multi-strategy support, Mobile app, Social trading
 - Export Journal to PDF
 - App.js refactoring (800+ lines)
