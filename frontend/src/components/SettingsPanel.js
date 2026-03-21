@@ -624,7 +624,7 @@ export default function SettingsPanel({ onClose, onSave }) {
                 <h3 className="font-bold text-gray-800 mb-3">Telegram Notifications</h3>
                 <div className="space-y-3">
                   <div className="flex items-center justify-between">
-                    <div><p className="font-medium text-gray-800">Enable Telegram</p><p className="text-xs text-gray-600">Send alerts to Telegram</p></div>
+                    <div><p className="font-medium text-gray-800">Enable Telegram</p><p className="text-xs text-gray-600">Send alerts to Telegram bot</p></div>
                     <Button onClick={() => { updateField('telegram', 'enabled', !settings.telegram?.enabled); updateField('notifications', 'telegram', !settings.telegram?.enabled); }} className={settings.telegram?.enabled ? 'bg-green-600' : 'bg-gray-400'}>{settings.telegram?.enabled ? 'ON' : 'OFF'}</Button>
                   </div>
                   {settings.telegram?.enabled && (
@@ -637,12 +637,76 @@ export default function SettingsPanel({ onClose, onSave }) {
                       <div>
                         <label className="block text-sm font-medium text-gray-700 mb-1">Chat ID</label>
                         <input type="text" value={settings.telegram?.chat_id || ''} onChange={(e) => updateField('telegram', 'chat_id', e.target.value)} className="w-full px-3 py-2 border border-gray-300 rounded-lg" placeholder="Your Chat ID" data-testid="telegram-chatid" />
-                        <p className="text-xs text-gray-500 mt-1">Get ID: Message @userinfobot on Telegram</p>
+                        <p className="text-xs text-gray-500 mt-1">Get ID: Send /start to your bot, then Auto-Detect karega</p>
                       </div>
-                      <div className="flex items-center justify-between">
-                        <div><p className="font-medium text-gray-800">Daily P&L Summary</p><p className="text-xs text-gray-600">Auto-send daily report after market close</p></div>
-                        <Button onClick={() => updateField('telegram', 'daily_summary', !settings.telegram?.daily_summary)} className={settings.telegram?.daily_summary ? 'bg-green-600' : 'bg-gray-400'}>{settings.telegram?.daily_summary ? 'ON' : 'OFF'}</Button>
+
+                      {/* Auto-Connect Button */}
+                      <div className="flex gap-2">
+                        <Button onClick={async () => {
+                          const token = settings.telegram?.bot_token;
+                          if (!token) { alert('Pehle Bot Token daalo!'); return; }
+                          try {
+                            const r1 = await axios.post(`${API}/telegram/setup`, { bot_token: token });
+                            if (r1.data?.status === 'success') {
+                              updateField('telegram', 'chat_id', String(r1.data.chat_id));
+                              alert(`Connected! Chat ID: ${r1.data.chat_id} (${r1.data.name})`);
+                            } else if (r1.data?.status === 'pending') {
+                              alert('Bot verified! Telegram mein /start bhejo, phir "Auto-Detect" click karo.');
+                              const r2 = await axios.post(`${API}/telegram/discover`);
+                              if (r2.data?.status === 'success') {
+                                updateField('telegram', 'chat_id', String(r2.data.chat_id));
+                                alert(`Connected! Chat ID: ${r2.data.chat_id}`);
+                              }
+                            } else { alert(r1.data?.message || 'Connection failed'); }
+                          } catch (e) { alert('Error: ' + e.message); }
+                        }} className="bg-blue-600 hover:bg-blue-700 text-white flex-1" data-testid="telegram-connect-btn">
+                          Auto-Connect
+                        </Button>
+                        <Button onClick={async () => {
+                          try {
+                            const r = await axios.post(`${API}/telegram/test`);
+                            alert(r.data?.status === 'success' ? 'Test message sent! Check Telegram.' : r.data?.message || 'Failed');
+                          } catch (e) { alert('Error: ' + e.message); }
+                        }} variant="outline" className="border-green-400 text-green-700" data-testid="telegram-test-btn">
+                          Test Message
+                        </Button>
                       </div>
+
+                      {/* Per-Alert Toggles */}
+                      <div className="border-t pt-3 mt-2">
+                        <p className="text-sm font-semibold text-gray-700 mb-2">Alert Types (ON/OFF):</p>
+                        <div className="space-y-2">
+                          {[
+                            { key: 'signals', label: 'New Signals', desc: 'Jab naya trading signal generate ho' },
+                            { key: 'trade_entry', label: 'Trade Entry', desc: 'Jab trade execute ho (paper/live)' },
+                            { key: 'trade_exit', label: 'Trade Exit', desc: 'Jab trade exit ho with P&L' },
+                            { key: 'daily_summary', label: 'Daily P&L Summary', desc: 'Din ka summary market close ke baad' },
+                            { key: 'guard_blocks', label: 'Guard Blocks', desc: 'Jab AI Guard trade block kare' },
+                            { key: 'exit_advice', label: 'Exit Advisor', desc: 'Jab AI exit/tighten SL suggest kare' },
+                          ].map(alert => (
+                            <div key={alert.key} className="flex items-center justify-between bg-gray-50 p-2 rounded-lg" data-testid={`telegram-alert-${alert.key}`}>
+                              <div>
+                                <p className="text-sm font-medium text-gray-800">{alert.label}</p>
+                                <p className="text-xs text-gray-500">{alert.desc}</p>
+                              </div>
+                              <Button
+                                size="sm"
+                                onClick={async () => {
+                                  const current = settings.telegram?.alerts?.[alert.key] !== false;
+                                  const newAlerts = { ...(settings.telegram?.alerts || {}), [alert.key]: !current };
+                                  updateField('telegram', 'alerts', newAlerts);
+                                  try { await axios.post(`${API}/telegram/alerts`, { alerts: { [alert.key]: !current } }); } catch (_) {}
+                                }}
+                                className={`min-w-[50px] ${(settings.telegram?.alerts?.[alert.key] !== false) ? 'bg-green-600 hover:bg-green-700' : 'bg-gray-400 hover:bg-gray-500'}`}
+                                data-testid={`telegram-toggle-${alert.key}`}
+                              >
+                                {(settings.telegram?.alerts?.[alert.key] !== false) ? 'ON' : 'OFF'}
+                              </Button>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+
                       <Button onClick={sendDailySummary} disabled={sendingSummary} className="bg-gradient-to-r from-blue-500 to-purple-500 text-white w-full" data-testid="send-daily-summary-btn">
                         {sendingSummary ? 'Sending...' : 'Send Daily Summary Now'}
                       </Button>
