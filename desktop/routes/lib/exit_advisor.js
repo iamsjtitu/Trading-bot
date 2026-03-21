@@ -3,6 +3,7 @@
  * Analyzes open trades every 3 min and provides real-time exit recommendations.
  * Uses GPT-4o to analyze market conditions, news sentiment, price action, and Greeks.
  */
+const axios = require('axios');
 let OpenAI;
 try { OpenAI = require('openai'); } catch (_) { OpenAI = null; }
 
@@ -144,11 +145,62 @@ function buildBasicAdvice(trade, db) {
   return { action, confidence, reason, risk_level: risk, suggested_sl: null, exit_pct: null, trade_id: trade.id || trade.instrument_token, symbol: trade.symbol, timestamp: new Date().toISOString(), source: 'rule', pnl_at_advice: Math.round(trade.live_pnl || 0), pnl_pct_at_advice: parseFloat(pnlPct.toFixed(1)) };
 }
 
+// Sync LIVE trade data from Upstox before analyzing
+async function syncLiveTradeData(db) {
+  try {
+    const activeBroker = db.data?.settings?.broker?.name || 'upstox';
+    const token = db.data?.settings?.broker?.[`${activeBroker}_token`] || db.data?.settings?.broker?.access_token || '';
+    const mode = db.data?.settings?.trading_mode || 'PAPER';
+
+    if (mode !== 'LIVE' || !token) return;
+
+    const liveTrades = (db.data?.trades || []).filter(t => t.status === 'OPEN' && t.mode === 'LIVE');
+    if (liveTrades.length === 0) return;
+
+    const headers = { Accept: 'application/json', Authorization: `Bearer ${token}`, 'Api-Version': '2.0' };
+    const posResp = await axios.get('https://api.upstox.com/v2/portfolio/short-term-positions', { headers, timeout: 10000 });
+
+    if (posResp.data?.status === 'success') {
+      const posMap = {};
+      for (const p of (posResp.data.data || [])) {
+        if (p.instrument_token) posMap[p.instrument_token] = p;
+      }
+
+      for (const trade of liveTrades) {
+        const pos = posMap[trade.instrument_token];
+        if (!pos) continue;
+
+        const currentPrice = pos.last_price || 0;
+        const entryPrice = pos.average_price || trade.entry_price || 0;
+        const qty = Math.abs(pos.quantity) || trade.quantity;
+
+        if (currentPrice > 0) {
+          trade.current_price = Math.round(currentPrice * 100) / 100;
+          trade.current_value = Math.round(currentPrice * qty * 100) / 100;
+          trade.live_pnl = Math.round(pos.pnl || ((currentPrice - entryPrice) * qty) * 100) / 100;
+          trade.pnl_percentage = entryPrice > 0 ? Math.round(((currentPrice - entryPrice) / entryPrice) * 10000) / 100 : 0;
+          if (entryPrice > 0 && Math.abs(trade.entry_price - entryPrice) > 1) {
+            trade.entry_price = Math.round(entryPrice * 100) / 100;
+          }
+        }
+      }
+      db.save();
+      console.log(`[ExitAdvisor] Synced ${liveTrades.length} LIVE trade(s) with Upstox prices`);
+    }
+  } catch (e) {
+    console.error('[ExitAdvisor] Live sync error:', e.message);
+  }
+}
+
+
 async function checkAllOpenTrades(db) {
   if (!isMarketHours()) {
     advisorState.last_check = new Date().toISOString();
     return;
   }
+
+  // FIX: Sync LIVE trade prices from Upstox before analyzing
+  await syncLiveTradeData(db);
 
   const openTrades = (db.data?.trades || []).filter(t => t.status === 'OPEN');
   if (openTrades.length === 0) {

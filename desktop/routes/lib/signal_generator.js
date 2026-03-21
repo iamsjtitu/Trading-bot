@@ -9,6 +9,14 @@ const { blackScholes, calcIV, getDaysToExpiry, analyzeOption } = require('./gree
 const telegram = require('./telegram');
 function uuid() { return crypto.randomUUID(); }
 
+// Helper: Send Telegram guard block alert
+function notifyGuardBlock(db, guardName, reason) {
+  const tgAlerts = db.data?.settings?.telegram?.alerts || {};
+  if (tgAlerts.guard_blocks !== false) {
+    telegram.sendGuardBlockAlert(guardName, reason).catch(() => {});
+  }
+}
+
 const INSTRUMENTS = {
   NIFTY50: { base_price: 24000, strike_step: 50 },
   BANKNIFTY: { base_price: 52000, strike_step: 100 },
@@ -50,6 +58,7 @@ module.exports = function createSignalGenerator(db, aiEngine) {
       const closeEnd = 930;   // 15:30 IST
       if ((istMins >= openStart && istMins <= openEnd) || (istMins >= closeStart && istMins <= closeEnd)) {
         console.log(`[Signal] BLOCKED by Time-of-Day Filter - IST ${Math.floor(istMins/60)}:${String(istMins%60).padStart(2,'0')} is in high-volatility window`);
+        notifyGuardBlock(db, 'Time-of-Day Filter', `IST ${Math.floor(istMins/60)}:${String(istMins%60).padStart(2,'0')} - High-volatility window, trading paused`);
         return null;
       }
       // Also block weekends
@@ -67,6 +76,7 @@ module.exports = function createSignalGenerator(db, aiEngine) {
     if (Math.abs(todayRealizedLoss) >= maxDailyLoss) {
       console.log(`[Signal] BLOCKED by Max Daily Loss - Today's loss: ₹${Math.abs(todayRealizedLoss)} >= limit ₹${maxDailyLoss}. Auto-stopped.`);
       if (db.notify) db.notify('risk', 'Daily Loss Limit Hit', `Today's loss ₹${Math.abs(Math.round(todayRealizedLoss))} >= ₹${maxDailyLoss}. Trading paused.`);
+      notifyGuardBlock(db, 'Max Daily Loss', `Today loss ₹${Math.abs(Math.round(todayRealizedLoss))} >= limit ₹${maxDailyLoss}. Trading stopped.`);
       return null;
     }
 
@@ -106,6 +116,7 @@ module.exports = function createSignalGenerator(db, aiEngine) {
         if (['SIDEWAYS', 'CHOPPY', 'RANGE_BOUND'].includes(regimeName.toUpperCase()) && regimeConf >= 60) {
           console.log(`[Signal] BLOCKED by Market Regime - ${regimeName} (${regimeConf}% confidence). Options lose value in sideways markets.`);
           if (db.notify) db.notify('risk', 'Sideways Market', `Trading paused - ${regimeName} regime detected (${regimeConf}%)`);
+          notifyGuardBlock(db, 'Market Regime Filter', `${regimeName} market (${regimeConf}% confidence). Options lose value in sideways.`);
           return null;
         }
       }
@@ -263,6 +274,7 @@ module.exports = function createSignalGenerator(db, aiEngine) {
         // Block if Greeks score is too low (option is terrible)
         if (analysis.score < 25) {
           console.log(`[Greeks] BLOCKED - Score ${analysis.score}/100 too low. ${analysis.warnings.join('; ')}`);
+          notifyGuardBlock(db, 'Greeks & IV Filter', `Score ${analysis.score}/100 too low. ${analysis.warnings.slice(0,2).join('; ')}`);
           return null;
         }
         // Warn but allow if score is mediocre

@@ -190,7 +190,7 @@ export default function SettingsPanel({ onClose, onSave }) {
     try {
       // Save settings first to ensure latest telegram config
       await saveSettings();
-      const res = await axios.post(`${API}/telegram/send-daily-summary`);
+      const res = await axios.post(`${API}/telegram/daily-summary`);
       if (res.data.status === 'success') {
         alert('Daily summary sent to Telegram!');
       } else {

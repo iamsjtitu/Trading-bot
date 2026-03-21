@@ -125,5 +125,22 @@ module.exports = (db) => {
     res.json({ status: 'success', alerts: db.data.settings.telegram.alerts });
   });
 
+  // POST /api/telegram/daily-summary - Send daily P&L summary
+  router.post('/api/telegram/daily-summary', async (req, res) => {
+    const mode = db.data?.settings?.trading_mode || 'PAPER';
+    const dayStart = new Date(); dayStart.setHours(0, 0, 0, 0);
+    const todayTrades = (db.data.trades || []).filter(t => t.status === 'CLOSED' && (t.exit_time || '') >= dayStart.toISOString() && (t.mode || 'PAPER') === mode);
+    const totalPnl = todayTrades.reduce((s, t) => s + (t.pnl || 0), 0);
+    const wins = todayTrades.filter(t => (t.pnl || 0) > 0);
+    const losses = todayTrades.filter(t => (t.pnl || 0) <= 0);
+    const winRate = todayTrades.length > 0 ? Math.round(wins.length / todayTrades.length * 100) : 0;
+    const biggestWin = wins.length > 0 ? Math.max(...wins.map(t => t.pnl || 0)) : 0;
+    const biggestLoss = losses.length > 0 ? Math.min(...losses.map(t => t.pnl || 0)) : 0;
+
+    const summary = { total_pnl: totalPnl, total_trades: todayTrades.length, wins: wins.length, losses: losses.length, win_rate: winRate, biggest_win: biggestWin, biggest_loss: biggestLoss, mode };
+    const result = await telegram.sendDailySummary(summary);
+    res.json({ status: result.ok ? 'success' : 'error', message: result.ok ? 'Daily summary sent!' : result.error, summary });
+  });
+
   return router;
 };
