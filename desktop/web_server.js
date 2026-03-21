@@ -109,7 +109,7 @@ const { startBackgroundFetcher, getJobStatus, isMarketHours } = require('./route
 app.get('/api/health', (req, res) => {
   res.json({
     status: 'healthy', timestamp: new Date().toISOString(),
-    version: '5.0.0', routes_loaded: loaded,
+    version: '5.1.0', routes_loaded: loaded,
     services: { news: 'active', sentiment: 'active', trading: 'active' },
     background_fetcher: getJobStatus(),
   });
@@ -117,7 +117,7 @@ app.get('/api/health', (req, res) => {
 
 app.get('/api/debug', (req, res) => {
   res.json({
-    version: '5.0.0', routes_loaded: loaded, backend: 'node.js',
+    version: '5.1.0', routes_loaded: loaded, backend: 'node.js',
     db_keys: Object.keys(db.data || {}),
     settings_sources: db.data?.settings?.news?.sources || [],
     news_count: (db.data?.news_articles || []).length,
