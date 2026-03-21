@@ -173,6 +173,13 @@ async function checkAllOpenTrades(db) {
         db.notify('exit_advice', `${emoji} ${trade.symbol}`, advice.reason);
       }
 
+      // Telegram: Exit Advice Alert (skip HOLD to avoid spam)
+      const tgAlerts = db.data?.settings?.telegram?.alerts || {};
+      if (tgAlerts.exit_advice !== false && advice.action !== 'HOLD') {
+        const tg = require('./telegram');
+        tg.sendExitAdviceAlert(trade, advice).catch(() => {});
+      }
+
       console.log(`[ExitAdvisor] ${trade.symbol}: ${advice.action} (${advice.confidence}%) - ${advice.reason}`);
     } catch (e) {
       console.error(`[ExitAdvisor] Error checking ${trade.symbol}:`, e.message);

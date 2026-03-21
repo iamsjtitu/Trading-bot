@@ -6,6 +6,7 @@ const axios = require('axios');
 const crypto = require('crypto');
 const { getSignalPositionSize } = require('./position_sizing');
 const { blackScholes, calcIV, getDaysToExpiry, analyzeOption } = require('./greeks');
+const telegram = require('./telegram');
 function uuid() { return crypto.randomUUID(); }
 
 const INSTRUMENTS = {
@@ -332,6 +333,12 @@ module.exports = function createSignalGenerator(db, aiEngine) {
       p.last_updated = new Date().toISOString();
     }
     db.save();
+
+    // Telegram: Trade Entry Alert
+    const tgAlerts = db.data?.settings?.telegram?.alerts || {};
+    if (tgAlerts.trade_entry !== false) {
+      telegram.sendTradeEntryAlert(trade).catch(() => {});
+    }
   }
 
   async function executeLiveTrade(signal, accessToken) {

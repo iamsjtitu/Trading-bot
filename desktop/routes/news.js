@@ -53,6 +53,13 @@ module.exports = function (db) {
             db.data.signals.push(signal);
             if (db.notify) db.notify('signal', `${signal.signal_type} Signal`, `${signal.symbol} | ${sentimentResult.sentiment} ${sentimentResult.confidence}% | ${sentimentResult.reason}`);
 
+            // Telegram: Signal Alert
+            const tgAlerts = db.data?.settings?.telegram?.alerts || {};
+            if (tgAlerts.signals !== false) {
+              const tg = require('./lib/telegram');
+              tg.sendSignalAlert({ ...signal, reason: sentimentResult.reason }).catch(() => {});
+            }
+
             const mode = db.data.settings?.trading_mode || 'PAPER';
             const autoEntryEnabled = db.data.settings?.auto_trading?.auto_entry || false;
 

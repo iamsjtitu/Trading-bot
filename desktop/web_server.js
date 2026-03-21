@@ -94,6 +94,7 @@ const routeModules = [
   { name: 'technical', load: () => require('./routes/technical')(db) },
   { name: 'journal', load: () => require('./routes/journal')(db) },
   { name: 'options', load: () => require('./routes/options')(db) },
+  { name: 'telegram', load: () => require('./routes/telegram')(db) },
 ];
 
 let loaded = 0;
