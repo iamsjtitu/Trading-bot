@@ -624,10 +624,16 @@ export default function SettingsPanel({ onClose, onSave }) {
                 <h3 className="font-bold text-gray-800 mb-3">Telegram Notifications</h3>
                 <div className="space-y-3">
                   <div className="flex items-center justify-between">
-                    <div><p className="font-medium text-gray-800">Enable Telegram</p><p className="text-xs text-gray-600">Send alerts to Telegram bot</p></div>
+                    <div>
+                      <p className="font-medium text-gray-800">Enable Telegram</p>
+                      <p className="text-xs text-gray-600">Send alerts to Telegram bot</p>
+                      {settings.telegram?.bot_token && settings.telegram?.chat_id && (
+                        <p className="text-xs text-green-600 font-semibold mt-1">Connected: {settings.telegram?.name || 'User'} (ID: {settings.telegram?.chat_id})</p>
+                      )}
+                    </div>
                     <Button onClick={() => { updateField('telegram', 'enabled', !settings.telegram?.enabled); updateField('notifications', 'telegram', !settings.telegram?.enabled); }} className={settings.telegram?.enabled ? 'bg-green-600' : 'bg-gray-400'}>{settings.telegram?.enabled ? 'ON' : 'OFF'}</Button>
                   </div>
-                  {settings.telegram?.enabled && (
+                  {(settings.telegram?.enabled || (settings.telegram?.bot_token && settings.telegram?.chat_id)) && (
                     <>
                       <div>
                         <label className="block text-sm font-medium text-gray-700 mb-1">Bot Token</label>
@@ -651,14 +657,20 @@ export default function SettingsPanel({ onClose, onSave }) {
                               updateField('telegram', 'chat_id', String(r1.data.chat_id));
                               alert(`Connected! Chat ID: ${r1.data.chat_id} (${r1.data.name})`);
                             } else if (r1.data?.status === 'pending') {
-                              alert('Bot verified! Telegram mein /start bhejo, phir "Auto-Detect" click karo.');
-                              const r2 = await axios.post(`${API}/telegram/discover`);
-                              if (r2.data?.status === 'success') {
-                                updateField('telegram', 'chat_id', String(r2.data.chat_id));
-                                alert(`Connected! Chat ID: ${r2.data.chat_id}`);
-                              }
+                              alert('Bot verified! Telegram mein /start bhejo, phir dubara "Auto-Connect" click karo.');
+                              try {
+                                const r2 = await axios.post(`${API}/telegram/discover`);
+                                if (r2.data?.status === 'success') {
+                                  updateField('telegram', 'chat_id', String(r2.data.chat_id));
+                                  alert(`Connected! Chat ID: ${r2.data.chat_id}`);
+                                }
+                              } catch (_) {}
                             } else { alert(r1.data?.message || 'Connection failed'); }
-                          } catch (e) { alert('Error: ' + e.message); }
+                          } catch (e) {
+                            if (e.response?.status === 404) {
+                              alert('Telegram API not available. Desktop app rebuild required for v6.0.0 features.');
+                            } else { alert('Error: ' + (e.response?.data?.message || e.message)); }
+                          }
                         }} className="bg-blue-600 hover:bg-blue-700 text-white flex-1" data-testid="telegram-connect-btn">
                           Auto-Connect
                         </Button>
@@ -666,7 +678,11 @@ export default function SettingsPanel({ onClose, onSave }) {
                           try {
                             const r = await axios.post(`${API}/telegram/test`);
                             alert(r.data?.status === 'success' ? 'Test message sent! Check Telegram.' : r.data?.message || 'Failed');
-                          } catch (e) { alert('Error: ' + e.message); }
+                          } catch (e) {
+                            if (e.response?.status === 404) {
+                              alert('Telegram API not available. Desktop app rebuild required for v6.0.0 features.');
+                            } else { alert('Error: ' + (e.response?.data?.message || e.message)); }
+                          }
                         }} variant="outline" className="border-green-400 text-green-700" data-testid="telegram-test-btn">
                           Test Message
                         </Button>
@@ -715,7 +731,10 @@ export default function SettingsPanel({ onClose, onSave }) {
                         try {
                           const r = await axios.post(`${API}/telegram/morning-briefing`);
                           alert(r.data?.status === 'success' ? 'Morning briefing sent! Check Telegram.' : r.data?.message || 'Failed');
-                        } catch (e) { alert('Error: ' + e.message); }
+                        } catch (e) {
+                          if (e.response?.status === 404) { alert('Desktop app rebuild required for v6.0.0.'); }
+                          else { alert('Error: ' + (e.response?.data?.message || e.message)); }
+                        }
                       }} className="bg-gradient-to-r from-orange-400 to-yellow-500 text-white w-full" data-testid="send-morning-briefing-btn">
                         Send Morning Briefing Now
                       </Button>
