@@ -300,7 +300,7 @@ async function createMainWindow(port) {
       { label: 'Check Updates', click: () => autoUpdater.checkForUpdates().catch(() => {}) },
       { label: 'DevTools', accelerator: 'F12', click: () => mainWindow?.webContents.toggleDevTools() },
       { type: 'separator' },
-      { label: 'About', click: () => dialog.showMessageBox(mainWindow, { type: 'info', title: 'AI Trading Bot', message: `Version: v${app.getVersion()}`, detail: 'AI-Powered Options Trading Bot\nUpstox Integration\n\nData: ' + dataDir }) }
+      { label: 'About', click: () => dialog.showMessageBox(mainWindow, { type: 'info', title: 'AI Trading Bot', message: `Version: v${app.getVersion()}`, detail: 'AI-Powered Options Trading Bot\n\nDesigned by: https://www.9x.Design\nContact Us: +91 72059 30002\n\nData: ' + dataDir }) }
     ]}
   ]);
   Menu.setApplicationMenu(menu);
