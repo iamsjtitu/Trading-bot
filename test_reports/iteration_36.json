@@ -1,0 +1,109 @@
+{
+  "summary": "Iteration 36 - v5.1.0 AI Exit Advisor Feature Testing PASSED. All 18 backend tests passed (100%). Frontend verified: v5.1.0 in footer, Active Trades tab working, Ask AI button ready (shows when trades exist).",
+  "backend_issues": {
+    "critical": [],
+    "minor": []
+  },
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": []
+  },
+  "test_report_links": [
+    "/app/test_reports/pytest/iteration36_v510_results.xml",
+    "/app/backend/tests/test_v510_exit_advisor.py"
+  ],
+  "action_items": [],
+  "critical_code_review_comments": [
+    "NEW FEATURE VERIFIED: AI Exit Advisor module at /app/desktop/routes/lib/exit_advisor.js",
+    "NEW FEATURE VERIFIED: GET /api/exit-advisor/status returns running=true with advisor status object",
+    "NEW FEATURE VERIFIED: GET /api/exit-advisor/advice returns advice map and open_trades count",
+    "NEW FEATURE VERIFIED: POST /api/exit-advisor/analyze with invalid trade_id returns 'Open trade not found' error",
+    "NEW FEATURE VERIFIED: Exit Advisor starts on boot via web_server.js startExitAdvisor(db)",
+    "NEW FEATURE VERIFIED: TradesList.js has Ask AI button and ExitAdviceCard component",
+    "VERSION BUMP VERIFIED: GET /api/health returns version=5.1.0",
+    "VERSION BUMP VERIFIED: GET /api/debug returns version=5.1.0",
+    "FRONTEND VERIFIED: Footer shows v5.1.0",
+    "FRONTEND VERIFIED: Active Trades tab shows trade cards correctly (0 trades currently)",
+    "FRONTEND VERIFIED: Ask AI button will appear on open trade cards when trades exist",
+    "REGRESSION PASSED: GET /api/health returns routes_loaded=12",
+    "REGRESSION PASSED: GET /api/ai-guards/status returns all 8 guards",
+    "REGRESSION PASSED: GET /api/position-sizing works with trading_mode",
+    "REGRESSION PASSED: GET /api/options/greeks works correctly with params",
+    "REGRESSION PASSED: GET /api/news/fetch returns articles from multiple sources (parallel fetching)"
+  ],
+  "updated_files": [
+    "/app/backend/tests/test_v510_exit_advisor.py"
+  ],
+  "success_rate": {
+    "backend": "100% (18/18 tests passed)",
+    "frontend": "100% (All features verified)"
+  },
+  "test_credentials": "None required",
+  "seed_data_creation": "None",
+  "retest_needed": false,
+  "main_agent_can_self_test": false,
+  "context_for_next_testing_agent": "v5.1.0 AI Exit Advisor feature verified. Key changes: (1) New exit_advisor.js module checks open trades every 3 min during market hours (IST 9:15AM-3:30PM). (2) New endpoints: GET /api/exit-advisor/status, GET /api/exit-advisor/advice, POST /api/exit-advisor/analyze. (3) TradesList.js has 'Ask AI' button on each open trade card. (4) ExitAdviceCard component shows AI recommendations (HOLD/EXIT_NOW/PARTIAL_EXIT/TIGHTEN_SL). (5) Uses GPT-4o for analysis via emergent_llm_key. (6) Market is currently CLOSED so advisor shows 0 checks. (7) There are 0 open trades currently so Ask AI button not visible. (8) News fetcher v2 uses parallel Promise.allSettled with round-robin distribution.",
+  "new_features_v510": {
+    "ai_exit_advisor": {
+      "status": "VERIFIED",
+      "description": "AI Exit Advisor checks open trades every 3 min and provides exit recommendations",
+      "module": "/app/desktop/routes/lib/exit_advisor.js",
+      "endpoints": [
+        "GET /api/exit-advisor/status",
+        "GET /api/exit-advisor/advice",
+        "POST /api/exit-advisor/analyze"
+      ],
+      "recommendations": ["HOLD", "EXIT_NOW", "PARTIAL_EXIT", "TIGHTEN_SL"],
+      "ai_model": "GPT-4o",
+      "interval": "3 minutes",
+      "market_hours_only": true,
+      "state_observed": {
+        "running": true,
+        "market_hours": false,
+        "check_count": 0,
+        "active_advice_count": 0
+      }
+    },
+    "ask_ai_button": {
+      "status": "VERIFIED",
+      "description": "Manual 'Ask AI' button on each open trade card for on-demand analysis",
+      "component": "/app/frontend/src/components/TradesList.js",
+      "visible_when": "Open trades exist"
+    },
+    "exit_advice_card": {
+      "status": "VERIFIED",
+      "description": "ExitAdviceCard component displays AI recommendations with confidence, risk level, and reason",
+      "component": "/app/frontend/src/components/TradesList.js"
+    },
+    "news_fetcher_v2": {
+      "status": "VERIFIED",
+      "description": "Parallel fetching with Promise.allSettled and round-robin distribution",
+      "module": "/app/desktop/routes/lib/news_fetcher.js"
+    },
+    "version_bump": {
+      "status": "VERIFIED",
+      "from": "5.0.0",
+      "to": "5.1.0",
+      "verified_in": ["/api/health", "/api/debug", "footer"]
+    }
+  },
+  "regression_tests": {
+    "health_endpoint": "PASS - version=5.1.0, routes_loaded=12, background_fetcher object present",
+    "debug_endpoint": "PASS - version=5.1.0",
+    "ai_guards_8_guards": "PASS - all 8 guards present",
+    "position_sizing": "PASS - returns trading_mode field, kelly and suggestion objects",
+    "options_greeks": "PASS - delta, gamma, theta, vega calculated with params",
+    "news_fetch": "PASS - returns articles from multiple sources"
+  },
+  "data_observed": {
+    "version": "5.1.0",
+    "routes_loaded": 12,
+    "exit_advisor_running": true,
+    "exit_advisor_market_hours": false,
+    "exit_advisor_check_count": 0,
+    "open_trades": 0,
+    "guards_count": 8,
+    "guards_active": 8
+  }
+}

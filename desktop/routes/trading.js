@@ -7,6 +7,7 @@ const crypto = require('crypto');
 const axios = require('axios');
 const createSignalGenerator = require('./lib/signal_generator');
 const { calculateTaxReport } = require('./lib/tax_calculator');
+const { analyzeTradeForExit, getAdvisorStatus, getAdviceForTrade, getAllAdvice } = require('./lib/exit_advisor');
 let OpenAI; try { OpenAI = require('openai'); } catch (_) { OpenAI = null; }
 
 function uuid() { return crypto.randomUUID(); }
@@ -429,6 +430,39 @@ module.exports = function (db) {
 
   // ============ Clear Paper Trades ============
   router.delete('/api/trades/clear-paper', (req, res) => { const before = (db.data.trades || []).length; db.data.trades = (db.data.trades || []).filter(t => (t.mode || 'PAPER') === 'LIVE'); const after = db.data.trades.length; const sigBefore = (db.data.signals || []).length; db.data.signals = (db.data.signals || []).filter(s => (s.mode || 'PAPER') === 'LIVE'); db.save(); res.json({ status: 'success', message: `Cleared ${before - after} paper trades`, trades_removed: before - after }); });
+
+  // ============ AI Exit Advisor ============
+  // Get advisor status
+  router.get('/api/exit-advisor/status', (req, res) => {
+    res.json({ status: 'success', advisor: getAdvisorStatus() });
+  });
+
+  // Get all active advice
+  router.get('/api/exit-advisor/advice', (req, res) => {
+    const openTrades = (db.data?.trades || []).filter(t => t.status === 'OPEN');
+    const adviceMap = {};
+    for (const trade of openTrades) {
+      const key = trade.id || trade.instrument_token || trade.symbol;
+      adviceMap[key] = trade.exit_advice || getAdviceForTrade(key) || null;
+    }
+    res.json({ status: 'success', advice: adviceMap, open_trades: openTrades.length });
+  });
+
+  // Manual "Ask AI" for a specific trade
+  router.post('/api/exit-advisor/analyze', async (req, res) => {
+    const { trade_id } = req.body;
+    const trade = (db.data?.trades || []).find(t => (t.id === trade_id || t.instrument_token === trade_id) && t.status === 'OPEN');
+    if (!trade) return res.json({ status: 'error', message: 'Open trade not found' });
+    try {
+      const advice = await analyzeTradeForExit(trade, db);
+      const tradeKey = trade.id || trade.instrument_token || trade.symbol;
+      trade.exit_advice = advice;
+      db.save();
+      res.json({ status: 'success', advice });
+    } catch (e) {
+      res.json({ status: 'error', message: e.message });
+    }
+  });
 
   return router;
 };

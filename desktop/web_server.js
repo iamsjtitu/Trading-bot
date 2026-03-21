@@ -104,6 +104,7 @@ for (const rm of routeModules) {
 console.log(`[Routes] ${loaded}/${routeModules.length} loaded`);
 
 const { startBackgroundFetcher, getJobStatus, isMarketHours } = require('./routes/lib/market_data_fetcher');
+const { startExitAdvisor, getAdvisorStatus: getExitAdvisorStatus } = require('./routes/lib/exit_advisor');
 
 // ============ HEALTH & VERSION ============
 app.get('/api/health', (req, res) => {
@@ -165,4 +166,7 @@ app.listen(PORT, HOST, () => {
 
   // Start background market data fetcher
   startBackgroundFetcher(db);
+
+  // Start AI Exit Advisor (checks open trades every 3 min)
+  startExitAdvisor(db);
 });
