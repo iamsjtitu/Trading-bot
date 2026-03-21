@@ -8,35 +8,41 @@ Build an AI-powered automated options trading bot that connects to world news, u
 - **Backend**: Node.js/Express (port 8002, proxied through Python FastAPI on 8001)
 - **Desktop**: Electron | **AI**: GPT-4o via Emergent LLM Key
 - **Broker**: Upstox API v2 (LIVE mode) | **Database**: Local JSON (lowdb)
-- **Notifications**: Telegram Bot (@T2_kridha_bot)
+- **Notifications**: Telegram Bot (@T2_kridha_bot, Chat ID: 5861330845)
 
-## v5.1.0 Features (All Verified)
+## v5.1.0 Features (Deep Verified, iteration_38)
 
-### New in this session:
-1. **AI Exit Advisor** - Checks open trades every 3 min during market hours. GPT-4o analyzes market conditions, news, price action. Provides HOLD/EXIT_NOW/PARTIAL_EXIT/TIGHTEN_SL recommendations. Manual "Ask AI" button on each trade. Shows advice card below trade with confidence, risk level, reason.
-2. **Telegram Alerts** - 6 alert types: New signals, Trade entry/exit, Daily P&L summary, Guard blocks, Exit Advisor recommendations. Bot: @T2_kridha_bot, Chat ID: 5861330845.
-3. **News Fetcher v2** - Parallel fetching from 8 sources with round-robin fair distribution. Fixed Business Today redirect, added proper User-Agent headers.
-4. **Background Market Data Fetcher** - Auto-caches live spot prices every 60s during market hours.
-5. **Collapsible AI Guards Panel** - Show/Hide dropdown.
+### Core AI Features:
+1. **AI Sentiment Analysis** - GPT-4o analyzes news from 8 sources
+2. **AI Exit Advisor** - Checks open trades every 3 min. GPT-4o recommends HOLD/EXIT_NOW/PARTIAL_EXIT/TIGHTEN_SL. Syncs LIVE prices from Upstox before analyzing. Manual "Ask AI" button on each trade.
+3. **Smart Position Sizing (Kelly Criterion)** - Dynamic trade sizing, 3 modes, mode-filtered stats, works in LIVE trades
+4. **Options Greeks & IV Filter** - Black-Scholes analysis, smart IV estimation, blocks bad options
 
-### v4.8.0 (Deep Verified):
-- Smart Position Sizing (Kelly Criterion) - 3 modes, mode-filtered stats
-- Options Greeks & IV Filter - Smart IV estimation, volatility smile
-- Kelly works in LIVE trades (bug fixed)
+### 8 AI Loss Prevention Guards:
+1. Multi-Timeframe Confirmation
+2. Market Regime Filter (sends Telegram alert on block)
+3. Trailing Stop Loss
+4. Multi-Source News Verification
+5. Time-of-Day Filter (sends Telegram alert on block)
+6. Max Daily Loss Auto-Stop (Always ON, sends Telegram alert)
+7. Smart Position Sizing - Kelly (Toggle)
+8. Options Greeks & IV Filter (Toggle, sends Telegram alert on block)
 
-### v4.7.0 (Verified):
-- 8 AI Loss Prevention Guards with ON/OFF toggles
-- min_confidence bug fix
-- Risk Ratio Alert
+### Telegram Alerts (6 types, individually toggleable):
+- New Signals, Trade Entry, Trade Exit, Daily P&L Summary, Guard Blocks, Exit Advisor
+- Auto-Connect with chat ID discovery
+- Test Message and Send Daily Summary buttons
 
-## API Endpoints (13 routes)
-- `/api/health`, `/api/debug`, `/api/settings/*`
-- `/api/news/*`, `/api/ai-guards/*`, `/api/position-sizing/*`
-- `/api/options/*` (greeks, chain, IV)
-- `/api/exit-advisor/*` (status, advice, analyze)
-- `/api/telegram/*` (status, setup, discover, test, alerts)
-- `/api/market-data/bg-status`
-- `/api/trading/*`, `/api/portfolio/*`
+### Infrastructure:
+- Background Market Data Fetcher (60s interval during market hours)
+- Parallel news fetching from 8 sources with fair distribution
+- 13 API routes
+
+## Bug Fixes in Deep Verification:
+1. Exit Advisor syncs LIVE trade prices from Upstox before analyzing
+2. Telegram exit alerts wired in auto-exit + manual exit (paper + LIVE)
+3. Guard block Telegram alerts wired (Market Regime, Max Daily Loss, Greeks)
+4. Daily summary endpoint created
 
 ## Backlog
 ### P1: App.js refactor (800+ lines)
