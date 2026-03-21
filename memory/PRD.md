@@ -3,14 +3,14 @@
 ## Original Problem Statement
 Build an AI-powered automated options trading bot that connects to world news, uses GPT-4o for sentiment analysis (Bullish/Bearish), and automatically executes options (Call/Put) trades on Upstox. Standalone desktop application for Windows/Mac with auto-updates.
 
-## Architecture (v6.0.0)
+## Architecture (v7.0.0)
 - **Frontend**: React + Tailwind CSS + Shadcn UI
 - **Backend**: Node.js/Express (port 8002, proxied through Python FastAPI on 8001)
 - **Desktop**: Electron | **AI**: GPT-4o via Emergent LLM Key
 - **Broker**: Upstox API v2 (LIVE mode) | **Database**: Local JSON (lowdb)
 - **Notifications**: Telegram Bot (@T2_kridha_bot, Chat ID: 5861330845)
 
-## v6.0.0 Features (All Verified, iteration_39)
+## v7.0.0 Features (All Verified, iteration_40)
 
 ### AI Features:
 1. **AI Sentiment Analysis** - GPT-4o analyzes news from 8 sources
@@ -32,6 +32,15 @@ Build an AI-powered automated options trading bot that connects to world news, u
 - Parallel news from 8 sources
 - 13 API routes
 
+## v7.0.0 Bug Fixes (Deep Audit - March 2026)
+1. **CRITICAL**: exit_advisor.js P&L operator precedence bug fixed (pos.pnl was divided by 100)
+2. **HIGH**: Missing Telegram trade entry alert for LIVE trades now added in signal_generator.js
+3. **MEDIUM**: SL/Target in executeLiveTrade now uses actual fill price (not hardcoded 150 premium)
+4. **LOW**: Multi-Source Verification guard now sends Telegram guard block alert
+5. **LOW**: Multi-Timeframe guard now sends Telegram guard block alert (news.js & trading.js)
+6. **COSMETIC**: web_server.js console log version corrected
+
 ## Backlog
-### P1: App.js refactor (800+ lines)
+### P1: App.js refactor (800+ lines monolith)
+### P1: Desktop app build trigger for v7.0.0
 ### P2: Multi-broker (Zerodha, Angel One, 5paisa) - when API keys ready
