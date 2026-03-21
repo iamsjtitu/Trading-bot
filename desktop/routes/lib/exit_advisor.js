@@ -177,7 +177,8 @@ async function syncLiveTradeData(db) {
         if (currentPrice > 0) {
           trade.current_price = Math.round(currentPrice * 100) / 100;
           trade.current_value = Math.round(currentPrice * qty * 100) / 100;
-          trade.live_pnl = Math.round(pos.pnl || ((currentPrice - entryPrice) * qty) * 100) / 100;
+          // FIX: Parentheses to prevent pos.pnl being divided by 100 (operator precedence bug)
+          trade.live_pnl = Math.round((pos.pnl || ((currentPrice - entryPrice) * qty)) * 100) / 100;
           trade.pnl_percentage = entryPrice > 0 ? Math.round(((currentPrice - entryPrice) / entryPrice) * 10000) / 100 : 0;
           if (entryPrice > 0 && Math.abs(trade.entry_price - entryPrice) > 1) {
             trade.entry_price = Math.round(entryPrice * 100) / 100;

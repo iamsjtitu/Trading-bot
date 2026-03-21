@@ -140,6 +140,7 @@ module.exports = function createSignalGenerator(db, aiEngine) {
       sources.add(currentSource);
       if (sources.size < 2 && (db.data.news_articles || []).length > 3) {
         console.log(`[Signal] BLOCKED by Multi-Source Check - Only ${sources.size} source(s) agree: [${[...sources].join(', ')}]. Need 2+.`);
+        notifyGuardBlock(db, 'Multi-Source Verification', `Only ${sources.size} source(s) agree: [${[...sources].join(', ')}]. Need 2+ sources confirming ${sentiment.sentiment}.`);
         return null;
       }
     }
@@ -471,6 +472,15 @@ module.exports = function createSignalGenerator(db, aiEngine) {
       }
 
       if (!db.data.trades) db.data.trades = [];
+      // FIX: Calculate SL/Target from actual fill price (not signal's hardcoded premium)
+      const riskCfgLive = db.data?.settings?.risk || {};
+      const autoTradingLive = db.data?.settings?.auto_trading || {};
+      const riskParamsLive = { low: { stop_loss_pct: 15, target_pct: 30 }, medium: { stop_loss_pct: 25, target_pct: 50 }, high: { stop_loss_pct: 35, target_pct: 70 } };
+      const rpLive = riskParamsLive[riskCfgLive.risk_tolerance || 'medium'] || riskParamsLive.medium;
+      const slPctLive = autoTradingLive.stoploss_pct || riskCfgLive.stop_loss_pct || rpLive.stop_loss_pct;
+      const tgtPctLive = Math.max(autoTradingLive.target_pct || riskCfgLive.target_pct || rpLive.target_pct, slPctLive);
+      const liveStopLoss = Math.round(actualEntryPrice * (1 - slPctLive / 100) * 100) / 100;
+      const liveTarget = Math.round(actualEntryPrice * (1 + tgtPctLive / 100) * 100) / 100;
       // Use signal's pre-calculated stop_loss and target (already set in generateSignal)
       const trade = {
         id: uuid(), signal_id: signal.id, trade_type: signal.signal_type,
@@ -478,8 +488,8 @@ module.exports = function createSignalGenerator(db, aiEngine) {
         instrument: signal.symbol || 'NIFTY50',
         entry_time: new Date().toISOString(),
         entry_price: actualEntryPrice, quantity: qty, investment: qty * actualEntryPrice,
-        stop_loss: signal.stop_loss || Math.round(actualEntryPrice * 0.80 * 100) / 100,
-        target: signal.target || Math.round(actualEntryPrice * 1.20 * 100) / 100,
+        stop_loss: liveStopLoss,
+        target: liveTarget,
         status: orderSuccess ? 'OPEN' : 'FAILED', mode: 'LIVE', order_id: orderId, instrument_token: instrumentToken,
         sentiment: signal.sentiment || 'N/A',
         confidence: signal.confidence || 0,
@@ -491,6 +501,11 @@ module.exports = function createSignalGenerator(db, aiEngine) {
       if (orderSuccess) {
         const p = db.data.portfolio;
         if (p) { p.invested_amount = (p.invested_amount || 0) + signal.investment_amount; p.available_capital = (p.available_capital || 0) - signal.investment_amount; if (!p.active_positions) p.active_positions = []; p.active_positions.push(trade.id); p.last_updated = new Date().toISOString(); }
+        // Telegram: Trade Entry Alert (LIVE)
+        const tgAlerts = db.data?.settings?.telegram?.alerts || {};
+        if (tgAlerts.trade_entry !== false) {
+          telegram.sendTradeEntryAlert(trade).catch(() => {});
+        }
       }
       db.save();
       return { success: orderSuccess, order_id: orderId, trade };

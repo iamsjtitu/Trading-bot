@@ -165,7 +165,7 @@ app.use((err, req, res, next) => {
 
 // ============ START ============
 app.listen(PORT, HOST, () => {
-  console.log(`[AI Trading Bot v5.0.0] Web server running on ${HOST}:${PORT}`);
+  console.log(`[AI Trading Bot v6.0.0] Web server running on ${HOST}:${PORT}`);
   console.log(`[AI Trading Bot] Routes: ${loaded}/${routeModules.length} | DB: ${db.dbFile}`);
 
   // Start background market data fetcher

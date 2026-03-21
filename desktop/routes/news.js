@@ -93,6 +93,12 @@ module.exports = function (db) {
                       signal.status = 'BLOCKED_TF';
                       signal.block_reason = tfCheck.reason;
                       if (db.notify) db.notify('risk', 'Multi-TF Block', `${signal.signal_type} ${signal.symbol} - ${tfCheck.reason}`);
+                      // Telegram: Guard Block Alert for Multi-TF
+                      const tgGuardAlerts = db.data?.settings?.telegram?.alerts || {};
+                      if (tgGuardAlerts.guard_blocks !== false) {
+                        const tgLib = require('./lib/telegram');
+                        tgLib.sendGuardBlockAlert('Multi-Timeframe', `${signal.signal_type} ${signal.symbol} - ${tfCheck.reason}`).catch(() => {});
+                      }
                     } else {
                     try {
                       const result = await signals.executeLiveTrade(signal, token);

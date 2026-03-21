@@ -294,6 +294,11 @@ module.exports = function (db) {
                 newSignal.status = 'BLOCKED_TF';
                 newSignal.block_reason = tfResult.reason;
                 db.data.signals.push(newSignal);
+                // Telegram: Guard Block Alert for Multi-TF on re-entry
+                const tgReentryAlerts = db.data?.settings?.telegram?.alerts || {};
+                if (tgReentryAlerts.guard_blocks !== false) {
+                  try { const tgMod = require('./lib/telegram'); tgMod.sendGuardBlockAlert('Multi-Timeframe', `Re-entry ${newSignal.signal_type} ${newSignal.symbol} - ${tfResult.reason}`).catch(() => {}); } catch (_) {}
+                }
               } else {
                 db.data.signals.push(newSignal);
                 if (mode === 'LIVE' && accessToken) { const r = await signalGen.executeLiveTrade(newSignal, accessToken); if (r?.success) newTradesCount++; } else { signalGen.executePaperTrade(newSignal); newTradesCount++; }
