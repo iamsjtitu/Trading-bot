@@ -4,6 +4,7 @@
  */
 const { Router } = require('express');
 const telegram = require('./lib/telegram');
+const { getBriefingStatus, sendMorningBriefing } = require('./lib/morning_briefing');
 
 module.exports = (db) => {
   const router = Router();
@@ -21,8 +22,9 @@ module.exports = (db) => {
     const alerts = db.data?.settings?.telegram?.alerts || {
       signals: true, trade_entry: true, trade_exit: true,
       daily_summary: true, guard_blocks: true, exit_advice: true,
+      morning_briefing: true,
     };
-    res.json({ status: 'success', telegram: status, alerts });
+    res.json({ status: 'success', telegram: status, alerts, morning_briefing: getBriefingStatus() });
   });
 
   // POST /api/telegram/setup - Configure bot token and discover chat ID
@@ -52,6 +54,7 @@ module.exports = (db) => {
           db.data.settings.telegram.alerts = {
             signals: true, trade_entry: true, trade_exit: true,
             daily_summary: true, guard_blocks: true, exit_advice: true,
+            morning_briefing: true,
           };
         }
         db.save();
@@ -140,6 +143,16 @@ module.exports = (db) => {
     const summary = { total_pnl: totalPnl, total_trades: todayTrades.length, wins: wins.length, losses: losses.length, win_rate: winRate, biggest_win: biggestWin, biggest_loss: biggestLoss, mode };
     const result = await telegram.sendDailySummary(summary);
     res.json({ status: result.ok ? 'success' : 'error', message: result.ok ? 'Daily summary sent!' : result.error, summary });
+  });
+
+  // POST /api/telegram/morning-briefing - Send morning briefing now (manual trigger)
+  router.post('/api/telegram/morning-briefing', async (req, res) => {
+    try {
+      await sendMorningBriefing(db);
+      res.json({ status: 'success', message: 'Morning briefing sent!', briefing: getBriefingStatus() });
+    } catch (e) {
+      res.json({ status: 'error', message: e.message });
+    }
   });
 
   return router;

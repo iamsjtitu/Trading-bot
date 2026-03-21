@@ -683,6 +683,7 @@ export default function SettingsPanel({ onClose, onSave }) {
                             { key: 'daily_summary', label: 'Daily P&L Summary', desc: 'Din ka summary market close ke baad' },
                             { key: 'guard_blocks', label: 'Guard Blocks', desc: 'Jab AI Guard trade block kare' },
                             { key: 'exit_advice', label: 'Exit Advisor', desc: 'Jab AI exit/tighten SL suggest kare' },
+                            { key: 'morning_briefing', label: 'Morning Briefing', desc: 'Subah 9 AM pe market outlook + AI analysis' },
                           ].map(alert => (
                             <div key={alert.key} className="flex items-center justify-between bg-gray-50 p-2 rounded-lg" data-testid={`telegram-alert-${alert.key}`}>
                               <div>
@@ -709,6 +710,14 @@ export default function SettingsPanel({ onClose, onSave }) {
 
                       <Button onClick={sendDailySummary} disabled={sendingSummary} className="bg-gradient-to-r from-blue-500 to-purple-500 text-white w-full" data-testid="send-daily-summary-btn">
                         {sendingSummary ? 'Sending...' : 'Send Daily Summary Now'}
+                      </Button>
+                      <Button onClick={async () => {
+                        try {
+                          const r = await axios.post(`${API}/telegram/morning-briefing`);
+                          alert(r.data?.status === 'success' ? 'Morning briefing sent! Check Telegram.' : r.data?.message || 'Failed');
+                        } catch (e) { alert('Error: ' + e.message); }
+                      }} className="bg-gradient-to-r from-orange-400 to-yellow-500 text-white w-full" data-testid="send-morning-briefing-btn">
+                        Send Morning Briefing Now
                       </Button>
                     </>
                   )}

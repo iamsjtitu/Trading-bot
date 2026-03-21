@@ -90,7 +90,8 @@
         "trade_exit": true,
         "daily_summary": true,
         "guard_blocks": true,
-        "exit_advice": true
+        "exit_advice": true,
+        "morning_briefing": true
       }
     }
   },

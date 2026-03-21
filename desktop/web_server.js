@@ -106,20 +106,23 @@ console.log(`[Routes] ${loaded}/${routeModules.length} loaded`);
 
 const { startBackgroundFetcher, getJobStatus, isMarketHours } = require('./routes/lib/market_data_fetcher');
 const { startExitAdvisor, getAdvisorStatus: getExitAdvisorStatus } = require('./routes/lib/exit_advisor');
+const { startMorningBriefing, getBriefingStatus } = require('./routes/lib/morning_briefing');
 
 // ============ HEALTH & VERSION ============
 app.get('/api/health', (req, res) => {
   res.json({
     status: 'healthy', timestamp: new Date().toISOString(),
-    version: '5.1.0', routes_loaded: loaded,
+    version: '6.0.0', routes_loaded: loaded,
     services: { news: 'active', sentiment: 'active', trading: 'active' },
     background_fetcher: getJobStatus(),
+    exit_advisor: getExitAdvisorStatus(),
+    morning_briefing: getBriefingStatus(),
   });
 });
 
 app.get('/api/debug', (req, res) => {
   res.json({
-    version: '5.1.0', routes_loaded: loaded, backend: 'node.js',
+    version: '6.0.0', routes_loaded: loaded, backend: 'node.js',
     db_keys: Object.keys(db.data || {}),
     settings_sources: db.data?.settings?.news?.sources || [],
     news_count: (db.data?.news_articles || []).length,
@@ -170,4 +173,7 @@ app.listen(PORT, HOST, () => {
 
   // Start AI Exit Advisor (checks open trades every 3 min)
   startExitAdvisor(db);
+
+  // Start Morning Briefing scheduler (9:00 AM IST weekdays)
+  startMorningBriefing(db);
 });
