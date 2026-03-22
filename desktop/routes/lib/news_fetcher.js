@@ -1,6 +1,6 @@
 /**
  * News Fetcher Module v2
- * Fetches news from 13+ sources in PARALLEL with fair distribution.
+ * Fetches news from 16 sources in PARALLEL with fair distribution.
  * Fixed: redirect handling, timeout issues, parallel fetch, per-source article limits.
  */
 const axios = require('axios');
@@ -320,6 +320,58 @@ async function fetchFromIndiaToday(max) {
   return articles.slice(0, max);
 }
 
+async function fetchFromReuters(max) {
+  // Reuters blocks direct requests, use Google News RSS as proxy
+  return fetchGoogleNewsRSS('site:reuters.com india market stock economy', 'Reuters', max);
+}
+
+async function fetchFromZeeBusiness(max) {
+  // Zee Business blocks direct requests, use Google News RSS as proxy
+  return fetchGoogleNewsRSS('site:zeebiz.com market stock', 'Zee Business', max);
+}
+
+async function fetchFromFinancialExpress(max) {
+  // Financial Express blocks direct requests, use Google News RSS as proxy
+  return fetchGoogleNewsRSS('site:financialexpress.com market stock', 'Financial Express', max);
+}
+
+// Google News RSS fetcher helper
+async function fetchGoogleNewsRSS(query, sourceName, max) {
+  const articles = [];
+  try {
+    const url = `https://news.google.com/rss/search?q=${encodeURIComponent(query)}&hl=en-IN&gl=IN&ceid=IN:en`;
+    const resp = await axios.get(url, { ...FETCH_CONFIG });
+    const xml = typeof resp.data === 'string' ? resp.data : '';
+    if (!xml) return [];
+
+    const items = xml.match(/<item>([\s\S]*?)<\/item>/g) || [];
+    for (const item of items) {
+      if (articles.length >= max) break;
+      const titleMatch = item.match(/<title><!\[CDATA\[([\s\S]*?)\]\]><\/title>/) || item.match(/<title>([\s\S]*?)<\/title>/);
+      const linkMatch = item.match(/<link>([\s\S]*?)<\/link>/);
+      const pubMatch = item.match(/<pubDate>([\s\S]*?)<\/pubDate>/);
+      if (!titleMatch) continue;
+
+      let title = stripHtml(titleMatch[1]).trim();
+      // Remove " - Source Name" suffix added by Google News
+      title = title.replace(/\s*-\s*(The\s+)?Financial Express$/, '').replace(/\s*-\s*Zee Business$/, '').trim();
+      if (!title || title.length < 15) continue;
+
+      const articleUrl = linkMatch ? linkMatch[1].trim() : '';
+      articles.push({
+        title, description: title, content: title,
+        source: sourceName, url: articleUrl,
+        published_at: pubMatch ? new Date(pubMatch[1].trim()).toISOString() : new Date().toISOString(),
+        fetched_at: new Date().toISOString(),
+      });
+    }
+    console.log(`[News] ${sourceName}: fetched ${articles.length} articles via Google News RSS`);
+  } catch (e) {
+    console.error(`[News] ${sourceName} error:`, e.message);
+  }
+  return articles.slice(0, max);
+}
+
 // Source dispatcher
 const SOURCE_MAP = {
   moneycontrol: (cfg, max) => fetchFromMoneycontrol(max),
@@ -332,6 +384,9 @@ const SOURCE_MAP = {
   livemint: (cfg, max) => fetchFromLivemint(max),
   bloomberg: (cfg, max) => fetchFromBloombergAsia(max),
   indiatoday: (cfg, max) => fetchFromIndiaToday(max),
+  reuters: (cfg, max) => fetchFromReuters(max),
+  zeebusiness: (cfg, max) => fetchFromZeeBusiness(max),
+  financialexpress: (cfg, max) => fetchFromFinancialExpress(max),
   newsapi: (cfg, max) => { const k = cfg.newsapi_key || ''; return (k && k !== 'get_from_newsapi_org') ? fetchFromNewsAPI(k, max) : Promise.resolve([]); },
   alphavantage: (cfg, max) => { const k = cfg.alphavantage_key || ''; return (k && k !== 'get_from_alphavantage_co') ? fetchFromAlphaVantage(k, max) : Promise.resolve([]); },
 };

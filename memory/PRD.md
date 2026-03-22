@@ -48,7 +48,7 @@ Build an AI-powered automated options trading bot that connects to world news, u
 - v7.0.1: Version refs fixed
 - v8.0.0: Permanent version fix, added missing telegram+options routes to main.js, added missing background jobs to main.js
 - **v9.0.1**: Added Bloomberg Asia as 12th news source (RSS feeds: markets + technology). Fixed RiskPanel hardcoded 25% Stop Loss → now reads from settings dynamically. Fixed Journal/Analytics mode filter (Paper data no longer shows in LIVE mode).
-- **v10.0.0**: Added India Today Market as 13th news source (HTML scraping from indiatoday.in/business/market). Now 10 free sources active: Bloomberg, India Today, Moneycontrol, Economic Times, Hindu Business Line, CNBC TV18, Livemint, Business Today, NDTV Profit, NSE India. 15 articles processed per cycle with fair round-robin distribution.
+- **v10.0.0**: Added Reuters, Zee Business, Financial Express, India Today, Bloomberg (5 new sources) — now 13 free sources total via direct scraping + Google News RSS fallback. Increased articles per cycle from 15 to 30. 16 total sources in SOURCE_MAP including 2 API-key sources.
 
 ## Pending/Backlog
 - **P0**: Desktop app rebuild for v8.1.0

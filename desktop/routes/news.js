@@ -29,7 +29,7 @@ module.exports = function (db) {
       const seenTitles = new Set();
       const oneHourAgo = new Date(Date.now() - 60 * 60 * 1000).toISOString();
       const existingTitles = new Set((db.data.news_articles || []).filter(n => (n.created_at || '') > oneHourAgo).map(n => (n.title || '').toLowerCase().trim()));
-      let allNews = allNewsRaw.filter(a => { const norm = (a.title || '').toLowerCase().trim(); if (!norm || seenTitles.has(norm) || existingTitles.has(norm)) return false; seenTitles.add(norm); return true; }).slice(0, 15);
+      let allNews = allNewsRaw.filter(a => { const norm = (a.title || '').toLowerCase().trim(); if (!norm || seenTitles.has(norm) || existingTitles.has(norm)) return false; seenTitles.add(norm); return true; }).slice(0, 30);
 
       if (!db.data.news_articles) db.data.news_articles = [];
       if (!db.data.signals) db.data.signals = [];
