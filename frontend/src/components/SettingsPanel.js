@@ -668,7 +668,7 @@ export default function SettingsPanel({ onClose, onSave }) {
                             } else { alert(r1.data?.message || 'Connection failed'); }
                           } catch (e) {
                             if (e.response?.status === 404) {
-                              alert('Telegram API not available. Desktop app rebuild required for v7.0.0 features.');
+                              alert('Telegram API not available. Desktop app rebuild required for v7.0.1 features.');
                             } else { alert('Error: ' + (e.response?.data?.message || e.message)); }
                           }
                         }} className="bg-blue-600 hover:bg-blue-700 text-white flex-1" data-testid="telegram-connect-btn">
@@ -680,7 +680,7 @@ export default function SettingsPanel({ onClose, onSave }) {
                             alert(r.data?.status === 'success' ? 'Test message sent! Check Telegram.' : r.data?.message || 'Failed');
                           } catch (e) {
                             if (e.response?.status === 404) {
-                              alert('Telegram API not available. Desktop app rebuild required for v7.0.0 features.');
+                              alert('Telegram API not available. Desktop app rebuild required for v7.0.1 features.');
                             } else { alert('Error: ' + (e.response?.data?.message || e.message)); }
                           }
                         }} variant="outline" className="border-green-400 text-green-700" data-testid="telegram-test-btn">
@@ -732,7 +732,7 @@ export default function SettingsPanel({ onClose, onSave }) {
                           const r = await axios.post(`${API}/telegram/morning-briefing`);
                           alert(r.data?.status === 'success' ? 'Morning briefing sent! Check Telegram.' : r.data?.message || 'Failed');
                         } catch (e) {
-                          if (e.response?.status === 404) { alert('Desktop app rebuild required for v7.0.0.'); }
+                          if (e.response?.status === 404) { alert('Desktop app rebuild required for v7.0.1.'); }
                           else { alert('Error: ' + (e.response?.data?.message || e.message)); }
                         }
                       }} className="bg-gradient-to-r from-orange-400 to-yellow-500 text-white w-full" data-testid="send-morning-briefing-btn">
