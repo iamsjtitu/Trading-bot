@@ -47,7 +47,7 @@ Build an AI-powered automated options trading bot that connects to world news, u
 - v7.0.0: Deep audit, 7 bug fixes
 - v7.0.1: Version refs fixed
 - v8.0.0: Permanent version fix, added missing telegram+options routes to main.js, added missing background jobs to main.js
-- **v8.1.0**: System Health Dashboard tab — shows background services, connections, AI guards, telegram alerts, system info. Auto-refreshes every 10s. Double verified (38/38 tests passed, iteration_42.json)
+- **v8.1.0**: System Health Dashboard tab + Telegram Auto-Connect bug fix. `discoverChatId` had invalid `offset: -10` parameter, replaced with proper `limit: 100` + retry mechanism. Double verified (38/38 tests passed, iteration_42.json)
 
 ## Pending/Backlog
 - **P0**: Desktop app rebuild for v8.1.0

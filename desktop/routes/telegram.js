@@ -38,8 +38,13 @@ module.exports = (db) => {
       const botInfo = await axios.get(`https://api.telegram.org/bot${bot_token}/getMe`, { timeout: 10000 });
       if (!botInfo.data?.ok) return res.json({ status: 'error', message: 'Invalid bot token' });
 
-      // Try to discover chat ID
-      const discovered = await telegram.discoverChatId(bot_token);
+      // Try to discover chat ID (try up to 3 times with 2s gap)
+      let discovered = null;
+      for (let attempt = 0; attempt < 3; attempt++) {
+        discovered = await telegram.discoverChatId(bot_token);
+        if (discovered) break;
+        if (attempt < 2) await new Promise(r => setTimeout(r, 2000));
+      }
 
       if (discovered) {
         telegram.configure(bot_token, discovered.chat_id);
@@ -77,7 +82,7 @@ module.exports = (db) => {
 
         res.json({
           status: 'pending',
-          message: 'Bot verified but no chat found. Please send /start to your bot on Telegram, then call /api/telegram/discover',
+          message: 'Bot verified par koi chat nahi mila. Pehle Telegram mein apne bot ko /start bhejo, phir Auto-Connect dubara click karo.',
           bot: botInfo.data.result,
         });
       }

@@ -657,14 +657,7 @@ export default function SettingsPanel({ onClose, onSave }) {
                               updateField('telegram', 'chat_id', String(r1.data.chat_id));
                               alert(`Connected! Chat ID: ${r1.data.chat_id} (${r1.data.name})`);
                             } else if (r1.data?.status === 'pending') {
-                              alert('Bot verified! Telegram mein /start bhejo, phir dubara "Auto-Connect" click karo.');
-                              try {
-                                const r2 = await axios.post(`${API}/telegram/discover`);
-                                if (r2.data?.status === 'success') {
-                                  updateField('telegram', 'chat_id', String(r2.data.chat_id));
-                                  alert(`Connected! Chat ID: ${r2.data.chat_id}`);
-                                }
-                              } catch (_) {}
+                              alert('Bot verified! Ab Telegram mein apne bot ko /start bhejo, phir "Auto-Connect" dubara click karo.');
                             } else { alert(r1.data?.message || 'Connection failed'); }
                           } catch (e) {
                             if (e.response?.status === 404) {

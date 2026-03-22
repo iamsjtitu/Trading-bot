@@ -56,15 +56,22 @@ async function sendMessage(text, parseMode = 'HTML') {
 // Auto-discover chat ID by polling for /start messages
 async function discoverChatId(botToken) {
   try {
+    // First try without offset to get all recent updates
     const resp = await axios.get(`https://api.telegram.org/bot${botToken}/getUpdates`, {
-      params: { timeout: 5, offset: -10 }, timeout: 15000,
+      params: { timeout: 2, limit: 100 }, timeout: 15000,
     });
     if (resp.data?.ok && resp.data.result?.length > 0) {
-      // Find the most recent /start message
+      // Find the most recent message with a chat.id (prefer /start but accept any)
       for (let i = resp.data.result.length - 1; i >= 0; i--) {
-        const msg = resp.data.result[i].message;
+        const update = resp.data.result[i];
+        const msg = update.message || update.my_chat_member?.chat;
         if (msg?.chat?.id) {
           return { chat_id: msg.chat.id, name: `${msg.chat.first_name || ''} ${msg.chat.last_name || ''}`.trim(), username: msg.chat.username || '' };
+        }
+        // Also check my_chat_member updates (when user starts bot)
+        if (update.my_chat_member?.chat?.id) {
+          const chat = update.my_chat_member.chat;
+          return { chat_id: chat.id, name: `${chat.first_name || ''} ${chat.last_name || ''}`.trim(), username: chat.username || '' };
         }
       }
     }
