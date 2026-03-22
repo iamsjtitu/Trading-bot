@@ -2,9 +2,11 @@ import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 
-export default function RiskPanel({ riskMetrics, emergencyStop, onEmergencyStop, formatCurrency, tradingMode, brokerConnected }) {
+export default function RiskPanel({ riskMetrics, emergencyStop, onEmergencyStop, formatCurrency, tradingMode, brokerConnected, stoploss_pct }) {
   const isLive = riskMetrics?.isLive || false;
   const isLiveDisconnected = tradingMode === 'LIVE' && !brokerConnected;
+  const sl = stoploss_pct ?? 25;
+  const riskLabel = sl <= 5 ? 'Low Risk' : sl <= 15 ? 'Medium Risk' : 'High Risk';
 
   return (
     <Card className="bg-gradient-to-r from-orange-50 to-red-50 border-orange-200 p-4 mb-4 shadow-lg" data-testid="risk-management-panel">
@@ -49,8 +51,8 @@ export default function RiskPanel({ riskMetrics, emergencyStop, onEmergencyStop,
             </div>
             <div>
               <p className="text-xs text-gray-600 font-medium">Stop Loss</p>
-              <p className="text-lg font-bold text-orange-600">25%</p>
-              <p className="text-xs text-gray-500">Medium Risk</p>
+              <p className="text-lg font-bold text-orange-600" data-testid="risk-stoploss-value">{sl}%</p>
+              <p className="text-xs text-gray-500">{riskLabel}</p>
             </div>
           </div>
         </div>

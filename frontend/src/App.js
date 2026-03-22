@@ -683,7 +683,7 @@ function App() {
           </div>
         )}
 
-        <RiskPanel riskMetrics={riskMetrics} emergencyStop={emergencyStop} onEmergencyStop={handleEmergencyStop} formatCurrency={formatCurrency} tradingMode={tradingMode} brokerConnected={brokerConnected} />
+        <RiskPanel riskMetrics={riskMetrics} emergencyStop={emergencyStop} onEmergencyStop={handleEmergencyStop} formatCurrency={formatCurrency} tradingMode={tradingMode} brokerConnected={brokerConnected} stoploss_pct={autoSettings.stoploss_pct} />
         <AutoTradingSettings autoSettings={autoSettings} showAutoSettings={showAutoSettings} setShowAutoSettings={setShowAutoSettings} updateAutoSettings={updateAutoSettings} onDebug={runAutoTradeDebug} onExecuteSignal={executeLatestSignal} debugResult={debugResult} />
         <AIGuards />
 
