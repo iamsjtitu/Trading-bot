@@ -47,7 +47,7 @@ Build an AI-powered automated options trading bot that connects to world news, u
 - v7.0.0: Deep audit, 7 bug fixes
 - v7.0.1: Version refs fixed
 - v8.0.0: Permanent version fix, added missing telegram+options routes to main.js, added missing background jobs to main.js
-- **v8.1.0**: System Health Dashboard tab + Telegram Auto-Connect bug fix (`discoverChatId` invalid offset) + Journal/Analytics mode filter fix (Paper data was showing in LIVE mode — now all endpoints filter by trading mode). Triple verified (iteration_42 + iteration_43, 100%)
+- **v9.0.1**: Added Bloomberg Asia as 12th news source (RSS feeds: markets + technology). Fixed RiskPanel hardcoded 25% Stop Loss → now reads from settings dynamically. Fixed Journal/Analytics mode filter (Paper data no longer shows in LIVE mode).
 
 ## Pending/Backlog
 - **P0**: Desktop app rebuild for v8.1.0

@@ -1,6 +1,6 @@
 /**
  * News Fetcher Module v2
- * Fetches news from 11+ sources in PARALLEL with fair distribution.
+ * Fetches news from 12+ sources in PARALLEL with fair distribution.
  * Fixed: redirect handling, timeout issues, parallel fetch, per-source article limits.
  */
 const axios = require('axios');
@@ -259,6 +259,13 @@ function getDemoNews() {
   ];
 }
 
+async function fetchFromBloombergAsia(max) {
+  return fetchRSSSource([
+    'https://feeds.bloomberg.com/markets/news.rss',
+    'https://feeds.bloomberg.com/technology/news.rss',
+  ], 'Bloomberg', max);
+}
+
 // Source dispatcher
 const SOURCE_MAP = {
   moneycontrol: (cfg, max) => fetchFromMoneycontrol(max),
@@ -269,6 +276,7 @@ const SOURCE_MAP = {
   ndtv_profit: (cfg, max) => fetchFromNDTVProfit(max),
   cnbc_tv18: (cfg, max) => fetchFromCNBCTV18(max),
   livemint: (cfg, max) => fetchFromLivemint(max),
+  bloomberg: (cfg, max) => fetchFromBloombergAsia(max),
   newsapi: (cfg, max) => { const k = cfg.newsapi_key || ''; return (k && k !== 'get_from_newsapi_org') ? fetchFromNewsAPI(k, max) : Promise.resolve([]); },
   alphavantage: (cfg, max) => { const k = cfg.alphavantage_key || ''; return (k && k !== 'get_from_alphavantage_co') ? fetchFromAlphaVantage(k, max) : Promise.resolve([]); },
 };
