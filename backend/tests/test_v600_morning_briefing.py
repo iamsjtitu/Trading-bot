@@ -6,7 +6,7 @@ import pytest
 import requests
 import os
 
-BASE_URL = os.environ.get('REACT_APP_BACKEND_URL', 'https://nifty-signal-lab.preview.emergentagent.com').rstrip('/')
+BASE_URL = os.environ.get('REACT_APP_BACKEND_URL', 'https://options-ai-trading.preview.emergentagent.com').rstrip('/')
 
 
 class TestHealthAndVersion:
