@@ -1,6 +1,6 @@
 {
   "name": "ai-trading-bot",
-  "version": "9.0.1",
+  "version": "10.0.0",
   "description": "AI-powered automated options trading bot with Upstox integration",
   "main": "main.js",
   "author": "AI Trading Bot",

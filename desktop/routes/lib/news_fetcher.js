@@ -1,6 +1,6 @@
 /**
  * News Fetcher Module v2
- * Fetches news from 12+ sources in PARALLEL with fair distribution.
+ * Fetches news from 13+ sources in PARALLEL with fair distribution.
  * Fixed: redirect handling, timeout issues, parallel fetch, per-source article limits.
  */
 const axios = require('axios');
@@ -266,6 +266,60 @@ async function fetchFromBloombergAsia(max) {
   ], 'Bloomberg', max);
 }
 
+async function fetchFromIndiaToday(max) {
+  const articles = [];
+  try {
+    const resp = await axios.get('https://www.indiatoday.in/business/market', {
+      ...FETCH_CONFIG,
+      headers: {
+        ...FETCH_CONFIG.headers,
+        'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
+      },
+    });
+    const html = typeof resp.data === 'string' ? resp.data : '';
+    if (!html) return [];
+
+    // Extract article links and titles: /business/market/story/...
+    const articleRegex = /href="(\/business\/(?:market|story)[^"]*story[^"]*-(\d{4}-\d{2}-\d{2}))"[^>]*>\s*([^<]+)/g;
+    const seen = new Set();
+    let match;
+    while ((match = articleRegex.exec(html)) !== null && articles.length < max) {
+      const url = `https://www.indiatoday.in${match[1]}`;
+      const title = stripHtml(match[3]).trim();
+      if (!title || title.length < 20 || seen.has(url)) continue;
+      seen.add(url);
+      articles.push({
+        title, description: title, content: title,
+        source: 'India Today', url,
+        published_at: match[2] ? new Date(match[2]).toISOString() : new Date().toISOString(),
+        fetched_at: new Date().toISOString(),
+      });
+    }
+
+    // Fallback: broader pattern for story links
+    if (articles.length < max) {
+      const fallbackRegex = /href="(\/business\/(?:market\/story|story)\/[^"]+)"[^>]*title="([^"]+)"/g;
+      while ((match = fallbackRegex.exec(html)) !== null && articles.length < max) {
+        const url = `https://www.indiatoday.in${match[1]}`;
+        const title = stripHtml(match[2]).trim();
+        if (!title || title.length < 20 || seen.has(url)) continue;
+        seen.add(url);
+        articles.push({
+          title, description: title, content: title,
+          source: 'India Today', url,
+          published_at: new Date().toISOString(),
+          fetched_at: new Date().toISOString(),
+        });
+      }
+    }
+
+    console.log(`[News] India Today: scraped ${articles.length} articles`);
+  } catch (e) {
+    console.error('[News] India Today error:', e.message);
+  }
+  return articles.slice(0, max);
+}
+
 // Source dispatcher
 const SOURCE_MAP = {
   moneycontrol: (cfg, max) => fetchFromMoneycontrol(max),
@@ -277,6 +331,7 @@ const SOURCE_MAP = {
   cnbc_tv18: (cfg, max) => fetchFromCNBCTV18(max),
   livemint: (cfg, max) => fetchFromLivemint(max),
   bloomberg: (cfg, max) => fetchFromBloombergAsia(max),
+  indiatoday: (cfg, max) => fetchFromIndiaToday(max),
   newsapi: (cfg, max) => { const k = cfg.newsapi_key || ''; return (k && k !== 'get_from_newsapi_org') ? fetchFromNewsAPI(k, max) : Promise.resolve([]); },
   alphavantage: (cfg, max) => { const k = cfg.alphavantage_key || ''; return (k && k !== 'get_from_alphavantage_co') ? fetchFromAlphaVantage(k, max) : Promise.resolve([]); },
 };

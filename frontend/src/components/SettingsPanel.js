@@ -536,6 +536,7 @@ export default function SettingsPanel({ onClose, onSave }) {
                         { value: 'businesstoday', label: 'Business Today (Free)', desc: 'Market & economy news from BusinessToday.in' },
                         { value: 'hindubusinessline', label: 'Hindu Business Line (Free)', desc: 'Markets & stocks from TheHinduBusinessLine.com' },
                         { value: 'bloomberg', label: 'Bloomberg Asia (Free)', desc: 'Global market headlines from Bloomberg.com/asia' },
+                        { value: 'indiatoday', label: 'India Today Market (Free)', desc: 'Sensex, Nifty, stock market news from IndiaToday.in' },
                         { value: 'newsapi', label: 'NewsAPI.org (API Key)', desc: 'Global news API - requires key' },
                         { value: 'alphavantage', label: 'Alpha Vantage (API Key)', desc: 'Financial news with sentiment - requires key' },
                       ].map(src => {
