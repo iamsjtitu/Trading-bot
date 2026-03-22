@@ -128,7 +128,7 @@ function JournalEntry({ entry }) {
   );
 }
 
-export default function TradeJournal() {
+export default function TradeJournal({ tradingMode = 'PAPER' }) {
   const [entries, setEntries] = useState([]);
   const [stats, setStats] = useState(null);
   const [insights, setInsights] = useState(null);
@@ -136,28 +136,30 @@ export default function TradeJournal() {
   const [reviewingAll, setReviewingAll] = useState(false);
   const [view, setView] = useState('entries'); // entries | stats | insights
 
+  const mode = tradingMode || 'PAPER';
+
   const fetchEntries = useCallback(async () => {
     try {
-      const resp = await axios.get(`${API}/journal/entries?limit=100`);
+      const resp = await axios.get(`${API}/journal/entries?limit=100&mode=${mode}`);
       if (resp.data?.status === 'success') setEntries(resp.data.entries || []);
     } catch (err) { console.error('Journal entries fetch error:', err); }
-  }, []);
+  }, [mode]);
 
   const fetchStats = useCallback(async () => {
     try {
-      const resp = await axios.get(`${API}/journal/stats`);
+      const resp = await axios.get(`${API}/journal/stats?mode=${mode}`);
       if (resp.data?.status === 'success') setStats(resp.data.stats);
     } catch (err) { console.error('Journal stats fetch error:', err); }
-  }, []);
+  }, [mode]);
 
   const fetchInsights = useCallback(async () => {
     setLoading(true);
     try {
-      const resp = await axios.get(`${API}/journal/insights`);
+      const resp = await axios.get(`${API}/journal/insights?mode=${mode}`);
       if (resp.data?.status === 'success') setInsights(resp.data.insights);
     } catch (err) { console.error('Journal insights fetch error:', err); }
     setLoading(false);
-  }, []);
+  }, [mode]);
 
   useEffect(() => {
     fetchEntries();
@@ -167,7 +169,7 @@ export default function TradeJournal() {
   const handleReviewAll = async () => {
     setReviewingAll(true);
     try {
-      const resp = await axios.post(`${API}/journal/review-all`);
+      const resp = await axios.post(`${API}/journal/review-all?mode=${mode}`);
       if (resp.data?.status === 'success') {
         await fetchEntries();
         await fetchStats();

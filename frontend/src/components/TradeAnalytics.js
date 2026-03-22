@@ -14,20 +14,23 @@ const BACKEND_URL = (() => {
 })();
 const API = `${BACKEND_URL}/api`;
 
-export default function TradeAnalytics() {
+export default function TradeAnalytics({ tradingMode = 'PAPER' }) {
   const [trades, setTrades] = useState([]);
   const [filter, setFilter] = useState('all');
   const [brokerPnl, setBrokerPnl] = useState(null);
+  const mode = tradingMode || 'PAPER';
 
   useEffect(() => {
-    axios.get(`${API}/trades/history?limit=200`).then(r => setTrades(r.data?.trades || [])).catch(() => {});
+    axios.get(`${API}/trades/history?limit=200&mode=${mode}`).then(r => setTrades(r.data?.trades || [])).catch(() => {});
     // Fetch actual P&L from broker for LIVE mode
-    axios.get(`${API}/combined-status`).then(r => {
-      if (r.data?.status === 'success' && r.data.portfolio?.total_pnl != null) {
-        setBrokerPnl(r.data.portfolio.total_pnl);
-      }
-    }).catch(() => {});
-  }, []);
+    if (mode === 'LIVE') {
+      axios.get(`${API}/combined-status`).then(r => {
+        if (r.data?.status === 'success' && r.data.portfolio?.total_pnl != null) {
+          setBrokerPnl(r.data.portfolio.total_pnl);
+        }
+      }).catch(() => {});
+    }
+  }, [mode]);
 
   const closedTrades = useMemo(() => trades.filter(t => t.status === 'CLOSED'), [trades]);
   const openTrades = useMemo(() => trades.filter(t => t.status === 'OPEN'), [trades]);

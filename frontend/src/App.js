@@ -761,12 +761,12 @@ function App() {
           <TabsContent value="trades"><TradesList trades={displayTrades} formatCurrency={formatCurrency} formatTime={formatTime} tradingMode={tradingMode} brokerConnected={brokerConnected} onManualExit={handleManualExit} /></TabsContent>
           <TabsContent value="history"><TradeHistory formatCurrency={formatCurrency} tradingMode={tradingMode} brokerConnected={brokerConnected} brokerOrders={brokerOrders} /></TabsContent>
           <TabsContent value="calculator"><PositionCalculator riskMetrics={riskMetrics} formatCurrency={formatCurrency} /></TabsContent>
-          <TabsContent value="analytics"><TradeAnalytics /></TabsContent>
+          <TabsContent value="analytics"><TradeAnalytics tradingMode={tradingMode} /></TabsContent>
           <TabsContent value="tax"><TaxReports formatCurrency={formatCurrency} /></TabsContent>
           <TabsContent value="ai-insights"><AIInsights /></TabsContent>
           <TabsContent value="technical"><TechnicalAnalysis /></TabsContent>
           <TabsContent value="option-chain"><OptionChain /></TabsContent>
-          <TabsContent value="journal"><TradeJournal /></TabsContent>
+          <TabsContent value="journal"><TradeJournal tradingMode={tradingMode} /></TabsContent>
           <TabsContent value="system-health"><SystemHealth /></TabsContent>
         </Tabs>
 

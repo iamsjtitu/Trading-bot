@@ -203,10 +203,12 @@ PATTERN TAGS (use 1-3): momentum_trade, news_driven, trend_following, counter_tr
     res.json({ status: 'success', count: entries.length, entries });
   });
 
-  // GET /api/journal/stats - Aggregate stats & patterns
+  // GET /api/journal/stats - Aggregate stats & patterns (filtered by mode)
   router.get('/api/journal/stats', (req, res) => {
     ensureJournal();
-    const entries = db.data.journal_entries || [];
+    let entries = db.data.journal_entries || [];
+    const { mode } = req.query;
+    if (mode) entries = entries.filter(e => e.mode === mode.toUpperCase());
     if (!entries.length) return res.json({ status: 'success', stats: { total: 0 } });
 
     const profitable = entries.filter(e => e.pnl > 0);
@@ -281,10 +283,12 @@ PATTERN TAGS (use 1-3): momentum_trade, news_driven, trend_following, counter_tr
     });
   });
 
-  // GET /api/journal/insights - AI-powered insights
+  // GET /api/journal/insights - AI-powered insights (filtered by mode)
   router.get('/api/journal/insights', async (req, res) => {
     ensureJournal();
-    const entries = db.data.journal_entries || [];
+    let entries = db.data.journal_entries || [];
+    const { mode } = req.query;
+    if (mode) entries = entries.filter(e => e.mode === mode.toUpperCase());
     if (entries.length < 2) return res.json({ status: 'success', insights: { message: 'Need at least 2 journal entries for insights.', patterns: [], suggestions: [] } });
 
     // Compute patterns locally first
@@ -388,10 +392,12 @@ PATTERN TAGS (use 1-3): momentum_trade, news_driven, trend_following, counter_tr
     res.json({ status: 'error', message: 'Failed to generate review' });
   });
 
-  // POST /api/journal/review-all - Review all unreviewed closed trades
+  // POST /api/journal/review-all - Review all unreviewed closed trades (filtered by mode)
   router.post('/api/journal/review-all', async (req, res) => {
     ensureJournal();
-    const closedTrades = (db.data.trades || []).filter(t => t.status === 'CLOSED');
+    const { mode } = req.query;
+    let closedTrades = (db.data.trades || []).filter(t => t.status === 'CLOSED');
+    if (mode) closedTrades = closedTrades.filter(t => (t.mode || 'PAPER') === mode.toUpperCase());
     const reviewedIds = new Set((db.data.journal_entries || []).map(j => j.trade_id));
     const unreviewed = closedTrades.filter(t => !reviewedIds.has(t.id));
 
