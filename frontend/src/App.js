@@ -77,6 +77,7 @@ function App() {
   const [wsConnected, setWsConnected] = useState(false);
   const wsRef = useRef(null);
   const [activeTab, setActiveTab] = useState('news');
+  const [appVersion, setAppVersion] = useState('');
 
   // Ultra-fast market data polling for LIVE mode (500ms)
   const loadMarketDataQuick = useCallback(async () => {
@@ -303,6 +304,11 @@ function App() {
           const settingsRes = await axios.get(`${API}/settings`);
           const autoAnalysis = settingsRes.data?.settings?.auto_trading?.auto_analysis;
           if (typeof autoAnalysis === 'boolean') setAutoAnalyze(autoAnalysis);
+        } catch (_) {}
+        // Fetch app version from backend (single source of truth: package.json)
+        try {
+          const healthRes = await axios.get(`${API}/health`);
+          if (healthRes.data?.version) setAppVersion(healthRes.data.version);
         } catch (_) {}
       } catch (error) {
         console.error('Initialize error:', error);
@@ -802,7 +808,7 @@ function App() {
       {/* Footer */}
       <footer className="border-t border-gray-200 bg-white/80 backdrop-blur-sm mt-8 py-4 shadow-sm">
         <div className="container mx-auto px-4 text-center text-sm text-gray-600">
-          <p>{tradingMode === 'LIVE' ? 'LIVE TRADING' : 'Paper Trading'} Mode | AI-Powered Options Trading Bot | v8.0.0</p>
+          <p>{tradingMode === 'LIVE' ? 'LIVE TRADING' : 'Paper Trading'} Mode | AI-Powered Options Trading Bot | v{appVersion || '...'}</p>
           <p className="text-xs text-gray-400 mt-1">Designed By : <a href="https://www.9x.Design" target="_blank" rel="noopener noreferrer" className="text-blue-500 hover:underline">https://www.9x.Design</a> | Contact Us: +91 72059 30002</p>
           <p className="text-xs mt-1 text-gray-500">Trading involves risk. Past performance does not guarantee future results.</p>
         </div>

@@ -130,7 +130,7 @@ function createApiServer(db) {
     console.log(`[Notify] [${type}] ${title}: ${body}`);
   };
 
-  // Load route modules
+  // Load route modules (must match web_server.js)
   const routeModules = [
     { name: 'settings', load: () => require('./routes/settings')(db) },
     { name: 'portfolio', load: () => require('./routes/portfolio')(db) },
@@ -143,6 +143,8 @@ function createApiServer(db) {
     { name: 'broker_router', load: () => require('./routes/broker_router')(db) },
     { name: 'technical', load: () => require('./routes/technical')(db) },
     { name: 'journal', load: () => require('./routes/journal')(db) },
+    { name: 'options', load: () => require('./routes/options')(db) },
+    { name: 'telegram', load: () => require('./routes/telegram')(db) },
   ];
 
   let loaded = 0;
@@ -152,9 +154,13 @@ function createApiServer(db) {
   }
   console.log(`[Routes] ${loaded}/${routeModules.length} loaded`);
 
-  // Health endpoint
+  // Health endpoint (use app.getVersion() for dynamic version)
   apiApp.get('/api/health', (req, res) => {
-    res.json({ status: 'healthy', timestamp: new Date().toISOString(), version: app.getVersion(), routes_loaded: loaded, services: { news: 'active', sentiment: 'active', trading: 'active' } });
+    let bgStatus = {}, exitStatus = {}, briefStatus = {};
+    try { bgStatus = require('./routes/lib/market_data_fetcher').getJobStatus(); } catch (_) {}
+    try { exitStatus = require('./routes/lib/exit_advisor').getAdvisorStatus(); } catch (_) {}
+    try { briefStatus = require('./routes/lib/morning_briefing').getBriefingStatus(); } catch (_) {}
+    res.json({ status: 'healthy', timestamp: new Date().toISOString(), version: app.getVersion(), routes_loaded: loaded, services: { news: 'active', sentiment: 'active', trading: 'active' }, background_fetcher: bgStatus, exit_advisor: exitStatus, morning_briefing: briefStatus });
   });
 
   // Debug endpoint - helps diagnose desktop issues
@@ -228,6 +234,19 @@ function createApiServer(db) {
     console.error(`[API Error] ${req.method} ${req.path}:`, err.message || err);
     res.status(500).json({ status: 'error', message: err.message || 'Internal server error' });
   });
+
+  // Start background jobs (must match web_server.js)
+  try {
+    const { startBackgroundFetcher } = require('./routes/lib/market_data_fetcher');
+    const { startExitAdvisor } = require('./routes/lib/exit_advisor');
+    const { startMorningBriefing } = require('./routes/lib/morning_briefing');
+    startBackgroundFetcher(db);
+    startExitAdvisor(db);
+    startMorningBriefing(db);
+    console.log('[Desktop] Background jobs started: MarketData, ExitAdvisor, MorningBriefing');
+  } catch (e) {
+    console.error('[Desktop] Background jobs error:', e.message);
+  }
 
   return new Promise((resolve, reject) => {
     server = apiApp.listen(API_PORT, '127.0.0.1', () => {

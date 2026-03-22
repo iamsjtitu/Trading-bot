@@ -358,7 +358,7 @@ module.exports = function (db) {
     steps.push({ step: 5, name: 'Active Signals', value: `${activeSignals.length} total, ${untradedSignals.length} untraded`, ok: untradedSignals.length > 0 });
     const recentTrades = (db.data.trades || []).filter(t => t.mode === 'LIVE').slice(-5).reverse();
     steps.push({ step: 6, name: 'Recent LIVE Trades', ok: recentTrades.length > 0, value: `${recentTrades.length} total`, trades: recentTrades.map(t => ({ id: t.id?.substring(0, 8), status: t.status, type: t.trade_type, symbol: t.symbol, error: t.error || '', time: t.entry_time })) });
-    res.json({ status: 'success', all_ok: steps.every(s => s.ok), version: '4.0.1', steps });
+    res.json({ status: 'success', all_ok: steps.every(s => s.ok), version: require('../package.json').version || 'unknown', steps });
   });
 
   router.post('/api/test/generate-trade', (req, res) => { const latestNews = (db.data.news_articles || []).sort((a, b) => (b.created_at || '').localeCompare(a.created_at || ''))[0]; if (!latestNews) return res.json({ status: 'failed', message: 'No news available' }); const signal = signalGen.generateSignal(latestNews); if (signal) { db.data.signals.push(signal); signalGen.executePaperTrade(signal); db.save(); return res.json({ status: 'success', message: 'New trade generated', signal }); } res.json({ status: 'failed', message: 'Could not generate signal' }); });
