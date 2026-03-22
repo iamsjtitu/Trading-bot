@@ -53,8 +53,6 @@ Build an AI-powered automated options trading bot that connects to world news, u
 - **P0**: Desktop app rebuild for v8.1.0
 - **P1**: Refactor App.js (800+ lines) into smaller components
 - **P2**: Multi-broker support (Zerodha, Angel One, 5paisa, Paytm Money, IIFL)
-
-## Key Files
 - `/app/desktop/package.json` — VERSION SOURCE OF TRUTH
 - `/app/desktop/main.js` — Electron main, 13 routes, 3 background jobs, About dialog
 - `/app/desktop/web_server.js` — Express server, APP_VERSION
@@ -62,6 +60,8 @@ Build an AI-powered automated options trading bot that connects to world news, u
 - `/app/desktop/routes/options.js` — Greeks, IV, position sizing
 - `/app/desktop/routes/trading.js` — Trades, auto-exit, guards, advisor
 - `/app/desktop/routes/news.js` — News fetch, sentiment, auto-entry
+
+## Key Files
 - `/app/desktop/routes/lib/` — All lib modules
 - `/app/frontend/src/App.js` — Main UI, tabs, dynamic version
 - `/app/frontend/src/components/SystemHealth.js` — NEW: System Health Dashboard
