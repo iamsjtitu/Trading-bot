@@ -112,7 +112,7 @@ const { startMorningBriefing, getBriefingStatus } = require('./routes/lib/mornin
 app.get('/api/health', (req, res) => {
   res.json({
     status: 'healthy', timestamp: new Date().toISOString(),
-    version: '7.0.0', routes_loaded: loaded,
+    version: '7.0.1', routes_loaded: loaded,
     services: { news: 'active', sentiment: 'active', trading: 'active' },
     background_fetcher: getJobStatus(),
     exit_advisor: getExitAdvisorStatus(),
@@ -122,7 +122,7 @@ app.get('/api/health', (req, res) => {
 
 app.get('/api/debug', (req, res) => {
   res.json({
-    version: '7.0.0', routes_loaded: loaded, backend: 'node.js',
+    version: '7.0.1', routes_loaded: loaded, backend: 'node.js',
     db_keys: Object.keys(db.data || {}),
     settings_sources: db.data?.settings?.news?.sources || [],
     news_count: (db.data?.news_articles || []).length,
@@ -165,7 +165,7 @@ app.use((err, req, res, next) => {
 
 // ============ START ============
 app.listen(PORT, HOST, () => {
-  console.log(`[AI Trading Bot v7.0.0] Web server running on ${HOST}:${PORT}`);
+  console.log(`[AI Trading Bot v7.0.1] Web server running on ${HOST}:${PORT}`);
   console.log(`[AI Trading Bot] Routes: ${loaded}/${routeModules.length} | DB: ${db.dbFile}`);
 
   // Start background market data fetcher
