@@ -24,6 +24,7 @@ import TradeJournal from '@/components/TradeJournal';
 import UpdateBanner from '@/components/UpdateBanner';
 import MarketStatusBanner from '@/components/MarketStatusBanner';
 import AIGuards from '@/components/AIGuards';
+import SystemHealth from '@/components/SystemHealth';
 
 // Detect if running in desktop (localhost) or web mode
 const BACKEND_URL = (() => {
@@ -752,6 +753,7 @@ function App() {
             <TabsTrigger value="technical" data-testid="technical-tab" className="data-[state=active]:bg-blue-100 data-[state=active]:text-blue-900">Technical</TabsTrigger>
             <TabsTrigger value="option-chain" data-testid="option-chain-tab" className="data-[state=active]:bg-blue-100 data-[state=active]:text-blue-900">Option Chain</TabsTrigger>
             <TabsTrigger value="journal" data-testid="journal-tab" className="data-[state=active]:bg-blue-100 data-[state=active]:text-blue-900">AI Journal</TabsTrigger>
+            <TabsTrigger value="system-health" data-testid="system-health-tab" className="data-[state=active]:bg-green-100 data-[state=active]:text-green-900">System Health</TabsTrigger>
           </TabsList>
 
           <TabsContent value="news"><NewsFeed news={news} formatTime={formatTime} /></TabsContent>
@@ -765,6 +767,7 @@ function App() {
           <TabsContent value="technical"><TechnicalAnalysis /></TabsContent>
           <TabsContent value="option-chain"><OptionChain /></TabsContent>
           <TabsContent value="journal"><TradeJournal /></TabsContent>
+          <TabsContent value="system-health"><SystemHealth /></TabsContent>
         </Tabs>
 
         {/* Live Positions from Upstox */}
