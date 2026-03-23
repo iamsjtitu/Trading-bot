@@ -102,6 +102,15 @@ export default function useAppState() {
       const res = await axios.get(`${API}/combined-status`);
       const data = res.data;
       setBrokerConnected(data.upstox_connected || false);
+      
+      // Token expired - show clear warning
+      if (data.token_expired) {
+        addNotification('error', data.error_message || 'Upstox token expired! Re-login in Settings > Broker.');
+        setBrokerConnected(false);
+        setLivePortfolio(null);
+        return;
+      }
+      
       if (data.upstox_connected) {
         if (data.market_data) setMarketIndices(data.market_data);
         if (data.portfolio) setLivePortfolio(data.portfolio);

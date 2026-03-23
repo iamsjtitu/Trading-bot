@@ -168,7 +168,7 @@ module.exports = function (db) {
 
     if (mode === 'LIVE') {
       const axios = require('axios');
-      const token = settings.broker?.access_token;
+      const token = settings.brokers?.upstox?.access_token || settings.broker?.access_token;
       if (token) {
         const headers = { Accept: 'application/json', Authorization: `Bearer ${token}`, 'Api-Version': '2.0' };
         try {
@@ -182,7 +182,18 @@ module.exports = function (db) {
               broker: 'Upstox',
             };
           }
-        } catch (_) { /* not connected */ }
+        } catch (err) {
+          // Token expired or invalid - show clear message
+          const status = err.response?.status;
+          if (status === 401 || status === 403) {
+            result.token_expired = true;
+            result.error_message = 'Upstox token expired. Please re-login in Settings > Broker.';
+            console.error('[CombinedStatus] Token EXPIRED (401/403). User needs to re-login.');
+          } else {
+            result.error_message = `Upstox connection error: ${err.message}`;
+            console.error('[CombinedStatus] Profile fetch error:', err.message);
+          }
+        }
 
         if (result.upstox_connected) {
           try {
@@ -246,7 +257,15 @@ module.exports = function (db) {
               orders.push({ order_id: o.order_id || '', symbol: o.trading_symbol || '', transaction_type: o.transaction_type || '', quantity: o.quantity || 0, price: o.price || 0, average_price: o.average_price || 0, status: o.status || '', order_type: o.order_type || '', product: o.product || '', placed_at: o.order_timestamp || '' });
             }
             result.orders = orders;
-          } catch (_) {}
+          } catch (e) {
+            console.error('[CombinedStatus] Portfolio/Funds error:', e.message);
+            const status = e.response?.status;
+            if (status === 401 || status === 403) {
+              result.upstox_connected = false;
+              result.token_expired = true;
+              result.error_message = 'Upstox token expired. Please re-login in Settings > Broker.';
+            }
+          }
         }
       }
     }
