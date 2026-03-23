@@ -74,7 +74,15 @@ module.exports = function (db) {
       const posMap = {}; for (const p of positions) { if (p.instrument_token) posMap[p.instrument_token] = p; }
       for (const t of dbOpenTrades) {
         if (t.instrument_token && !posMap[t.instrument_token]) {
-          // Position closed on broker - estimate exit data from last known price
+          // Also check by symbol match before closing
+          const symbolMatch = positions.find(p => (p.trading_symbol || '').replace(/\s+/g, '') === (t.symbol || '').replace(/\s+/g, ''));
+          if (symbolMatch) {
+            // Position exists but instrument_token mismatch — update token instead of closing
+            t.instrument_token = symbolMatch.instrument_token;
+            console.log(`[Trades] Updated instrument_token for ${t.symbol} to ${symbolMatch.instrument_token}`);
+            continue;
+          }
+          // Position truly closed on broker - estimate exit data from last known price
           const lastPrice = t.current_price || t.entry_price || 0;
           const qty = t.quantity || 1;
           t.status = 'CLOSED';
@@ -90,19 +98,29 @@ module.exports = function (db) {
       }
       db.save();
 
-      const storedTradesMap = {}; for (const t of (db.data.trades || [])) { if (t.mode === 'LIVE' && t.status === 'OPEN' && t.instrument_token) storedTradesMap[t.instrument_token] = t; }
+      const storedTradesMap = {};
+      const storedBySymbol = {};
+      for (const t of (db.data.trades || [])) {
+        if (t.mode === 'LIVE' && t.status === 'OPEN') {
+          if (t.instrument_token) storedTradesMap[t.instrument_token] = t;
+          if (t.symbol) storedBySymbol[t.symbol.replace(/\s+/g, '')] = t;
+        }
+      }
       const tradesFromPositions = positions.map(pos => {
         const entryPrice = pos.average_price || pos.buy_price || (pos.buy_quantity > 0 ? pos.buy_value / pos.buy_quantity : 0);
         const qty = Math.abs(pos.quantity); const investment = entryPrice * qty; const currentPrice = pos.last_price || 0; const currentValue = currentPrice * qty;
-        // ALWAYS calculate P&L ourselves for consistency: (currentPrice - entryPrice) * qty
-        const livePnl = (currentPrice - entryPrice) * qty;
+        // ALWAYS calculate P&L from Upstox data for accuracy
+        const livePnl = pos.pnl || pos.unrealised || ((currentPrice - entryPrice) * qty);
         const pnlPercentage = entryPrice > 0 ? Math.round(((currentPrice - entryPrice) / entryPrice) * 10000) / 100 : 0;
-        const stored = storedTradesMap[pos.instrument_token] || {};
+        // Match stored trade by instrument_token OR trading_symbol
+        const stored = storedTradesMap[pos.instrument_token] || storedBySymbol[(pos.trading_symbol || '').replace(/\s+/g, '')] || {};
         if (stored.id && entryPrice > 0) {
-          // ALWAYS sync entry price from Upstox for accuracy
-          const needsUpdate = stored.entry_price === 0 || stored.entry_price === 150 || Math.abs(stored.entry_price - entryPrice) > 1;
-          if (needsUpdate) {
+          // ALWAYS sync entry price from Upstox (no threshold - broker is source of truth)
+          if (stored.entry_price !== entryPrice) {
+            console.log(`[Sync] Entry price updated: ₹${stored.entry_price} → ₹${entryPrice} (Upstox avg_price)`);
             stored.entry_price = entryPrice; stored.investment = investment;
+            // Also update instrument_token if it was missing
+            if (!stored.instrument_token && pos.instrument_token) stored.instrument_token = pos.instrument_token;
             const riskCfg = db.data?.settings?.risk || {};
             const autoT = db.data?.settings?.auto_trading || {};
             const slPct = autoT.stoploss_pct || riskCfg.stop_loss_pct || rp.stop_loss_pct;

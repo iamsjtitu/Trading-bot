@@ -472,12 +472,24 @@ module.exports = function createSignalGenerator(db, aiEngine) {
 
       let actualEntryPrice = signal.entry_price;
       if (orderSuccess && orderId) {
-        try {
-          await new Promise(r => setTimeout(r, 2000));
-          const orderDetail = await axios.get(`https://api.upstox.com/v2/order/details?order_id=${orderId}`, { headers: { Accept: 'application/json', Authorization: `Bearer ${accessToken}`, 'Api-Version': '2.0' }, timeout: 10000 });
-          const fillPrice = orderDetail.data?.data?.average_price || orderDetail.data?.data?.price || 0;
-          if (fillPrice > 0) actualEntryPrice = fillPrice;
-        } catch (e) { console.log(`[LiveTrade] Could not fetch fill price: ${e.message}`); }
+        // Retry up to 3 times to get actual fill price from Upstox
+        for (let attempt = 0; attempt < 3; attempt++) {
+          try {
+            await new Promise(r => setTimeout(r, 2000 + attempt * 1500)); // 2s, 3.5s, 5s delays
+            const orderDetail = await axios.get(`https://api.upstox.com/v2/order/details?order_id=${orderId}`, { headers: { Accept: 'application/json', Authorization: `Bearer ${accessToken}`, 'Api-Version': '2.0' }, timeout: 10000 });
+            const fillPrice = orderDetail.data?.data?.average_price || orderDetail.data?.data?.price || 0;
+            if (fillPrice > 0) {
+              actualEntryPrice = fillPrice;
+              console.log(`[LiveTrade] Fill price confirmed: ₹${fillPrice} (attempt ${attempt + 1})`);
+              break;
+            }
+          } catch (e) {
+            console.log(`[LiveTrade] Fill price fetch attempt ${attempt + 1} failed: ${e.message}`);
+          }
+        }
+        if (actualEntryPrice === signal.entry_price) {
+          console.log(`[LiveTrade] WARNING: Could not get fill price, using signal estimate ₹${actualEntryPrice}. Will sync from positions later.`);
+        }
       }
 
       if (!db.data.trades) db.data.trades = [];
