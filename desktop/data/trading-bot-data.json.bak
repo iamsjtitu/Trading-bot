@@ -76,7 +76,7 @@
       "risk_warnings": true,
       "daily_summary": true
     },
-    "trading_instrument": "FINNIFTY",
+    "trading_instrument": "NIFTY50",
     "emergency_stop": false,
     "active_broker": "upstox",
     "ai_guards": {
@@ -253,14 +253,14 @@
       "pnl_percentage": 0,
       "exit_advice": {
         "action": "HOLD",
-        "confidence": 75,
-        "reason": "Market sentiment bearish hai, lekin price move nahi hua ab tak. Abhi hold karna sahi hoga.",
+        "confidence": 80,
+        "reason": "Market sentiment abhi bearish hai, aur aapka entry price aur current price same hai. Trend ko thoda aur dekhte hain.",
         "risk_level": "MEDIUM",
         "suggested_sl": null,
         "exit_pct": null,
         "trade_id": "7e04dd2e-3247-4de4-9aa9-d644faf2a82f",
         "symbol": "BANKNIFTY26032353200PE",
-        "timestamp": "2026-03-23T08:44:20.311Z",
+        "timestamp": "2026-03-23T08:47:20.207Z",
         "source": "ai",
         "pnl_at_advice": 0,
         "pnl_pct_at_advice": 0
@@ -291,14 +291,14 @@
       "pnl_percentage": 0,
       "exit_advice": {
         "action": "HOLD",
-        "confidence": 75,
-        "reason": "Market bearish sentiment hai, aur aapka position abhi break-even par hai. Trend dekhte rahein.",
+        "confidence": 80,
+        "reason": "Market mein bearish sentiment hai aur price entry ke aas paas hai, trend dekhne ka waqt hai.",
         "risk_level": "MEDIUM",
         "suggested_sl": null,
         "exit_pct": null,
         "trade_id": "de791b87-720d-49cd-b6ce-cda01fdfb3bd",
         "symbol": "BANKNIFTY26032353200PE",
-        "timestamp": "2026-03-23T08:44:21.573Z",
+        "timestamp": "2026-03-23T08:47:21.275Z",
         "source": "ai",
         "pnl_at_advice": 0,
         "pnl_pct_at_advice": 0
