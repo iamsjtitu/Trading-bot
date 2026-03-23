@@ -1,7 +1,7 @@
 {
   "settings": {
     "type": "main",
-    "trading_mode": "PAPER",
+    "trading_mode": "LIVE",
     "ai": {
       "emergent_llm_key": "sk-emergent-754BdB27f511c159cC",
       "model": "gpt-4o",
@@ -447,7 +447,7 @@
       "exit_price": null,
       "pnl": 0,
       "pnl_percentage": 0,
-      "_simPrice": 150.0083214115856
+      "_simPrice": 150.04695934286525
     }
   ],
   "signals": [
