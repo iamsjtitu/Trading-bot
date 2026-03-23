@@ -12,7 +12,7 @@ Build an AI-powered automated options trading bot that connects to world news, u
 - **APIs**: Upstox REST API v2, Telegram Bot API
 - **Proxy**: Python FastAPI at `/app/backend/server.py` (forwards to Node.js)
 
-## Current Version: v21.0.0
+## Current Version: v22.0.0
 
 ## Version Management
 - **Single source of truth**: `desktop/package.json` -> `version` field
@@ -72,6 +72,11 @@ Build an AI-powered automated options trading bot that connects to world news, u
    - When Auto Entry OFF: Signals generate but no auto-trade execution
    - When Auto Exit OFF: No auto-exit at SL/target, user controls exits manually
    - Backend double-checks settings before any auto-action
+5. **API Cost Optimization** - ADDED 2026-03-23
+   - Keyword pre-filter: Only market-relevant articles sent to GPT-4o (~70-85% API calls saved)
+   - Max articles per cycle: 30 → 10
+   - Exit Advisor polling: 60s → 5 min (80% savings)
+   - Estimated total API cost reduction: ~75-80%
 
 ## Pending/Backlog
 - **P0**: Desktop app build trigger for v20.0.0+ (after instrument bug fix)

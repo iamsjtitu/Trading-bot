@@ -122,7 +122,7 @@ module.exports = function (db) {
       const seenTitles = new Set();
       const oneHourAgo = new Date(Date.now() - 60 * 60 * 1000).toISOString();
       const existingTitles = new Set((db.data.news_articles || []).filter(n => (n.created_at || '') > oneHourAgo).map(n => (n.title || '').toLowerCase().trim()));
-      let allNews = allNewsRaw.filter(a => { const norm = (a.title || '').toLowerCase().trim(); if (!norm || seenTitles.has(norm) || existingTitles.has(norm)) return false; seenTitles.add(norm); return true; }).slice(0, 30);
+      let allNews = allNewsRaw.filter(a => { const norm = (a.title || '').toLowerCase().trim(); if (!norm || seenTitles.has(norm) || existingTitles.has(norm)) return false; seenTitles.add(norm); return true; }).slice(0, 10);
 
       if (!db.data.news_articles) db.data.news_articles = [];
       if (!db.data.signals) db.data.signals = [];
@@ -130,7 +130,20 @@ module.exports = function (db) {
       const processed = [];
       for (const article of allNews) {
         const articleId = uuid();
-        const sentimentResult = await sentiment.analyzeSentiment(article);
+
+        // OPTIMIZATION: Keyword pre-filter to save API calls
+        // Only send market-relevant articles to AI
+        const kwResult = sentiment.keywordSentiment(article);
+        const isRelevant = kwResult.sentiment !== 'NEUTRAL' || kwResult.confidence > 55;
+
+        let sentimentResult;
+        if (isRelevant) {
+          sentimentResult = await sentiment.analyzeSentiment(article);
+          console.log(`[News] AI analysis for: ${(article.title || '').substring(0, 50)}...`);
+        } else {
+          sentimentResult = kwResult;
+          console.log(`[News] Keyword-only (irrelevant): ${(article.title || '').substring(0, 50)}...`);
+        }
         const newsDoc = { id: articleId, title: article.title, description: article.description, content: article.content || '', source: article.source, url: article.url, published_at: article.published_at, sentiment_analysis: sentimentResult, created_at: new Date().toISOString() };
         db.data.news_articles.push(newsDoc);
 

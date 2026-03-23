@@ -96,7 +96,7 @@ export default function TradesList({ trades, formatCurrency, formatTime, trading
   useEffect(() => {
     if (trades.length > 0 && trades.some(t => t.status === 'OPEN')) {
       fetchAllAdvice();
-      const interval = setInterval(fetchAllAdvice, 60000);
+      const interval = setInterval(fetchAllAdvice, 300000); // 5 min instead of 60s to save API
       return () => clearInterval(interval);
     }
   }, [trades, fetchAllAdvice]);
