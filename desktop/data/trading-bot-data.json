@@ -254,13 +254,13 @@
       "exit_advice": {
         "action": "HOLD",
         "confidence": 85,
-        "reason": "Market sentiment bearish hai due to global selloff, jo put position ke liye favorable hai.",
+        "reason": "Global bearish sentiment aur BankNifty ka current level stable hai, abhi trend reversal ka koi signal nahi hai.",
         "risk_level": "MEDIUM",
         "suggested_sl": null,
         "exit_pct": null,
         "trade_id": "7e04dd2e-3247-4de4-9aa9-d644faf2a82f",
         "symbol": "BANKNIFTY26032353200PE",
-        "timestamp": "2026-03-23T07:22:56.322Z",
+        "timestamp": "2026-03-23T07:24:34.551Z",
         "source": "ai",
         "pnl_at_advice": 0,
         "pnl_pct_at_advice": 0
@@ -291,14 +291,14 @@
       "pnl_percentage": 0,
       "exit_advice": {
         "action": "HOLD",
-        "confidence": 85,
-        "reason": "Market sentiment bearish hai aur BankNifty pe pressure hai, position hold karna sahi hoga.",
+        "confidence": 80,
+        "reason": "Market sentiment abhi bearish hai due to global selloff, position ke liye favorable hai.",
         "risk_level": "MEDIUM",
         "suggested_sl": null,
         "exit_pct": null,
         "trade_id": "de791b87-720d-49cd-b6ce-cda01fdfb3bd",
         "symbol": "BANKNIFTY26032353200PE",
-        "timestamp": "2026-03-23T07:22:57.371Z",
+        "timestamp": "2026-03-23T07:24:35.703Z",
         "source": "ai",
         "pnl_at_advice": 0,
         "pnl_pct_at_advice": 0
@@ -13431,5 +13431,7 @@
       "was_profitable": false,
       "created_at": "2026-03-20T18:49:02.511Z"
     }
-  ]
+  ],
+  "_cachedBrokerPnl": 0,
+  "_cachedBrokerPnlTime": 1774250654201
 }
