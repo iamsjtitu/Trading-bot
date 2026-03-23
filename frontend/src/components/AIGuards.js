@@ -137,7 +137,7 @@ export default function AIGuards() {
                                 const val = parseInt(e.target.value) || 5000;
                                 try {
                                   await axios.post(`${API}/settings/update`, { auto_trading: { max_daily_loss: val }, risk: { max_daily_loss: val } });
-                                  fetchGuards();
+                                  fetchStatus();
                                 } catch (_) {}
                               }}
                               onKeyDown={(e) => { if (e.key === 'Enter') e.target.blur(); }}
@@ -165,7 +165,7 @@ export default function AIGuards() {
                                 const val = parseInt(e.target.value) || 10000;
                                 try {
                                   await axios.post(`${API}/settings/update`, { auto_trading: { max_daily_profit: val }, risk: { max_daily_profit: val } });
-                                  fetchGuards();
+                                  fetchStatus();
                                 } catch (_) {}
                               }}
                               onKeyDown={(e) => { if (e.key === 'Enter') e.target.blur(); }}
