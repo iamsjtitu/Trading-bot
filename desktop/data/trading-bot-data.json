@@ -117,8 +117,8 @@
     "type": "paper",
     "initial_capital": 500000,
     "current_capital": 500000,
-    "invested_amount": -19345,
-    "available_capital": 513818.4105063991,
+    "invested_amount": 8555,
+    "available_capital": 485918.4105063991,
     "total_pnl": -5526.58949360089,
     "daily_pnl": 0,
     "total_trades": 4,
@@ -128,10 +128,12 @@
       "8e9dd30d-28d2-4ffb-a444-89be1caedb6e",
       "81b3c059-c51c-4ed0-aabf-4b3bc9deec8a",
       "7e04dd2e-3247-4de4-9aa9-d644faf2a82f",
-      "de791b87-720d-49cd-b6ce-cda01fdfb3bd"
+      "de791b87-720d-49cd-b6ce-cda01fdfb3bd",
+      "472147c5-8e16-4edb-ae72-c0497096208a",
+      "a5aeedbc-70a8-4162-b19c-54af81f9d964"
     ],
     "created_at": "2026-03-19T16:54:46.498Z",
-    "last_updated": "2026-03-23T06:04:28.705Z"
+    "last_updated": "2026-03-23T09:17:45.221Z"
   },
   "trades": [
     {
@@ -254,13 +256,13 @@
       "exit_advice": {
         "action": "HOLD",
         "confidence": 75,
-        "reason": "Market sentiment bearish hai, lekin price movement abhi stable hai. Wait karna sahi hoga.",
+        "reason": "Market mein bearish sentiment hai aur aapka trade abhi break-even par hai. Trend dekhte hue hold karna sahi rahega.",
         "risk_level": "MEDIUM",
         "suggested_sl": null,
         "exit_pct": null,
         "trade_id": "7e04dd2e-3247-4de4-9aa9-d644faf2a82f",
         "symbol": "BANKNIFTY26032353200PE",
-        "timestamp": "2026-03-23T08:48:19.326Z",
+        "timestamp": "2026-03-23T09:17:49.336Z",
         "source": "ai",
         "pnl_at_advice": 0,
         "pnl_pct_at_advice": 0
@@ -292,18 +294,92 @@
       "exit_advice": {
         "action": "HOLD",
         "confidence": 80,
-        "reason": "Market sentiment abhi bearish hai, aur aapka trade entry price pe hai. Trend dekhte rahiye.",
+        "reason": "Market sentiment abhi bearish hai aur price entry ke aas paas hai, toh hold karna sahi hoga.",
         "risk_level": "MEDIUM",
         "suggested_sl": null,
         "exit_pct": null,
         "trade_id": "de791b87-720d-49cd-b6ce-cda01fdfb3bd",
         "symbol": "BANKNIFTY26032353200PE",
-        "timestamp": "2026-03-23T08:48:21.414Z",
+        "timestamp": "2026-03-23T09:17:50.616Z",
         "source": "ai",
         "pnl_at_advice": 0,
         "pnl_pct_at_advice": 0
       },
       "peak_price": 150.44645400769724
+    },
+    {
+      "id": "472147c5-8e16-4edb-ae72-c0497096208a",
+      "signal_id": "a7014397-3e84-411f-9489-6f05c402a711",
+      "trade_type": "PUT",
+      "symbol": "BANKNIFTY",
+      "instrument": "BANKNIFTY",
+      "entry_time": "2026-03-23T09:14:54.033Z",
+      "entry_price": 150,
+      "quantity": 70,
+      "investment": 10500,
+      "stop_loss": 112.5,
+      "target": 225,
+      "status": "OPEN",
+      "mode": "PAPER",
+      "sentiment": "BEARISH",
+      "confidence": 70,
+      "sector": "IT",
+      "exit_time": null,
+      "exit_price": null,
+      "pnl": 0,
+      "pnl_percentage": 0,
+      "_simPrice": 150.00903227959623,
+      "exit_advice": {
+        "action": "HOLD",
+        "confidence": 75,
+        "reason": "Market mein bearish sentiment hai aur aapka entry price aur current price same hai, toh abhi hold karna sahi rahega.",
+        "risk_level": "MEDIUM",
+        "suggested_sl": null,
+        "exit_pct": null,
+        "trade_id": "472147c5-8e16-4edb-ae72-c0497096208a",
+        "symbol": "BANKNIFTY",
+        "timestamp": "2026-03-23T09:17:52.751Z",
+        "source": "ai",
+        "pnl_at_advice": 0,
+        "pnl_pct_at_advice": 0
+      }
+    },
+    {
+      "id": "a5aeedbc-70a8-4162-b19c-54af81f9d964",
+      "signal_id": "3ed094c7-0268-4bea-88ca-83d85ed04418",
+      "trade_type": "CALL",
+      "symbol": "BANKNIFTY",
+      "instrument": "BANKNIFTY",
+      "entry_time": "2026-03-23T09:17:45.221Z",
+      "entry_price": 150,
+      "quantity": 116,
+      "investment": 17400,
+      "stop_loss": 112.5,
+      "target": 225,
+      "status": "OPEN",
+      "mode": "PAPER",
+      "sentiment": "BULLISH",
+      "confidence": 90,
+      "sector": "BANKING",
+      "exit_time": null,
+      "exit_price": null,
+      "pnl": 0,
+      "pnl_percentage": 0,
+      "_simPrice": 149.9530428812816,
+      "exit_advice": {
+        "action": "HOLD",
+        "confidence": 80,
+        "reason": "Abhi entry hui hai aur koi clear signal nahi hai, market context bhi mixed hai.",
+        "risk_level": "MEDIUM",
+        "suggested_sl": null,
+        "exit_pct": null,
+        "trade_id": "a5aeedbc-70a8-4162-b19c-54af81f9d964",
+        "symbol": "BANKNIFTY",
+        "timestamp": "2026-03-23T09:17:54.949Z",
+        "source": "ai",
+        "pnl_at_advice": 0,
+        "pnl_pct_at_advice": 0
+      }
     }
   ],
   "signals": [
@@ -19907,5 +19983,5 @@
     }
   ],
   "_cachedBrokerPnl": 0,
-  "_cachedBrokerPnlTime": 1774255459156
+  "_cachedBrokerPnlTime": 1774257461401
 }

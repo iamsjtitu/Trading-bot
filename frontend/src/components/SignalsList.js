@@ -1,9 +1,29 @@
+import { useState, useEffect } from 'react';
 import { Card } from '@/components/ui/card';
+import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { FaBullseye } from 'react-icons/fa';
+import { toast } from 'sonner';
+import axios from 'axios';
 
-export default function SignalsList({ signals, formatCurrency, formatTime, tradingMode, brokerConnected }) {
+const BACKEND_URL = (() => {
+  const envUrl = process.env.REACT_APP_BACKEND_URL || '';
+  if (typeof window !== 'undefined' && (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1')) return '';
+  return envUrl;
+})();
+const API = `${BACKEND_URL}/api`;
+
+export default function SignalsList({ signals, formatCurrency, formatTime, tradingMode, brokerConnected, onTradeExecuted }) {
   const isLiveMode = tradingMode === 'LIVE';
+  const [executingId, setExecutingId] = useState(null);
+  const [tradedSignalIds, setTradedSignalIds] = useState(new Set());
+
+  useEffect(() => {
+    axios.get(`${API}/trades/active`).then(res => {
+      const ids = new Set((res.data.trades || []).map(t => t.signal_id).filter(Boolean));
+      setTradedSignalIds(ids);
+    }).catch(() => {});
+  }, [signals]);
 
   const getSentimentColor = (sentiment) => {
     if (!sentiment) return 'bg-gray-500';
@@ -11,6 +31,27 @@ export default function SignalsList({ signals, formatCurrency, formatTime, tradi
     if (s === 'BULLISH') return 'bg-green-500';
     if (s === 'BEARISH') return 'bg-red-500';
     return 'bg-yellow-500';
+  };
+
+  const handleManualEntry = async (signal) => {
+    if (executingId) return;
+    setExecutingId(signal.id);
+    try {
+      const res = await axios.post(`${API}/trades/execute-signal`, { signal_id: signal.id });
+      if (res.data.status === 'success') {
+        toast.success(`Trade Entered: ${signal.signal_type} ${signal.symbol}`, {
+          description: `${formatCurrency(signal.investment_amount)} @ Strike ${signal.strike_price}`,
+        });
+        setTradedSignalIds(prev => new Set([...prev, signal.id]));
+        if (onTradeExecuted) onTradeExecuted();
+      } else {
+        toast.error('Trade Failed', { description: res.data.message || 'Could not execute trade' });
+      }
+    } catch (e) {
+      toast.error('Trade Error', { description: e.response?.data?.message || e.message });
+    } finally {
+      setExecutingId(null);
+    }
   };
 
   if (signals.length === 0) {
@@ -105,7 +146,21 @@ export default function SignalsList({ signals, formatCurrency, formatTime, tradi
             </div>
           </div>
           <p className="text-sm text-gray-600 mt-3 italic bg-gray-50 p-2 rounded">{signal.reason}</p>
-          <p className="text-xs text-gray-500 mt-2">Generated: {formatTime(signal.created_at)}</p>
+          <div className="flex items-center justify-between mt-3">
+            <p className="text-xs text-gray-500">Generated: {formatTime(signal.created_at)}</p>
+            {tradedSignalIds.has(signal.id) ? (
+              <Badge className="bg-gray-500" data-testid={`signal-traded-${idx}`}>Already Traded</Badge>
+            ) : (
+              <Button
+                onClick={() => handleManualEntry(signal)}
+                disabled={executingId === signal.id || (isLiveMode && !brokerConnected)}
+                className={`${signal.signal_type === 'CALL' ? 'bg-green-600 hover:bg-green-700' : 'bg-red-600 hover:bg-red-700'} text-white font-semibold px-6`}
+                data-testid={`enter-trade-btn-${idx}`}
+              >
+                {executingId === signal.id ? 'Executing...' : `Enter ${signal.signal_type} Trade`}
+              </Button>
+            )}
+          </div>
         </Card>
       ))}
     </div>

@@ -54,6 +54,17 @@ Build an AI-powered automated options trading bot that connects to world news, u
    - Fix: (a) `handleInstrumentChange` now also syncs `settings` state, (b) `saveSettings` strips `trading_instrument` and `active_broker` from the save payload
    - Also fixed duplicate `<TabsContent value="risk">` in JSX
 
+## New Features (v21.0.0)
+1. **Manual Trade Entry from Signals** - ADDED 2026-03-23
+   - "Enter CALL/PUT Trade" button on each signal card in Signals tab
+   - Works in both Paper and Live modes
+   - Shows "Already Traded" badge for signals that already have an open trade
+   - Toast notification on successful/failed trade execution
+   - When Auto ON is off, user can manually pick signals and enter trades
+   - Button disabled in LIVE mode when broker is disconnected
+2. **Instrument Change Toast** - ADDED 2026-03-23
+   - Shows confirmation toast when trading instrument is changed (e.g., "Switched to Bank Nifty")
+
 ## Pending/Backlog
 - **P0**: Desktop app build trigger for v20.0.0+ (after instrument bug fix)
 - **P1**: Refactor SettingsPanel.js (750+ lines -> smaller components)
