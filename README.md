@@ -70,7 +70,7 @@ RISK_TOLERANCE=medium
 
 **Frontend Configuration** (`.env` file):
 ```env
-REACT_APP_BACKEND_URL=https://news-driven-options-1.preview.emergentagent.com
+REACT_APP_BACKEND_URL=https://options-sentinel.preview.emergentagent.com
 ```
 
 ### Running the Application
@@ -112,7 +112,7 @@ tail -f /var/log/supervisor/frontend.out.log
 ## 🎮 How to Use
 
 ### 1. Access Dashboard
-Open: https://news-driven-options-1.preview.emergentagent.com
+Open: https://options-sentinel.preview.emergentagent.com
 
 ### 2. Analyze News
 - Click **"Analyze News"** button

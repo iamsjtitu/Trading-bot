@@ -50,6 +50,8 @@ export default function SettingsPanel({ onClose, onSave }) {
       const res = await axios.post(`${API}/brokers/set-active`, { broker_id: brokerId });
       if (res.data.status === 'success') {
         setActiveBroker(brokerId);
+        // Keep settings state in sync to prevent overwrite on save
+        setSettings(prev => ({ ...prev, active_broker: brokerId }));
         // Re-check connection for newly selected broker
         checkUpstoxConnection();
       }
@@ -75,6 +77,8 @@ export default function SettingsPanel({ onClose, onSave }) {
       const res = await axios.post(`${API}/instruments/set`, { instrument });
       if (res.data.status === 'success') {
         setActiveInstrument(instrument);
+        // Keep settings state in sync to prevent overwrite on save
+        setSettings(prev => ({ ...prev, trading_instrument: instrument }));
       }
     } catch (e) {
       console.error('Set instrument error:', e);
@@ -121,6 +125,9 @@ export default function SettingsPanel({ onClose, onSave }) {
         syncedSettings.auto_trading.stoploss_pct = syncedSettings.risk.stop_loss_pct;
         syncedSettings.auto_trading.target_pct = syncedSettings.risk.target_pct;
       }
+      // Remove fields managed by separate APIs to prevent overwrite
+      delete syncedSettings.trading_instrument;
+      delete syncedSettings.active_broker;
       const response = await axios.post(`${API}/settings/update`, syncedSettings);
       if (response.data.status === 'success') {
         // Also update auto-settings separately to ensure sync
@@ -340,11 +347,7 @@ export default function SettingsPanel({ onClose, onSave }) {
               </div>
             </TabsContent>
 
-            {/* ===== Risk Tab ===== */}
-            <TabsContent value="risk" className="space-y-4">
-
             {/* ===== Trading Instrument Tab ===== */}
-            </TabsContent>
             <TabsContent value="trading" className="space-y-4">
               <div className="bg-gradient-to-r from-indigo-50 to-blue-50 p-4 rounded-lg border border-indigo-200">
                 <h3 className="font-bold text-gray-800 mb-3">Trading Instrument</h3>

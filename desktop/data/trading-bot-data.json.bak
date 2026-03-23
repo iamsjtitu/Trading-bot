@@ -76,7 +76,7 @@
       "risk_warnings": true,
       "daily_summary": true
     },
-    "trading_instrument": "BANKNIFTY",
+    "trading_instrument": "FINNIFTY",
     "emergency_stop": false,
     "active_broker": "upstox",
     "ai_guards": {
@@ -253,14 +253,14 @@
       "pnl_percentage": 0,
       "exit_advice": {
         "action": "HOLD",
-        "confidence": 85,
-        "reason": "Market sentiment abhi bearish hai aur BankNifty bhi neeche ja raha hai, jo aapke put position ke liye favorable hai.",
+        "confidence": 80,
+        "reason": "Market sentiment bearish hai, lekin price movement abhi neutral hai. Hold karna sahi rahega.",
         "risk_level": "MEDIUM",
         "suggested_sl": null,
         "exit_pct": null,
         "trade_id": "7e04dd2e-3247-4de4-9aa9-d644faf2a82f",
         "symbol": "BANKNIFTY26032353200PE",
-        "timestamp": "2026-03-23T08:22:38.099Z",
+        "timestamp": "2026-03-23T08:38:20.387Z",
         "source": "ai",
         "pnl_at_advice": 0,
         "pnl_pct_at_advice": 0
@@ -291,14 +291,14 @@
       "pnl_percentage": 0,
       "exit_advice": {
         "action": "HOLD",
-        "confidence": 85,
-        "reason": "Market sentiment abhi bearish hai, aur BankNifty bhi downtrend mein hai.",
+        "confidence": 75,
+        "reason": "Market sentiment abhi bearish hai aur BankNifty me weakness dikh rahi hai.",
         "risk_level": "MEDIUM",
         "suggested_sl": null,
         "exit_pct": null,
         "trade_id": "de791b87-720d-49cd-b6ce-cda01fdfb3bd",
         "symbol": "BANKNIFTY26032353200PE",
-        "timestamp": "2026-03-23T08:22:42.439Z",
+        "timestamp": "2026-03-23T08:38:21.666Z",
         "source": "ai",
         "pnl_at_advice": 0,
         "pnl_pct_at_advice": 0
@@ -19907,5 +19907,5 @@
     }
   ],
   "_cachedBrokerPnl": 0,
-  "_cachedBrokerPnlTime": 1774251272885
+  "_cachedBrokerPnlTime": 1774255214451
 }
