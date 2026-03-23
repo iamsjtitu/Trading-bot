@@ -14,21 +14,18 @@ Build an AI-powered automated options trading bot that connects to world news, u
 
 ## Current Version: v15.0.0
 
-## Version Management (PERMANENT FIX)
+## Version Management
 - **Single source of truth**: `desktop/package.json` → `version` field
-- `web_server.js`: APP_VERSION from package.json
-- `main.js` (Electron): app.getVersion()
-- Frontend: Fetches from /api/health
 
 ## Completed Features
 - AI-powered sentiment analysis (GPT-4o via Emergent LLM Key)
-- Live news from 13 sources (Bloomberg, India Today, Reuters, Zee Business, Financial Express, etc.)
+- Live news from 13 sources (Bloomberg, India Today, Reuters, etc.)
 - Paper & Live trading modes
 - Upstox broker integration with P&L sync
 - Real-time market data & Option Chain
 - AI Guards (9 safety guards including Max Daily Profit & Max Daily Loss)
 - AI Exit Advisor (HOLD/EXIT/PARTIAL_EXIT/TIGHTEN_SL)
-- Kelly Criterion position sizing
+- Kelly Criterion position sizing (ADVISORY MODE - never blocks 1 lot)
 - Options Greeks & IV analysis
 - Telegram alerts (7 alert types) with anti-spam cooldown
 - AI Morning Briefing (9:00 AM IST weekdays)
@@ -38,53 +35,33 @@ Build an AI-powered automated options trading bot that connects to world news, u
 - Emergency Stop, Trailing SL, Auto re-entry
 - Trade Journal with AI reviews
 - System Health Dashboard
-- **App.js Refactoring** — 830-line monolith split into modular components
-- **Guard-First AI Analysis** — Daily Profit/Loss guards block AI calls to save API balance
-- **Telegram Anti-Spam** — 30-min cooldown per guard type for notifications
-
-## App.js Component Architecture (Refactored)
-```
-App.js (134 lines) — Main shell, routing, layout
-├── hooks/useAppState.js (512 lines) — State management, API calls, effects
-├── components/AppHeader.js — Header toolbar, badges, buttons
-├── components/PortfolioCards.js — 4 portfolio summary cards
-├── components/LivePositions.js — Live positions table (LIVE mode only)
-├── components/NotificationToasts.js — Notification system
-├── components/AppFooter.js — Footer with version and credits
-└── (12 tab components + settings, market ticker, risk panel, etc.)
-```
+- App.js Refactoring (830 → 134 lines)
+- Guard-First AI Analysis (saves API balance)
+- Telegram Anti-Spam (30-min cooldown per guard)
+- **Smart Broker-based Position Sizing** (LIVE mode uses available margin)
 
 ## Bug Fixes (Latest Session)
-1. **Telegram "New Signal: undefined"** — Fixed formatSignalAlert to use signal_type instead of trade_type
-2. **AI balance waste on guard hit** — Added early guard check in news.js BEFORE AI analysis loop
-3. **Telegram guard block spam** — Added 30-min cooldown per guard in notifyGuardBlock()
-
-## Changelog
-- v1.0-v6.0: Core features built
-- v7.0.0: Deep audit, 7 bug fixes
-- v8.0.0: Permanent version fix, added missing routes to main.js
-- v9.0.1: Bloomberg RSS, RiskPanel fix, Journal mode filter
-- v10.0.0: 5 new news sources (13 total), 30 articles/cycle
-- v11.0.0-v14.0.0: Critical live trading bug fixes, P&L sync, Max Daily Loss guard
-- v15.0.0: Max Daily Profit guard, App.js refactoring, desktop build prep
-- v15.0.0 (fixes): Telegram undefined fix, Guard-first AI analysis, Telegram cooldown
+1. **Telegram "New Signal: undefined"** — Fixed formatSignalAlert to use signal_type
+2. **AI balance waste on guard hit** — Early guard check in news.js BEFORE AI loop
+3. **Telegram guard spam** — 30-min cooldown per guard in notifyGuardBlock()
+4. **"1 lot cost exceeds max per trade"** — Kelly Criterion now advisory mode:
+   - LIVE mode fetches broker's available margin for realistic maxTrade
+   - Kelly suggests amount but never blocks below 1 lot
+   - If 1 lot costs more than Kelly budget, override and allow 1 lot
 
 ## Pending/Backlog
-- **P0**: Desktop app build trigger (frontend-build ready, user needs electron-builder locally)
-- **P2**: Multi-broker support (Zerodha, Angel One, 5paisa, Paytm Money, IIFL)
-- **P3**: News fetcher refactoring into source-specific modules
+- **P0**: Desktop app build trigger (frontend-build ready)
+- **P2**: Multi-broker support (Zerodha, Angel One, etc.)
+- **P3**: News fetcher refactoring
 
 ## Key Files
-- `/app/desktop/package.json` — VERSION SOURCE OF TRUTH (v15.0.0)
-- `/app/desktop/main.js` — Electron main, 13 routes, 3 background jobs
+- `/app/desktop/routes/lib/signal_generator.js` — Trade execution with smart sizing
+- `/app/desktop/routes/lib/position_sizing.js` — Kelly Criterion calculation
 - `/app/desktop/routes/news.js` — News fetch with guard-first AI analysis
 - `/app/desktop/routes/lib/telegram.js` — Telegram alerts (fixed formatters)
-- `/app/desktop/routes/lib/signal_generator.js` — Signal generation with cooldown
-- `/app/desktop/routes/lib/sentiment.js` — AI sentiment analysis with logging
-- `/app/frontend/src/App.js` — Refactored main UI (134 lines)
 - `/app/frontend/src/hooks/useAppState.js` — State management hook
-- `/app/desktop/BUILD_GUIDE.md` — Desktop build instructions
+- `/app/frontend/src/App.js` — Refactored main UI (134 lines)
 
 ## Test Reports
 - `/app/test_reports/iteration_45.json` — v15.0.0 App.js refactoring (100%)
-- `/app/test_reports/iteration_46.json` — v15.0.0 Telegram/Guard bug fixes (100%, 9/9 backend, all frontend)
+- `/app/test_reports/iteration_46.json` — v15.0.0 Telegram/Guard bug fixes (100%)

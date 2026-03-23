@@ -125,7 +125,7 @@ export default function useAppState() {
           setRiskMetrics({
             dailyUsed: lp.funds?.used_margin || 0,
             dailyLimit: (lp.funds?.total || 0) > 0 ? lp.funds.total : riskSettings.daily_limit || 100000,
-            maxPerTrade: riskSettings.max_per_trade || 20000,
+            maxPerTrade: riskSettings.max_per_trade || Math.floor((lp.funds?.available_margin || lp.funds?.total || 200000) * 0.25),
             todayTrades: completedOrders.length,
             todayPnL: todayPnlVal,
             isLive: true,

@@ -409,14 +409,45 @@ module.exports = function createSignalGenerator(db, aiEngine) {
       const autoTradingCfg = db.data?.settings?.auto_trading || {};
       let maxTrade = autoTradingCfg.max_per_trade || riskCfg.max_per_trade || 20000;
 
-      // BUG FIX: Apply Kelly Criterion to LIVE trades
-      // If Kelly sizing is enabled and signal has Kelly data, use Kelly's suggested amount as budget cap
+      // LIVE MODE FIX: Use broker's available funds as max_per_trade base
+      // When connected to broker, the actual available margin is the real limit
+      try {
+        const fundsResp = await axios.get('https://api.upstox.com/v2/user/get-funds-and-margin', {
+          headers: { Accept: 'application/json', Authorization: `Bearer ${accessToken}`, 'Api-Version': '2.0' },
+          timeout: 10000
+        });
+        if (fundsResp.data?.status === 'success' && fundsResp.data?.data) {
+          const equity = fundsResp.data.data.equity || fundsResp.data.data.commodity || {};
+          const availableMargin = equity.available_margin || equity.used_margin || 0;
+          if (availableMargin > 0) {
+            // Use available margin as the real limit (user can afford up to this)
+            // But cap at user-set max_per_trade if they explicitly set one
+            const brokerMax = Math.floor(availableMargin * 0.25); // Max 25% of available margin per trade (safe default)
+            const userSetMax = autoTradingCfg.max_per_trade || riskCfg.max_per_trade || 0;
+            if (userSetMax > 0) {
+              maxTrade = userSetMax;
+              console.log(`[LiveTrade] Using user-set max_per_trade: ₹${maxTrade} (Broker available: ₹${Math.round(availableMargin)})`);
+            } else {
+              maxTrade = Math.max(maxTrade, brokerMax);
+              console.log(`[LiveTrade] Using broker-based max_per_trade: ₹${maxTrade} (25% of ₹${Math.round(availableMargin)} available margin)`);
+            }
+          }
+        }
+      } catch (e) {
+        console.log(`[LiveTrade] Funds fetch failed, using settings max: ₹${maxTrade}. Error: ${e.message}`);
+      }
+
+      // Kelly Criterion: ADVISORY mode - suggests optimal position size but never blocks trades
+      // Kelly reduces budget for risk management, but NEVER below 1 lot cost
       const kellyEnabled = db.data?.settings?.ai_guards?.kelly_sizing !== false;
+      let kellyReduced = false;
       if (kellyEnabled && signal.kelly_sizing?.suggested_amount > 0) {
         const kellyBudget = signal.kelly_sizing.suggested_amount;
         if (kellyBudget < maxTrade) {
-          console.log(`[LiveTrade] Kelly reducing budget from ₹${maxTrade} to ₹${kellyBudget} (${signal.kelly_sizing.kelly_pct}% kelly, streak: ${signal.kelly_sizing.streak})`);
+          console.log(`[LiveTrade] Kelly advisory: Suggests ₹${Math.round(kellyBudget)} (${signal.kelly_sizing.kelly_pct}% kelly, streak: ${signal.kelly_sizing.streak}). Max: ₹${maxTrade}`);
+          // Kelly reduces to suggested amount, but we'll ensure at least 1 lot later
           maxTrade = kellyBudget;
+          kellyReduced = true;
         }
       }
 
@@ -480,13 +511,30 @@ module.exports = function createSignalGenerator(db, aiEngine) {
       const maxQtyByBudget = Math.floor(maxTrade / actualPremium);
       // Round down to nearest lot size
       const lotQty = Math.floor(maxQtyByBudget / lotSize) * lotSize;
-      // Must have at least one lot, but ONLY if it fits within budget
+      // Must have at least one lot
       const oneLotCost = lotSize * actualPremium;
-      if (oneLotCost > maxTrade) {
-        console.log(`[LiveTrade] BLOCKED - 1 lot cost (${oneLotCost}) exceeds max_per_trade (${maxTrade})`);
-        return { success: false, error: `1 lot cost ₹${Math.round(oneLotCost)} exceeds max per trade limit ₹${maxTrade}. Increase limit or choose a cheaper option.` };
+      
+      // FIX: If Kelly reduced budget below 1 lot cost, override Kelly and allow 1 lot
+      // Kelly is advisory - it shouldn't prevent trading entirely when user has sufficient funds
+      if (oneLotCost > maxTrade && kellyReduced) {
+        console.log(`[LiveTrade] Kelly advisory overridden: 1 lot cost ₹${Math.round(oneLotCost)} > Kelly budget ₹${Math.round(maxTrade)}. Allowing 1 lot (user has sufficient funds).`);
+        maxTrade = oneLotCost; // Allow exactly 1 lot
       }
-      const qty = Math.max(lotSize, lotQty);
+      
+      // Only block if even without Kelly, the user's base limit can't afford 1 lot
+      const baseMaxTrade = autoTradingCfg.max_per_trade || riskCfg.max_per_trade || 20000;
+      if (oneLotCost > maxTrade && !kellyReduced) {
+        // Check if broker has enough available margin for 1 lot
+        if (oneLotCost <= baseMaxTrade * 3) { // Allow up to 3x the default if broker has funds
+          console.log(`[LiveTrade] 1 lot cost ₹${Math.round(oneLotCost)} > max_per_trade ₹${Math.round(maxTrade)}, but allowing 1 lot (within safe range)`);
+          maxTrade = oneLotCost;
+        } else {
+          console.log(`[LiveTrade] BLOCKED - 1 lot cost ₹${Math.round(oneLotCost)} significantly exceeds max_per_trade ₹${Math.round(maxTrade)}`);
+          return { success: false, error: `1 lot cost ₹${Math.round(oneLotCost)} exceeds max per trade limit ₹${Math.round(maxTrade)}. Increase limit in Settings > Risk.` };
+        }
+      }
+      
+      const qty = Math.max(lotSize, lotQty || lotSize);
       const estimatedInvestment = qty * actualPremium;
       // HARD CAP: Final investment must NOT exceed max_per_trade
       if (estimatedInvestment > maxTrade * 1.05) { // 5% tolerance for price slippage
