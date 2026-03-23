@@ -10,7 +10,21 @@ const telegram = require('./telegram');
 function uuid() { return crypto.randomUUID(); }
 
 // Helper: Send Telegram guard block alert
+// Cooldown tracker to prevent Telegram spam for repeated guard blocks
+const guardBlockCooldowns = {};
+const GUARD_COOLDOWN_MS = 30 * 60 * 1000; // 30 minutes between same guard alerts
+
 function notifyGuardBlock(db, guardName, reason) {
+  const now = Date.now();
+  const lastSent = guardBlockCooldowns[guardName] || 0;
+  
+  // Skip Telegram if same guard was notified within cooldown period
+  if (now - lastSent < GUARD_COOLDOWN_MS) {
+    console.log(`[Guard] ${guardName} blocked (Telegram skipped - cooldown active)`);
+    return;
+  }
+  
+  guardBlockCooldowns[guardName] = now;
   const tgAlerts = db.data?.settings?.telegram?.alerts || {};
   if (tgAlerts.guard_blocks !== false) {
     telegram.sendGuardBlockAlert(guardName, reason).catch(() => {});

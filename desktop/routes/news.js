@@ -22,6 +22,64 @@ module.exports = function (db) {
   // GET /api/news/fetch
   router.get('/api/news/fetch', async (req, res) => {
     try {
+      // ===== EARLY GUARD CHECK: Block AI analysis if daily limits hit =====
+      // This prevents wasting API key balance when trading is stopped for the day
+      const isEmergencyStopped = db.data?.settings?.emergency_stop || false;
+      let dailyGuardBlocked = false;
+      let dailyGuardReason = '';
+
+      if (isEmergencyStopped) {
+        dailyGuardBlocked = true;
+        dailyGuardReason = 'Emergency Stop active';
+        console.log('[News] AI analysis SKIPPED - Emergency Stop active. Saving API balance.');
+      }
+
+      if (!dailyGuardBlocked) {
+        // Check Max Daily Loss
+        const maxDailyLossEnabled = db.data?.settings?.ai_guards?.max_daily_loss !== false;
+        if (maxDailyLossEnabled) {
+          const maxDailyLoss = db.data?.settings?.auto_trading?.max_daily_loss || db.data?.settings?.risk?.max_daily_loss || 5000;
+          const dayStartLoss = new Date(); dayStartLoss.setHours(0, 0, 0, 0);
+          const todayClosed = (db.data.trades || []).filter(t => t.status === 'CLOSED' && (t.exit_time || '') >= dayStartLoss.toISOString());
+          const todayLoss = todayClosed.reduce((sum, t) => sum + Math.min(0, t.pnl || 0), 0);
+          if (Math.abs(todayLoss) >= maxDailyLoss) {
+            dailyGuardBlocked = true;
+            dailyGuardReason = `Max Daily Loss hit: ₹${Math.abs(Math.round(todayLoss))} >= ₹${maxDailyLoss}`;
+            console.log(`[News] AI analysis SKIPPED - ${dailyGuardReason}. Saving API balance.`);
+          }
+        }
+      }
+
+      if (!dailyGuardBlocked) {
+        // Check Max Daily Profit
+        const maxDailyProfitEnabled = db.data?.settings?.ai_guards?.max_daily_profit !== false;
+        if (maxDailyProfitEnabled) {
+          const maxDailyProfit = db.data?.settings?.auto_trading?.max_daily_profit || db.data?.settings?.risk?.max_daily_profit || 10000;
+          const dayStartProfit = new Date(); dayStartProfit.setHours(0, 0, 0, 0);
+          const todayClosed = (db.data.trades || []).filter(t => t.status === 'CLOSED' && (t.exit_time || '') >= dayStartProfit.toISOString());
+          const todayProfit = todayClosed.reduce((sum, t) => sum + Math.max(0, t.pnl || 0), 0);
+          if (todayProfit >= maxDailyProfit) {
+            dailyGuardBlocked = true;
+            dailyGuardReason = `Max Daily Profit target hit: ₹${Math.round(todayProfit)} >= ₹${maxDailyProfit}`;
+            console.log(`[News] AI analysis SKIPPED - ${dailyGuardReason}. Saving API balance.`);
+          }
+        }
+      }
+
+      // If daily guard is hit, return early - don't fetch/analyze news at all
+      if (dailyGuardBlocked) {
+        res.json({
+          status: 'success',
+          articles_processed: 0,
+          articles: [],
+          errors: [],
+          guard_blocked: true,
+          guard_reason: dailyGuardReason,
+          message: `Analysis skipped: ${dailyGuardReason}. API key balance preserved.`,
+        });
+        return;
+      }
+
       const newsCfg = db.data.settings?.news || { sources: ['demo'] };
       const { articles: allNewsRaw, errors } = await fetchAllNews(newsCfg);
 
@@ -127,11 +185,11 @@ module.exports = function (db) {
 
       // Auto-entry for untraded signals (BLOCKED by emergency stop)
       const autoEntryOn = db.data.settings?.auto_trading?.auto_entry || false;
-      const isEmergencyStopped = db.data?.settings?.emergency_stop || false;
+      const emergencyStopped = db.data?.settings?.emergency_stop || false;
       const mode = db.data.settings?.trading_mode || 'PAPER';
       const activeBroker2 = db.data.settings?.active_broker || db.data.settings?.broker?.name || 'upstox';
       const token2 = db.data.settings?.broker?.[`${activeBroker2}_token`] || db.data.settings?.broker?.access_token;
-      if (autoEntryOn && !isEmergencyStopped && mode === 'LIVE' && token2) {
+      if (autoEntryOn && !emergencyStopped && mode === 'LIVE' && token2) {
         const recentTradeSignalIds = new Set((db.data.trades || []).filter(t => t.mode === 'LIVE' && (t.status === 'OPEN' || (t.status === 'FAILED' && (t.entry_time || '') > new Date(Date.now() - 30 * 60 * 1000).toISOString()))).map(t => t.signal_id));
         const untradedSignals = (db.data.signals || []).filter(s => s.status === 'ACTIVE' && s.mode === 'LIVE' && !recentTradeSignalIds.has(s.id)).sort((a, b) => (b.created_at || '').localeCompare(a.created_at || '')).slice(0, 1);
         for (const sig of untradedSignals) {

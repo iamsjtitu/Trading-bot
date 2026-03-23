@@ -123,8 +123,10 @@ module.exports = function createSentimentAnalyzer(db, aiEngine) {
         const client = new OpenAI({ apiKey: aiKey, baseURL: 'https://integrations.emergentagent.com/llm' });
         const systemMsg = aiEngine.getEnhancedSystemPrompt();
         const userMsg = `Title: ${article.title || ''}\nDescription: ${article.description || ''}\nSource: ${article.source || ''}\nPublished: ${article.published_at || ''}\nFreshness Score: ${freshnessScore}/100`;
+        console.log(`[Sentiment] AI analysis started for: ${(article.title || '').substring(0, 60)}...`);
         const completion = await client.chat.completions.create({ model: 'gpt-4o', messages: [{ role: 'system', content: systemMsg }, { role: 'user', content: userMsg }], max_tokens: 500 });
         const result = parseEnhancedSentiment(completion.choices?.[0]?.message?.content || '');
+        console.log(`[Sentiment] AI result: ${result.sentiment} ${result.confidence}% | Signal: ${result.trading_signal} | Sector: ${result.sector}`);
 
         const trendAdj = getTrendAdjustment(result.sentiment);
         result.confidence = Math.max(30, Math.min(98, result.confidence + trendAdj));
@@ -155,6 +157,8 @@ module.exports = function createSentimentAnalyzer(db, aiEngine) {
         console.error('[Sentiment] AI error:', err.message, '- Model: gpt-4o, Key present:', !!aiKey);
         console.error('[Sentiment] Falling back to keyword-based analysis');
       }
+    } else {
+      console.log(`[Sentiment] Using keyword analysis (AI Key: ${!!aiKey}, OpenAI module: ${!!OpenAI})`);
     }
 
     // Fallback: keyword-based

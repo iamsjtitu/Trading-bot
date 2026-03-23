@@ -85,11 +85,13 @@ async function discoverChatId(botToken) {
 // ============ Alert Formatters ============
 
 function formatSignalAlert(signal) {
-  const emoji = signal.trade_type === 'CALL' ? '\u{1F7E2}' : '\u{1F534}';
-  const direction = signal.trade_type === 'CALL' ? 'BULLISH' : 'BEARISH';
-  return `${emoji} <b>NEW SIGNAL: ${signal.trade_type}</b>
+  const type = signal.signal_type || signal.trade_type || 'UNKNOWN';
+  const emoji = type === 'CALL' ? '\u{1F7E2}' : '\u{1F534}';
+  const direction = type === 'CALL' ? 'BULLISH' : 'BEARISH';
+  return `${emoji} <b>NEW SIGNAL: ${type}</b>
 
-<b>Instrument:</b> ${signal.instrument || signal.symbol || 'N/A'}
+<b>Instrument:</b> ${signal.symbol || signal.instrument || 'N/A'}
+<b>Option:</b> ${signal.option_symbol || 'N/A'}
 <b>Direction:</b> ${direction}
 <b>Confidence:</b> ${signal.confidence || 0}%
 <b>Entry:</b> \u20B9${signal.entry_price || 0}
@@ -100,13 +102,14 @@ ${signal.kelly_sizing ? `<b>Kelly:</b> ${signal.kelly_sizing.kelly_pct}% (${sign
 }
 
 function formatTradeEntry(trade) {
-  const emoji = trade.trade_type === 'CALL' || trade.trade_type === 'BUY' ? '\u{1F7E2}' : '\u{1F534}';
+  const type = trade.trade_type || trade.signal_type || 'UNKNOWN';
+  const emoji = type === 'CALL' || type === 'BUY' ? '\u{1F7E2}' : '\u{1F534}';
   return `${emoji} <b>TRADE ENTRY</b>
 
-<b>Symbol:</b> ${trade.symbol}
-<b>Type:</b> ${trade.trade_type}
-<b>Qty:</b> ${trade.quantity}
-<b>Entry:</b> \u20B9${trade.entry_price}
+<b>Symbol:</b> ${trade.symbol || 'N/A'}
+<b>Type:</b> ${type}
+<b>Qty:</b> ${trade.quantity || 0}
+<b>Entry:</b> \u20B9${trade.entry_price || 0}
 <b>Investment:</b> \u20B9${trade.investment || 0}
 <b>Target:</b> \u20B9${trade.target || 0}
 <b>SL:</b> \u20B9${trade.stop_loss || 0}

@@ -1,0 +1,91 @@
+{
+  "summary": "v15.0.0 Bug Fixes VERIFIED. All 3 reported bugs fixed: 1) Telegram signal_type shows CALL/PUT not 'undefined', 2) /api/news/fetch returns guard_blocked=true when daily limits hit (saves API balance), 3) Guard block Telegram notifications have 30-min cooldown. 9/9 backend tests passed, 100% frontend tests passed.",
+  "backend_issues": {
+    "critical": [],
+    "minor": []
+  },
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": []
+  },
+  "test_report_links": [
+    "/app/backend/tests/test_v1500_telegram_guard_fixes.py",
+    "/app/test_reports/pytest/iteration46_v1500_telegram_guard_results.xml"
+  ],
+  "action_items": [],
+  "critical_code_review_comments": [
+    "=== BUG FIX 1: Telegram signal_type VERIFIED ===",
+    "VERIFIED: telegram.js line 88: formatSignalAlert uses signal.signal_type || signal.trade_type || 'UNKNOWN'",
+    "VERIFIED: telegram.js line 105: formatTradeEntry uses trade.trade_type || trade.signal_type || 'UNKNOWN'",
+    "VERIFIED: Frontend Signals tab shows 'PUT' badge for BANKNIFTY signal (not 'undefined')",
+    "=== BUG FIX 2: Guard Blocking BEFORE AI Analysis VERIFIED ===",
+    "VERIFIED: news.js lines 25-81: Early guard check BEFORE AI analysis loop",
+    "VERIFIED: Checks emergency_stop, max_daily_loss, max_daily_profit BEFORE fetching/analyzing news",
+    "VERIFIED: Returns guard_blocked=true with guard_reason when limits hit",
+    "VERIFIED: Backend test confirmed: emergency_stop returns guard_blocked=true",
+    "VERIFIED: API balance preserved when guards block analysis",
+    "=== BUG FIX 3: Guard Block Telegram Cooldown VERIFIED ===",
+    "VERIFIED: signal_generator.js lines 13-31: guardBlockCooldowns object with 30-min cooldown",
+    "VERIFIED: GUARD_COOLDOWN_MS = 30 * 60 * 1000 (30 minutes)",
+    "VERIFIED: notifyGuardBlock() checks cooldown before sending Telegram alert",
+    "=== AI GUARDS STATUS VERIFIED ===",
+    "VERIFIED: /api/ai-guards/status returns all 9 guards",
+    "Guards: multi_timeframe, market_regime_filter, trailing_stop, multi_source_verification, time_of_day_filter, max_daily_loss, max_daily_profit, kelly_sizing, greeks_filter",
+    "=== FRONTEND VERIFIED ===",
+    "VERIFIED: App loads correctly with all tabs visible",
+    "VERIFIED: Portfolio cards render (Portfolio Value, Total P&L, Active Positions, Win Rate)",
+    "VERIFIED: Trading mode badge shows 'LIVE TRADING'",
+    "VERIFIED: AI Loss Prevention Guards shows '9/9 Active'",
+    "VERIFIED: System Health shows 'ALL SYSTEMS GO' with v15.0.0",
+    "VERIFIED: News Feed shows articles with sentiment analysis (BEARISH 75%)",
+    "VERIFIED: Signals tab shows signal_type (PUT) not 'undefined'"
+  ],
+  "updated_files": [
+    "/app/backend/tests/test_v1500_telegram_guard_fixes.py"
+  ],
+  "success_rate": {
+    "backend": "100% (9/9 tests passed)",
+    "frontend": "100% (All UI elements verified)"
+  },
+  "test_credentials": "None needed",
+  "seed_data_creation": "None",
+  "retest_needed": false,
+  "main_agent_can_self_test": false,
+  "context_for_next_testing_agent": "v15.0.0 Bug Fixes VERIFIED. Three bugs fixed: 1) Telegram formatSignalAlert now uses signal.signal_type || signal.trade_type (line 88), 2) news.js has early guard check (lines 25-81) that returns guard_blocked=true BEFORE AI analysis, saving API balance, 3) signal_generator.js notifyGuardBlock has 30-min cooldown (lines 13-31). All 9 AI guards working. Frontend loads correctly.",
+  "bugs_verified": {
+    "bug_1_telegram_undefined": {
+      "status": "FIXED",
+      "description": "Telegram signal alert was showing 'New Signal: undefined'",
+      "fix_location": "/app/desktop/routes/lib/telegram.js line 88",
+      "fix_code": "const type = signal.signal_type || signal.trade_type || 'UNKNOWN'",
+      "verification": "Frontend Signals tab shows 'PUT' badge, not 'undefined'"
+    },
+    "bug_2_guard_blocking_ai_analysis": {
+      "status": "FIXED",
+      "description": "AI analysis was running even when Max Daily Loss/Profit guards hit, wasting API balance",
+      "fix_location": "/app/desktop/routes/news.js lines 25-81",
+      "fix_code": "Early guard check BEFORE AI analysis loop, returns guard_blocked=true",
+      "verification": "Backend test confirmed emergency_stop returns guard_blocked=true with 0 articles processed"
+    },
+    "bug_3_telegram_spam_cooldown": {
+      "status": "FIXED",
+      "description": "Guard block Telegram notifications were spamming repeatedly",
+      "fix_location": "/app/desktop/routes/lib/signal_generator.js lines 13-31",
+      "fix_code": "guardBlockCooldowns object with GUARD_COOLDOWN_MS = 30 * 60 * 1000",
+      "verification": "Code review confirmed 30-min cooldown per guard type"
+    }
+  },
+  "data_observed": {
+    "version": "15.0.0",
+    "routes_loaded": 13,
+    "trading_mode": "LIVE",
+    "ai_guards_count": 9,
+    "ai_guards_active": 9,
+    "telegram_alerts": "7/7",
+    "market_status": "OPEN",
+    "system_health": "ALL SYSTEMS GO",
+    "signals_with_signal_type": true,
+    "news_with_sentiment": true
+  }
+}

@@ -237,10 +237,15 @@ export default function useAppState() {
     setFetchingNews(true);
     try {
       const response = await axios.get(`${API}/news/fetch`);
-      const articles = response.data.articles || [];
-      const highConfidence = articles.filter(a => a.sentiment_analysis?.confidence >= 80 && a.signal_generated);
-      if (highConfidence.length > 0) addNotification('success', `${highConfidence.length} high-confidence signal(s)!`);
-      addNotification('info', `Analyzed ${articles.length} news articles`);
+      // Check if guard blocked the analysis (saves API balance)
+      if (response.data.guard_blocked) {
+        addNotification('warning', response.data.message || 'Analysis skipped - daily limit hit');
+      } else {
+        const articles = response.data.articles || [];
+        const highConfidence = articles.filter(a => a.sentiment_analysis?.confidence >= 80 && a.signal_generated);
+        if (highConfidence.length > 0) addNotification('success', `${highConfidence.length} high-confidence signal(s)!`);
+        if (articles.length > 0) addNotification('info', `Analyzed ${articles.length} news articles`);
+      }
       await loadData();
     } catch (error) {
       addNotification('error', 'Failed to fetch news');
