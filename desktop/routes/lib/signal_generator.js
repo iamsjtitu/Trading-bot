@@ -186,8 +186,8 @@ module.exports = function createSignalGenerator(db, aiEngine) {
       rp.target_pct = rp.stop_loss_pct; // At minimum, target = stoploss (1:1)
     }
 
-    const maxTrade = riskCfg.max_per_trade || 20000;
-    const dailyLimit = riskCfg.daily_limit || 100000;
+    const maxTrade = autoTrading.max_per_trade || riskCfg.max_per_trade || 20000;
+    const dailyLimit = autoTrading.daily_limit || riskCfg.daily_limit || 100000;
 
     const todayStart = new Date(); todayStart.setHours(0, 0, 0, 0);
     const todayTrades = (db.data.trades || []).filter(t => t.entry_time >= todayStart.toISOString() && t.status === 'OPEN');
@@ -372,9 +372,10 @@ module.exports = function createSignalGenerator(db, aiEngine) {
         return { success: false, error: `Max open trades reached (${openInInstrument.length}/${maxTotalTrades})` };
       }
 
-      // STRICT max_per_trade enforcement
+      // STRICT max_per_trade enforcement — check BOTH risk and auto_trading settings
       const riskCfg = db.data?.settings?.risk || {};
-      let maxTrade = riskCfg.max_per_trade || 20000;
+      const autoTradingCfg = db.data?.settings?.auto_trading || {};
+      let maxTrade = autoTradingCfg.max_per_trade || riskCfg.max_per_trade || 20000;
 
       // BUG FIX: Apply Kelly Criterion to LIVE trades
       // If Kelly sizing is enabled and signal has Kelly data, use Kelly's suggested amount as budget cap
@@ -455,6 +456,11 @@ module.exports = function createSignalGenerator(db, aiEngine) {
       }
       const qty = Math.max(lotSize, lotQty);
       const estimatedInvestment = qty * actualPremium;
+      // HARD CAP: Final investment must NOT exceed max_per_trade
+      if (estimatedInvestment > maxTrade * 1.05) { // 5% tolerance for price slippage
+        console.log(`[LiveTrade] BLOCKED - Investment ₹${Math.round(estimatedInvestment)} exceeds max_per_trade ₹${maxTrade}`);
+        return { success: false, error: `Trade investment ₹${Math.round(estimatedInvestment)} exceeds max per trade limit ₹${maxTrade}. Reduce lot size or increase limit.` };
+      }
       console.log(`[LiveTrade] Premium: ₹${actualPremium}, Lot: ${lotSize}, Qty: ${qty}, Est. Investment: ₹${Math.round(estimatedInvestment)}, Max: ₹${maxTrade}`);
       const orderBody = { quantity: qty, product: 'I', validity: 'DAY', price: 0, instrument_token: instrumentToken, order_type: 'MARKET', transaction_type: 'BUY', disclosed_quantity: 0, trigger_price: 0, is_amo: false };
       const orderResp = await axios.post('https://api.upstox.com/v2/order/place', orderBody, { headers, timeout: 15000 });

@@ -99,7 +99,7 @@ export default function AIGuards() {
             const Icon = info.icon;
             const isBlocked = guard.blocked;
             const isEnabled = guard.enabled !== false;
-            const canToggle = key !== 'max_daily_loss';
+            const canToggle = true; // All guards can be toggled including max_daily_loss
 
             return (
               <div key={key} className={`p-3 rounded-lg border transition ${isBlocked ? 'border-red-300 bg-red-50' : isEnabled ? 'border-green-200 bg-green-50/50' : 'border-gray-200 bg-gray-50'}`} data-testid={`guard-${key}`}>

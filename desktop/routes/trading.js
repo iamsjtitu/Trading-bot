@@ -39,7 +39,28 @@ module.exports = function (db) {
   router.get('/api/trades/active', async (req, res) => {
     const mode = db.data.settings?.trading_mode || 'PAPER';
     const accessToken = getActiveBrokerToken();
-    const dbOpenTrades = (db.data.trades || []).filter(t => t.status === 'OPEN' && t.mode === mode);
+    let dbOpenTrades = (db.data.trades || []).filter(t => t.status === 'OPEN' && t.mode === mode);
+
+    // Auto-close stale OPEN trades older than 24 hours (market day boundary cleanup)
+    const staleThreshold = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
+    let staleClosed = 0;
+    for (const t of dbOpenTrades) {
+      if (t.entry_time && t.entry_time < staleThreshold) {
+        t.status = 'CLOSED';
+        t.exit_time = new Date().toISOString();
+        t.exit_reason = 'STALE_AUTO_CLOSE';
+        t.exit_price = t.current_price || t.entry_price || 0;
+        t.pnl = Math.round(((t.exit_price - (t.entry_price || 0)) * (t.quantity || 1)) * 100) / 100;
+        t.pnl_percentage = t.entry_price > 0 ? Math.round(((t.exit_price - t.entry_price) / t.entry_price) * 10000) / 100 : 0;
+        staleClosed++;
+      }
+    }
+    if (staleClosed > 0) {
+      db.save();
+      console.log(`[Trades] Auto-closed ${staleClosed} stale OPEN trades (>24h old)`);
+      dbOpenTrades = (db.data.trades || []).filter(t => t.status === 'OPEN' && t.mode === mode);
+    }
+
     const rp = riskParams[getRiskTolerance()] || riskParams.medium;
 
     if (mode === 'LIVE' && accessToken) {
@@ -273,12 +294,13 @@ module.exports = function (db) {
 
         // Auto re-entry only if auto_entry is ON AND NOT emergency stopped AND target hit
         if (isAutoEntryOn && !isEmergencyStopped && exitReason === 'TARGET_HIT') {
-          // FEATURE 6: Max Daily Loss check before re-entry
+          // FEATURE 6: Max Daily Loss check before re-entry (only if enabled)
+          const maxDailyLossEnabled = db.data?.settings?.ai_guards?.max_daily_loss !== false;
           const maxDailyLoss = db.data?.settings?.auto_trading?.max_daily_loss || db.data?.settings?.risk?.max_daily_loss || 5000;
           const dayStart = new Date(); dayStart.setHours(0, 0, 0, 0);
           const dayClosedTrades = (db.data.trades || []).filter(t => t.status === 'CLOSED' && (t.exit_time || '') >= dayStart.toISOString());
           const dayLoss = dayClosedTrades.reduce((s, t) => s + Math.min(0, t.pnl || 0), 0);
-          if (Math.abs(dayLoss) >= maxDailyLoss) {
+          if (maxDailyLossEnabled && Math.abs(dayLoss) >= maxDailyLoss) {
             console.log(`[AutoExit] Re-entry BLOCKED - Daily loss ₹${Math.abs(dayLoss)} >= ₹${maxDailyLoss}`);
           } else {
           const reentryMinConf = db.data?.settings?.news?.min_confidence || 70;
@@ -420,7 +442,7 @@ module.exports = function (db) {
         trailing_stop: { enabled: guards.trailing_stop !== false, description: 'SL moves up as price rises' },
         multi_source_verification: { enabled: guards.multi_source_verification !== false, recent_sources: sourceCount },
         time_of_day_filter: { enabled: guards.time_of_day_filter !== false, current_window: isVolatileWindow ? 'HIGH VOLATILITY - BLOCKED' : 'NORMAL', ist_time: istTimeStr },
-        max_daily_loss: { enabled: true, today_loss: Math.round(Math.abs(todayLoss)), limit: maxDailyLoss, blocked: Math.abs(todayLoss) >= maxDailyLoss },
+        max_daily_loss: { enabled: guards.max_daily_loss !== false, today_loss: Math.round(Math.abs(todayLoss)), limit: maxDailyLoss, blocked: guards.max_daily_loss !== false && Math.abs(todayLoss) >= maxDailyLoss },
         kelly_sizing: { enabled: guards.kelly_sizing !== false, mode: kellyMode, win_rate: winRate, total_trades: closedTrades.length, consecutive_losses: consecutiveLosses, description: 'AI decides how much to invest per trade' },
         greeks_filter: { enabled: guards.greeks_filter !== false, description: 'Options Greeks & IV analysis filters bad options' },
       },
@@ -431,7 +453,7 @@ module.exports = function (db) {
     const body = req.body || {};
     if (!db.data.settings) db.data.settings = {};
     if (!db.data.settings.ai_guards) db.data.settings.ai_guards = {};
-    const allowed = ['multi_timeframe', 'market_regime_filter', 'trailing_stop', 'multi_source_verification', 'time_of_day_filter', 'kelly_sizing', 'greeks_filter'];
+    const allowed = ['multi_timeframe', 'market_regime_filter', 'trailing_stop', 'multi_source_verification', 'time_of_day_filter', 'max_daily_loss', 'kelly_sizing', 'greeks_filter'];
     for (const key of allowed) {
       if (key in body) db.data.settings.ai_guards[key] = !!body[key];
     }

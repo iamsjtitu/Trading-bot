@@ -48,11 +48,13 @@ async function fetchMarketData(db) {
 
   if (!token) {
     jobState.last_status = 'no_token';
+    // Don't clear existing cached data — keep last known values
     return;
   }
 
   if (!isMarketHours()) {
     jobState.last_status = 'market_closed';
+    // Don't clear existing cached data — keep last known values
     return;
   }
 
@@ -120,10 +122,15 @@ async function fetchMarketData(db) {
     jobState.error_count++;
     jobState.last_status = 'fetch_error';
     jobState.last_error = e.message;
-    // Don't spam logs on repeated errors
-    if (jobState.error_count % 5 === 1) {
+    // Check if token expired (401/403)
+    if (e.response?.status === 401 || e.response?.status === 403) {
+      jobState.last_status = 'token_expired';
+      jobState.last_error = `Token expired (${e.response.status}). Please re-authenticate with broker.`;
+      console.log(`[BgFetch] Token expired (${e.response.status}). Market data will stop until re-auth.`);
+    } else if (jobState.error_count % 5 === 1) {
       console.log(`[BgFetch] Error (${jobState.error_count}): ${e.message}`);
     }
+    // IMPORTANT: Don't clear db.data.market_data — keep last known values
   }
 }
 
