@@ -32,8 +32,32 @@ module.exports = function (db) {
   function getRiskTolerance() { return db.data?.settings?.risk?.risk_tolerance || 'medium'; }
 
   // ============ Signal Routes ============
-  router.get('/api/signals/latest', (req, res) => { const limit = parseInt(req.query.limit) || 20; const currentMode = db.data.settings?.trading_mode || 'PAPER'; const sigs = (db.data.signals || []).filter(s => (s.mode || 'PAPER') === currentMode).slice(-limit).reverse(); res.json({ status: 'success', count: sigs.length, signals: sigs }); });
-  router.get('/api/signals/active', (req, res) => { const currentMode = db.data.settings?.trading_mode || 'PAPER'; const active = (db.data.signals || []).filter(s => s.status === 'ACTIVE' && (s.mode || 'PAPER') === currentMode); res.json({ status: 'success', count: active.length, signals: active }); });
+  router.get('/api/signals/latest', (req, res) => {
+    const limit = parseInt(req.query.limit) || 20;
+    const currentMode = db.data.settings?.trading_mode || 'PAPER';
+    const oneHourAgo = new Date(Date.now() - 60 * 60 * 1000).toISOString();
+    // Expire old ACTIVE signals
+    (db.data.signals || []).forEach(s => {
+      if (s.status === 'ACTIVE' && s.created_at && s.created_at < oneHourAgo) {
+        s.status = 'EXPIRED';
+      }
+    });
+    const sigs = (db.data.signals || [])
+      .filter(s => (s.mode || 'PAPER') === currentMode && s.status === 'ACTIVE')
+      .slice(-limit).reverse();
+    res.json({ status: 'success', count: sigs.length, signals: sigs });
+  });
+  router.get('/api/signals/active', (req, res) => {
+    const currentMode = db.data.settings?.trading_mode || 'PAPER';
+    const oneHourAgo = new Date(Date.now() - 60 * 60 * 1000).toISOString();
+    (db.data.signals || []).forEach(s => {
+      if (s.status === 'ACTIVE' && s.created_at && s.created_at < oneHourAgo) {
+        s.status = 'EXPIRED';
+      }
+    });
+    const active = (db.data.signals || []).filter(s => s.status === 'ACTIVE' && (s.mode || 'PAPER') === currentMode);
+    res.json({ status: 'success', count: active.length, signals: active });
+  });
 
   // ============ Trade Query Routes ============
   router.get('/api/trades/active', async (req, res) => {
@@ -365,7 +389,13 @@ module.exports = function (db) {
                 }
               } else {
                 db.data.signals.push(newSignal);
-                if (mode === 'LIVE' && accessToken) { const r = await signalGen.executeLiveTrade(newSignal, accessToken); if (r?.success) newTradesCount++; } else { signalGen.executePaperTrade(newSignal); newTradesCount++; }
+                // CHECK: Only auto-execute re-entry if auto_entry is ON
+                const isAutoEntryOn = db.data?.settings?.auto_trading?.auto_entry || false;
+                if (isAutoEntryOn) {
+                  if (mode === 'LIVE' && accessToken) { const r = await signalGen.executeLiveTrade(newSignal, accessToken); if (r?.success) newTradesCount++; } else { signalGen.executePaperTrade(newSignal); newTradesCount++; }
+                } else {
+                  console.log(`[AutoExit] Re-entry signal generated but NOT executed - auto_entry is OFF. Manual trade from Signals tab.`);
+                }
               }
             }
           }

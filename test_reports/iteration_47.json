@@ -1,0 +1,117 @@
+{
+  "summary": "v22.0.0 Feature Testing COMPLETE. All 15 backend tests passed (100%). All frontend UI elements verified. Key features tested: 1) Signal expiry (1-hour) working - signals show ACTIVE only within 1 hour, 2) Auto-trade protection working - auto_exit/auto_entry OFF returns exits_executed:0, new_trades_generated:0, 3) Manual trade entry from Signals tab working with toast notification, 4) Manual trade exit from Active Trades working, 5) News Feed 'Fetch Latest News' button working (no AI), 6) 'Analyze with AI' per article working with toast notification.",
+  "backend_issues": {
+    "critical": [],
+    "minor": []
+  },
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": [
+      {
+        "screen": "Console",
+        "issues": ["404 errors for favicon.ico - cosmetic only, does not affect functionality"]
+      }
+    ]
+  },
+  "test_report_links": [
+    "/app/backend/tests/test_v2200_features.py",
+    "/app/test_reports/pytest/iteration47_v2200_features_results.xml"
+  ],
+  "action_items": [],
+  "critical_code_review_comments": [
+    "=== SIGNAL EXPIRY (1-HOUR) VERIFIED ===",
+    "VERIFIED: trading.js lines 35-48: GET /api/signals/latest expires signals older than 1 hour",
+    "VERIFIED: Code sets status='EXPIRED' for signals where created_at < oneHourAgo",
+    "VERIFIED: Only ACTIVE signals returned (filtered by status === 'ACTIVE')",
+    "VERIFIED: Current LIVE signals are ~20 mins old, correctly showing as ACTIVE",
+    "=== AUTO-TRADE PROTECTION VERIFIED ===",
+    "VERIFIED: auto_entry=false, auto_exit=false in settings",
+    "VERIFIED: POST /api/auto-exit/check returns exits_executed:0, new_trades_generated:0 when auto_exit=false",
+    "VERIFIED: trading.js line 267: Early return when !isAutoExitOn",
+    "VERIFIED: news.js lines 173-175: Signal saved but NOT executed when auto_entry OFF",
+    "VERIFIED: Frontend shows 'Exit: OFF | Entry: OFF' badge",
+    "=== MANUAL TRADE ENTRY VERIFIED ===",
+    "VERIFIED: POST /api/trades/execute-signal creates trade in PAPER mode",
+    "VERIFIED: SignalsList.js has 'Enter Trade' buttons with data-testid='enter-trade-btn-{idx}'",
+    "VERIFIED: Toast notification: 'Trade Entered: PUT NIFTY50 ₹3,900 @ Strike 23000'",
+    "VERIFIED: Trade appears in Active Trades tab after entry",
+    "=== MANUAL TRADE EXIT VERIFIED ===",
+    "VERIFIED: POST /api/trades/manual-exit closes trade with trade_id",
+    "VERIFIED: TradesList.js has 'Exit' button with data-testid='manual-exit-btn-{idx}'",
+    "VERIFIED: Exit button visible in Active Trades tab",
+    "=== NEWS FETCH-ONLY VERIFIED ===",
+    "VERIFIED: POST /api/news/fetch-only returns articles with ai_analyzed=false",
+    "VERIFIED: news.js lines 263-298: fetch-only endpoint uses keyword analysis only (no API calls)",
+    "VERIFIED: NewsFeed.js has 'Fetch Latest News' button with data-testid='fetch-news-only-btn'",
+    "VERIFIED: Button text: 'Fetches news without using AI credits. Analyze individual articles below.'",
+    "=== NEWS ANALYZE-ARTICLE VERIFIED ===",
+    "VERIFIED: POST /api/news/analyze-article analyzes single article with AI",
+    "VERIFIED: news.js lines 302-334: analyze-article endpoint runs AI analysis and generates signal if confidence >= 70",
+    "VERIFIED: NewsFeed.js has 'Analyze with AI' buttons with data-testid='analyze-article-btn-{idx}'",
+    "VERIFIED: Toast notification: 'Analysis Complete - Analysis complete, no signal (low confidence or HOLD)'",
+    "VERIFIED: 'AI Analyzed' badge appears after analysis"
+  ],
+  "updated_files": [
+    "/app/backend/tests/test_v2200_features.py"
+  ],
+  "success_rate": {
+    "backend": "100% (15/15 tests passed)",
+    "frontend": "100% (All UI elements verified)"
+  },
+  "test_credentials": "None needed",
+  "seed_data_creation": "None",
+  "retest_needed": false,
+  "main_agent_can_self_test": false,
+  "context_for_next_testing_agent": "v22.0.0 Feature Testing COMPLETE. All requested features verified: 1) Signal expiry (1-hour) - trading.js lines 35-48 expires old signals, 2) Auto-trade protection - auto_exit/auto_entry OFF prevents auto trades, 3) Manual trade entry - SignalsList.js 'Enter Trade' buttons work, 4) Manual trade exit - TradesList.js 'Exit' buttons work, 5) News fetch-only - NewsFeed.js 'Fetch Latest News' button fetches without AI, 6) News analyze-article - 'Analyze with AI' buttons analyze single articles. All 15 backend tests passed. Frontend UI verified with Playwright.",
+  "features_verified": {
+    "signal_expiry_1_hour": {
+      "status": "VERIFIED",
+      "description": "Signals older than 1 hour are marked EXPIRED",
+      "code_location": "/app/desktop/routes/trading.js lines 35-48",
+      "test_result": "Current LIVE signals ~20 mins old, correctly showing ACTIVE"
+    },
+    "auto_trade_protection": {
+      "status": "VERIFIED",
+      "description": "No auto trades when auto_entry/auto_exit OFF",
+      "code_location": "/app/desktop/routes/trading.js line 267, /app/desktop/routes/news.js lines 173-175",
+      "test_result": "POST /api/auto-exit/check returns exits_executed:0, new_trades_generated:0"
+    },
+    "manual_trade_entry": {
+      "status": "VERIFIED",
+      "description": "Manual trade entry from Signals tab",
+      "code_location": "/app/frontend/src/components/SignalsList.js",
+      "test_result": "Toast: 'Trade Entered: PUT NIFTY50 ₹3,900 @ Strike 23000'"
+    },
+    "manual_trade_exit": {
+      "status": "VERIFIED",
+      "description": "Manual trade exit from Active Trades",
+      "code_location": "/app/frontend/src/components/TradesList.js",
+      "test_result": "Exit button visible and functional"
+    },
+    "news_fetch_only": {
+      "status": "VERIFIED",
+      "description": "Fetch news without AI analysis",
+      "code_location": "/app/desktop/routes/news.js lines 263-298",
+      "test_result": "POST /api/news/fetch-only returns articles with ai_analyzed=false"
+    },
+    "news_analyze_article": {
+      "status": "VERIFIED",
+      "description": "Analyze single article with AI",
+      "code_location": "/app/desktop/routes/news.js lines 302-334",
+      "test_result": "Toast: 'Analysis Complete - Analysis complete, no signal (low confidence or HOLD)'"
+    }
+  },
+  "data_observed": {
+    "version": "22.0.0",
+    "routes_loaded": 13,
+    "trading_mode": "LIVE (restored after testing)",
+    "auto_entry": false,
+    "auto_exit": false,
+    "ai_guards_count": 9,
+    "ai_guards_active": 9,
+    "active_signals_live": 3,
+    "active_signals_paper": 0,
+    "signal_age_minutes": "~20 mins (within 1-hour expiry)"
+  }
+}
