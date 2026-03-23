@@ -57,7 +57,7 @@ module.exports = function (db) {
           const maxDailyProfit = db.data?.settings?.auto_trading?.max_daily_profit || db.data?.settings?.risk?.max_daily_profit || 10000;
           const dayStartProfit = new Date(); dayStartProfit.setHours(0, 0, 0, 0);
           const todayClosed = (db.data.trades || []).filter(t => t.status === 'CLOSED' && (t.exit_time || '') >= dayStartProfit.toISOString());
-          const todayProfit = todayClosed.reduce((sum, t) => sum + Math.max(0, t.pnl || 0), 0);
+          const todayProfit = todayClosed.reduce((sum, t) => sum + (t.pnl || 0), 0); // NET P&L
           if (todayProfit >= maxDailyProfit) {
             dailyGuardBlocked = true;
             dailyGuardReason = `Max Daily Profit target hit: ₹${Math.round(todayProfit)} >= ₹${maxDailyProfit}`;

@@ -432,7 +432,7 @@ module.exports = function (db) {
     const todayClosed = (db.data.trades || []).filter(t => t.status === 'CLOSED' && (t.exit_time || '') >= todayStart.toISOString());
     const todayLoss = todayClosed.reduce((s, t) => s + Math.min(0, t.pnl || 0), 0);
     const maxDailyLoss = db.data?.settings?.auto_trading?.max_daily_loss || 5000;
-    const todayProfit = todayClosed.reduce((s, t) => s + Math.max(0, t.pnl || 0), 0);
+    const todayProfit = todayClosed.reduce((s, t) => s + (t.pnl || 0), 0); // NET P&L (wins + losses combined)
     const maxDailyProfit = db.data?.settings?.auto_trading?.max_daily_profit || db.data?.settings?.risk?.max_daily_profit || 10000;
 
     const aiEngine = db._sharedAIEngine;
@@ -471,7 +471,7 @@ module.exports = function (db) {
         multi_source_verification: { enabled: guards.multi_source_verification !== false, recent_sources: sourceCount },
         time_of_day_filter: { enabled: guards.time_of_day_filter !== false, current_window: isVolatileWindow ? 'HIGH VOLATILITY - BLOCKED' : 'NORMAL', ist_time: istTimeStr },
         max_daily_loss: { enabled: guards.max_daily_loss !== false, today_loss: Math.round(Math.abs(todayLoss)), limit: maxDailyLoss, blocked: guards.max_daily_loss !== false && Math.abs(todayLoss) >= maxDailyLoss },
-        max_daily_profit: { enabled: guards.max_daily_profit !== false, today_profit: Math.round(todayProfit), target: maxDailyProfit, blocked: guards.max_daily_profit !== false && todayProfit >= maxDailyProfit },
+        max_daily_profit: { enabled: guards.max_daily_profit !== false, today_profit: Math.round(todayProfit), target: maxDailyProfit, blocked: guards.max_daily_profit !== false && todayProfit > 0 && todayProfit >= maxDailyProfit },
         kelly_sizing: { enabled: guards.kelly_sizing !== false, mode: kellyMode, win_rate: winRate, total_trades: closedTrades.length, consecutive_losses: consecutiveLosses, description: 'AI decides how much to invest per trade' },
         greeks_filter: { enabled: guards.greeks_filter !== false, description: 'Options Greeks & IV analysis filters bad options' },
       },

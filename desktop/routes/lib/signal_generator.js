@@ -103,7 +103,7 @@ module.exports = function createSignalGenerator(db, aiEngine) {
       const maxDailyProfit = db.data?.settings?.auto_trading?.max_daily_profit || db.data?.settings?.risk?.max_daily_profit || 10000;
       const dayStartForProfit = new Date(); dayStartForProfit.setHours(0, 0, 0, 0);
       const todayClosedForProfit = (db.data.trades || []).filter(t => t.status === 'CLOSED' && (t.exit_time || '') >= dayStartForProfit.toISOString());
-      const todayRealizedProfit = todayClosedForProfit.reduce((sum, t) => sum + Math.max(0, t.pnl || 0), 0);
+      const todayRealizedProfit = todayClosedForProfit.reduce((sum, t) => sum + (t.pnl || 0), 0); // NET P&L
       if (todayRealizedProfit >= maxDailyProfit) {
         console.log(`[Signal] BLOCKED by Max Daily Profit - Today's profit: ₹${Math.round(todayRealizedProfit)} >= target ₹${maxDailyProfit}. Target achieved! Auto-stopped.`);
         if (db.notify) db.notify('risk', 'Daily Profit Target Hit!', `Today's profit ₹${Math.round(todayRealizedProfit)} >= ₹${maxDailyProfit}. Trading paused - target achieved!`);
