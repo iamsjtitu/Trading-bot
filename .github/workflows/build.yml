@@ -33,8 +33,9 @@ jobs:
 
       - name: Copy frontend build to desktop
         run: |
-          if exist desktop\frontend-build rmdir /S /Q desktop\frontend-build
-          xcopy /E /I /Y frontend\build desktop\frontend-build
+          if (Test-Path desktop\frontend-build) { Remove-Item -Recurse -Force desktop\frontend-build }
+          Copy-Item -Recurse -Force frontend\build desktop\frontend-build
+        shell: pwsh
 
       - name: Install desktop dependencies
         working-directory: desktop
