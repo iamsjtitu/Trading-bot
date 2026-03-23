@@ -3,6 +3,7 @@ import { Card } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { FaChartLine, FaSignOutAlt, FaCircle, FaRobot } from 'react-icons/fa';
+import { toast } from 'sonner';
 import axios from 'axios';
 
 const BACKEND_URL = (() => {
@@ -105,6 +106,11 @@ export default function TradesList({ trades, formatCurrency, formatTime, trading
     setExitingId(trade.instrument_token || trade.id);
     try {
       if (onManualExit) await onManualExit(trade);
+      toast.success(`Position Closed: ${trade.symbol}`, {
+        description: `${trade.trade_type} | Qty: ${trade.quantity}`,
+      });
+    } catch (e) {
+      toast.error('Exit Failed', { description: e.message });
     } finally {
       setExitingId(null);
     }

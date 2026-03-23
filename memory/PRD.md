@@ -60,10 +60,18 @@ Build an AI-powered automated options trading bot that connects to world news, u
    - Works in both Paper and Live modes
    - Shows "Already Traded" badge for signals that already have an open trade
    - Toast notification on successful/failed trade execution
-   - When Auto ON is off, user can manually pick signals and enter trades
+   - When Auto Entry is OFF, user can manually pick signals and enter trades
    - Button disabled in LIVE mode when broker is disconnected
-2. **Instrument Change Toast** - ADDED 2026-03-23
+2. **Manual Trade Exit with Toast** - ENHANCED 2026-03-23
+   - Already existing "Exit" button now shows toast notification on success
+   - "Ask AI" button for AI exit advice on each trade
+   - Works for both Paper and Live modes
+3. **Instrument Change Toast** - ADDED 2026-03-23
    - Shows confirmation toast when trading instrument is changed (e.g., "Switched to Bank Nifty")
+4. **Auto Entry/Exit Protection Verified** - 2026-03-23
+   - When Auto Entry OFF: Signals generate but no auto-trade execution
+   - When Auto Exit OFF: No auto-exit at SL/target, user controls exits manually
+   - Backend double-checks settings before any auto-action
 
 ## Pending/Backlog
 - **P0**: Desktop app build trigger for v20.0.0+ (after instrument bug fix)
