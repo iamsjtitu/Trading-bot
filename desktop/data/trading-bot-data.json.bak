@@ -1,7 +1,7 @@
 {
   "settings": {
     "type": "main",
-    "trading_mode": "PAPER",
+    "trading_mode": "LIVE",
     "ai": {
       "emergent_llm_key": "sk-emergent-754BdB27f511c159cC",
       "model": "gpt-4o",
@@ -256,13 +256,13 @@
       "exit_advice": {
         "action": "HOLD",
         "confidence": 85,
-        "reason": "Market sentiment abhi bearish hai, aur BankNifty bhi downtrend mein hai.",
+        "reason": "Market sentiment bearish hai aur BankNifty pe pressure hai, isliye position hold karna sahi rahega.",
         "risk_level": "MEDIUM",
         "suggested_sl": null,
         "exit_pct": null,
         "trade_id": "7e04dd2e-3247-4de4-9aa9-d644faf2a82f",
         "symbol": "BANKNIFTY26032353200PE",
-        "timestamp": "2026-03-23T09:23:48.833Z",
+        "timestamp": "2026-03-23T09:26:49.219Z",
         "source": "ai",
         "pnl_at_advice": 0,
         "pnl_pct_at_advice": 0
@@ -293,14 +293,14 @@
       "pnl_percentage": 0,
       "exit_advice": {
         "action": "HOLD",
-        "confidence": 75,
-        "reason": "Market sentiment abhi bearish hai, aur aapka position neutral hai. Trend reversal ka koi clear signal nahi hai.",
+        "confidence": 85,
+        "reason": "Market sentiment bearish hai, aur recent news bhi negative hai. Trend abhi tak support kar raha hai.",
         "risk_level": "MEDIUM",
         "suggested_sl": null,
         "exit_pct": null,
         "trade_id": "de791b87-720d-49cd-b6ce-cda01fdfb3bd",
         "symbol": "BANKNIFTY26032353200PE",
-        "timestamp": "2026-03-23T09:23:50.497Z",
+        "timestamp": "2026-03-23T09:26:50.486Z",
         "source": "ai",
         "pnl_at_advice": 0,
         "pnl_pct_at_advice": 0
