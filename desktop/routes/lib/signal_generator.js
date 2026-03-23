@@ -83,31 +83,56 @@ module.exports = function createSignalGenerator(db, aiEngine) {
     }
 
     // ===== FEATURE 6: MAX DAILY LOSS AUTO-STOP (only if enabled) =====
-    const maxDailyLossEnabled = db.data?.settings?.ai_guards?.max_daily_loss !== false;
-    if (maxDailyLossEnabled) {
-      const maxDailyLoss = db.data?.settings?.auto_trading?.max_daily_loss || db.data?.settings?.risk?.max_daily_loss || 5000;
+    // In LIVE mode, use broker's actual P&L; in PAPER mode, use local DB
+    const currentMode = db.data?.settings?.trading_mode || 'PAPER';
+    let actualPnlForGuards = null; // Will be fetched once and reused for both guards
+    
+    if (currentMode === 'LIVE') {
+      const brokers = db.data?.settings?.brokers || {};
+      const upstoxToken = brokers.upstox?.access_token || '';
+      if (upstoxToken) {
+        try {
+          const headers = { Accept: 'application/json', Authorization: `Bearer ${upstoxToken}`, 'Api-Version': '2.0' };
+          const posResp = await axios.get('https://api.upstox.com/v2/portfolio/short-term-positions', { headers, timeout: 10000 });
+          if (posResp.data?.status === 'success') {
+            let rPnl = 0, uPnl = 0;
+            for (const pos of (posResp.data.data || [])) {
+              if (pos.quantity !== 0) { uPnl += pos.unrealised || ((pos.last_price - pos.average_price) * Math.abs(pos.quantity)); rPnl += pos.realised || 0; }
+              else { rPnl += pos.pnl || pos.realised || 0; }
+            }
+            actualPnlForGuards = Math.round((rPnl + uPnl) * 100) / 100;
+            console.log(`[Signal] Broker actual P&L for guards: ₹${actualPnlForGuards}`);
+          }
+        } catch (e) { console.log(`[Signal] Broker P&L fetch failed: ${e.message}`); }
+      }
+    }
+    
+    // Fallback to local DB if broker fetch failed or PAPER mode
+    if (actualPnlForGuards === null) {
       const dayStartForLoss = new Date(); dayStartForLoss.setHours(0, 0, 0, 0);
       const todayClosedTrades = (db.data.trades || []).filter(t => t.status === 'CLOSED' && (t.exit_time || '') >= dayStartForLoss.toISOString());
-      const todayRealizedLoss = todayClosedTrades.reduce((sum, t) => sum + Math.min(0, t.pnl || 0), 0);
-      if (Math.abs(todayRealizedLoss) >= maxDailyLoss) {
-        console.log(`[Signal] BLOCKED by Max Daily Loss - Today's loss: ₹${Math.abs(todayRealizedLoss)} >= limit ₹${maxDailyLoss}. Auto-stopped.`);
-        if (db.notify) db.notify('risk', 'Daily Loss Limit Hit', `Today's loss ₹${Math.abs(Math.round(todayRealizedLoss))} >= ₹${maxDailyLoss}. Trading paused.`);
-        notifyGuardBlock(db, 'Max Daily Loss', `Today loss ₹${Math.abs(Math.round(todayRealizedLoss))} >= limit ₹${maxDailyLoss}. Trading stopped.`);
+      actualPnlForGuards = todayClosedTrades.reduce((sum, t) => sum + (t.pnl || 0), 0);
+    }
+
+    const maxDailyLossEnabled = db.data?.settings?.ai_guards?.max_daily_loss !== false;
+    if (maxDailyLossEnabled && actualPnlForGuards < 0) {
+      const maxDailyLoss = db.data?.settings?.auto_trading?.max_daily_loss || db.data?.settings?.risk?.max_daily_loss || 5000;
+      if (Math.abs(actualPnlForGuards) >= maxDailyLoss) {
+        console.log(`[Signal] BLOCKED by Max Daily Loss - Today's loss: ₹${Math.abs(Math.round(actualPnlForGuards))} >= limit ₹${maxDailyLoss}. Auto-stopped.`);
+        if (db.notify) db.notify('risk', 'Daily Loss Limit Hit', `Today's loss ₹${Math.abs(Math.round(actualPnlForGuards))} >= ₹${maxDailyLoss}. Trading paused.`);
+        notifyGuardBlock(db, 'Max Daily Loss', `Today loss ₹${Math.abs(Math.round(actualPnlForGuards))} >= limit ₹${maxDailyLoss}. Trading stopped.`);
         return null;
       }
     }
 
     // ===== FEATURE 9: MAX DAILY PROFIT AUTO-STOP (only if enabled) =====
     const maxDailyProfitEnabled = db.data?.settings?.ai_guards?.max_daily_profit !== false;
-    if (maxDailyProfitEnabled) {
+    if (maxDailyProfitEnabled && actualPnlForGuards > 0) {
       const maxDailyProfit = db.data?.settings?.auto_trading?.max_daily_profit || db.data?.settings?.risk?.max_daily_profit || 10000;
-      const dayStartForProfit = new Date(); dayStartForProfit.setHours(0, 0, 0, 0);
-      const todayClosedForProfit = (db.data.trades || []).filter(t => t.status === 'CLOSED' && (t.exit_time || '') >= dayStartForProfit.toISOString());
-      const todayRealizedProfit = todayClosedForProfit.reduce((sum, t) => sum + (t.pnl || 0), 0); // NET P&L
-      if (todayRealizedProfit >= maxDailyProfit) {
-        console.log(`[Signal] BLOCKED by Max Daily Profit - Today's profit: ₹${Math.round(todayRealizedProfit)} >= target ₹${maxDailyProfit}. Target achieved! Auto-stopped.`);
-        if (db.notify) db.notify('risk', 'Daily Profit Target Hit!', `Today's profit ₹${Math.round(todayRealizedProfit)} >= ₹${maxDailyProfit}. Trading paused - target achieved!`);
-        notifyGuardBlock(db, 'Max Daily Profit', `Today profit ₹${Math.round(todayRealizedProfit)} >= target ₹${maxDailyProfit}. Target achieved! Trading stopped.`);
+      if (actualPnlForGuards >= maxDailyProfit) {
+        console.log(`[Signal] BLOCKED by Max Daily Profit - Today's profit: ₹${Math.round(actualPnlForGuards)} >= target ₹${maxDailyProfit}. Target achieved! Auto-stopped.`);
+        if (db.notify) db.notify('risk', 'Daily Profit Target Hit!', `Today's profit ₹${Math.round(actualPnlForGuards)} >= ₹${maxDailyProfit}. Trading paused - target achieved!`);
+        notifyGuardBlock(db, 'Max Daily Profit', `Today profit ₹${Math.round(actualPnlForGuards)} >= target ₹${maxDailyProfit}. Target achieved! Trading stopped.`);
         return null;
       }
     }

@@ -34,33 +34,68 @@ module.exports = function (db) {
         console.log('[News] AI analysis SKIPPED - Emergency Stop active. Saving API balance.');
       }
 
+      // Get today's ACTUAL P&L — from Broker in LIVE mode, local DB in PAPER mode
+      let actualTodayPnl = 0;
+      const currentMode = db.data?.settings?.trading_mode || 'PAPER';
+      
       if (!dailyGuardBlocked) {
-        // Check Max Daily Loss
+        if (currentMode === 'LIVE') {
+          // LIVE: Fetch actual P&L from Upstox (same source as Risk Panel)
+          const brokers = db.data?.settings?.brokers || {};
+          const upstoxToken = brokers.upstox?.access_token || '';
+          if (upstoxToken) {
+            try {
+              const headers = { Accept: 'application/json', Authorization: `Bearer ${upstoxToken}`, 'Api-Version': '2.0' };
+              const posResp = await axios.get('https://api.upstox.com/v2/portfolio/short-term-positions', { headers, timeout: 10000 });
+              if (posResp.data?.status === 'success') {
+                let realizedPnl = 0, unrealizedPnl = 0;
+                for (const pos of (posResp.data.data || [])) {
+                  if (pos.quantity !== 0) {
+                    unrealizedPnl += pos.unrealised || ((pos.last_price - pos.average_price) * Math.abs(pos.quantity));
+                    realizedPnl += pos.realised || 0;
+                  } else {
+                    realizedPnl += pos.pnl || pos.realised || 0;
+                  }
+                }
+                actualTodayPnl = Math.round((realizedPnl + unrealizedPnl) * 100) / 100;
+                console.log(`[News] Broker actual P&L: ₹${actualTodayPnl}`);
+              }
+            } catch (e) {
+              console.log(`[News] Broker P&L fetch failed, using local DB: ${e.message}`);
+              const todayStart = new Date(); todayStart.setHours(0, 0, 0, 0);
+              const todayClosed = (db.data.trades || []).filter(t => t.status === 'CLOSED' && (t.exit_time || '') >= todayStart.toISOString());
+              actualTodayPnl = todayClosed.reduce((sum, t) => sum + (t.pnl || 0), 0);
+            }
+          }
+        } else {
+          // PAPER: Use local DB
+          const todayStart = new Date(); todayStart.setHours(0, 0, 0, 0);
+          const todayClosed = (db.data.trades || []).filter(t => t.status === 'CLOSED' && (t.exit_time || '') >= todayStart.toISOString());
+          actualTodayPnl = todayClosed.reduce((sum, t) => sum + (t.pnl || 0), 0);
+        }
+      }
+
+      if (!dailyGuardBlocked) {
+        // Check Max Daily Loss (use actual P&L)
         const maxDailyLossEnabled = db.data?.settings?.ai_guards?.max_daily_loss !== false;
-        if (maxDailyLossEnabled) {
+        if (maxDailyLossEnabled && actualTodayPnl < 0) {
           const maxDailyLoss = db.data?.settings?.auto_trading?.max_daily_loss || db.data?.settings?.risk?.max_daily_loss || 5000;
-          const dayStartLoss = new Date(); dayStartLoss.setHours(0, 0, 0, 0);
-          const todayClosed = (db.data.trades || []).filter(t => t.status === 'CLOSED' && (t.exit_time || '') >= dayStartLoss.toISOString());
-          const todayLoss = todayClosed.reduce((sum, t) => sum + Math.min(0, t.pnl || 0), 0);
-          if (Math.abs(todayLoss) >= maxDailyLoss) {
+          if (Math.abs(actualTodayPnl) >= maxDailyLoss) {
             dailyGuardBlocked = true;
-            dailyGuardReason = `Max Daily Loss hit: ₹${Math.abs(Math.round(todayLoss))} >= ₹${maxDailyLoss}`;
+            dailyGuardReason = `Max Daily Loss hit: ₹${Math.abs(Math.round(actualTodayPnl))} >= ₹${maxDailyLoss}`;
             console.log(`[News] AI analysis SKIPPED - ${dailyGuardReason}. Saving API balance.`);
           }
         }
       }
 
       if (!dailyGuardBlocked) {
-        // Check Max Daily Profit
+        // Check Max Daily Profit (use actual P&L)
         const maxDailyProfitEnabled = db.data?.settings?.ai_guards?.max_daily_profit !== false;
-        if (maxDailyProfitEnabled) {
+        if (maxDailyProfitEnabled && actualTodayPnl > 0) {
           const maxDailyProfit = db.data?.settings?.auto_trading?.max_daily_profit || db.data?.settings?.risk?.max_daily_profit || 10000;
-          const dayStartProfit = new Date(); dayStartProfit.setHours(0, 0, 0, 0);
-          const todayClosed = (db.data.trades || []).filter(t => t.status === 'CLOSED' && (t.exit_time || '') >= dayStartProfit.toISOString());
-          const todayProfit = todayClosed.reduce((sum, t) => sum + (t.pnl || 0), 0); // NET P&L
-          if (todayProfit >= maxDailyProfit) {
+          if (actualTodayPnl >= maxDailyProfit) {
             dailyGuardBlocked = true;
-            dailyGuardReason = `Max Daily Profit target hit: ₹${Math.round(todayProfit)} >= ₹${maxDailyProfit}`;
+            dailyGuardReason = `Max Daily Profit target hit: ₹${Math.round(actualTodayPnl)} >= ₹${maxDailyProfit}`;
             console.log(`[News] AI analysis SKIPPED - ${dailyGuardReason}. Saving API balance.`);
           }
         }

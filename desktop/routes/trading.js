@@ -421,18 +421,56 @@ module.exports = function (db) {
   router.get('/api/historical-patterns', (req, res) => { const patterns = db.data.historical_patterns || []; const total = patterns.length; const profitable = patterns.filter(p => p.was_profitable).length; const sectorStats = {}; for (const p of patterns) { const s = p.sector || 'BROAD_MARKET'; if (!sectorStats[s]) sectorStats[s] = { total: 0, profitable: 0, total_pnl: 0 }; sectorStats[s].total++; if (p.was_profitable) sectorStats[s].profitable++; sectorStats[s].total_pnl += p.pnl || 0; } const sentimentStats = {}; for (const p of patterns) { const s = p.sentiment || 'NEUTRAL'; if (!sentimentStats[s]) sentimentStats[s] = { total: 0, profitable: 0, total_pnl: 0 }; sentimentStats[s].total++; if (p.was_profitable) sentimentStats[s].profitable++; sentimentStats[s].total_pnl += p.pnl || 0; } res.json({ status: 'success', total_patterns: total, profitable_patterns: profitable, win_rate: total ? Math.round((profitable / total) * 1000) / 10 : 0, sector_stats: sectorStats, sentiment_stats: sentimentStats, recent: patterns.slice(-20).reverse() }); });
 
   // ============ AI Guards Status & Config ============
-  router.get('/api/ai-guards/status', (req, res) => {
+  router.get('/api/ai-guards/status', async (req, res) => {
     const guards = db.data?.settings?.ai_guards || {};
     const ist = new Date(Date.now() + 5.5 * 60 * 60 * 1000);
     const istMins = ist.getUTCHours() * 60 + ist.getUTCMinutes();
     const istTimeStr = `${Math.floor(istMins / 60)}:${String(istMins % 60).padStart(2, '0')} IST`;
     const isVolatileWindow = (istMins >= 555 && istMins <= 585) || (istMins >= 900 && istMins <= 930);
 
-    const todayStart = new Date(); todayStart.setHours(0, 0, 0, 0);
-    const todayClosed = (db.data.trades || []).filter(t => t.status === 'CLOSED' && (t.exit_time || '') >= todayStart.toISOString());
-    const todayLoss = todayClosed.reduce((s, t) => s + Math.min(0, t.pnl || 0), 0);
+    // Calculate today's P&L — use BROKER data in LIVE mode, local DB in PAPER mode
+    let todayPnl = 0;
+    let todayLossVal = 0;
+    const currentMode = db.data?.settings?.trading_mode || 'PAPER';
+
+    if (currentMode === 'LIVE') {
+      // LIVE: Fetch ACTUAL P&L from Upstox positions API (same source as Risk Panel)
+      const token = getActiveBrokerToken();
+      if (token) {
+        try {
+          const headers = { Accept: 'application/json', Authorization: `Bearer ${token}`, 'Api-Version': '2.0' };
+          const posResp = await axios.get('https://api.upstox.com/v2/portfolio/short-term-positions', { headers, timeout: 10000 });
+          if (posResp.data?.status === 'success') {
+            let realizedPnl = 0, unrealizedPnl = 0;
+            for (const pos of (posResp.data.data || [])) {
+              if (pos.quantity !== 0) {
+                unrealizedPnl += pos.unrealised || ((pos.last_price - pos.average_price) * Math.abs(pos.quantity));
+                realizedPnl += pos.realised || 0;
+              } else {
+                realizedPnl += pos.pnl || pos.realised || 0;
+              }
+            }
+            todayPnl = Math.round((realizedPnl + unrealizedPnl) * 100) / 100;
+            todayLossVal = todayPnl < 0 ? todayPnl : 0;
+          }
+        } catch (e) {
+          console.error('[Guards] Broker P&L fetch failed, using local DB:', e.message);
+          // Fallback to local DB
+          const todayStart = new Date(); todayStart.setHours(0, 0, 0, 0);
+          const todayClosed = (db.data.trades || []).filter(t => t.status === 'CLOSED' && (t.exit_time || '') >= todayStart.toISOString());
+          todayPnl = todayClosed.reduce((s, t) => s + (t.pnl || 0), 0);
+          todayLossVal = todayClosed.reduce((s, t) => s + Math.min(0, t.pnl || 0), 0);
+        }
+      }
+    } else {
+      // PAPER: Use local DB
+      const todayStart = new Date(); todayStart.setHours(0, 0, 0, 0);
+      const todayClosed = (db.data.trades || []).filter(t => t.status === 'CLOSED' && (t.exit_time || '') >= todayStart.toISOString());
+      todayPnl = todayClosed.reduce((s, t) => s + (t.pnl || 0), 0);
+      todayLossVal = todayClosed.reduce((s, t) => s + Math.min(0, t.pnl || 0), 0);
+    }
+
     const maxDailyLoss = db.data?.settings?.auto_trading?.max_daily_loss || 5000;
-    const todayProfit = todayClosed.reduce((s, t) => s + (t.pnl || 0), 0); // NET P&L (wins + losses combined)
     const maxDailyProfit = db.data?.settings?.auto_trading?.max_daily_profit || db.data?.settings?.risk?.max_daily_profit || 10000;
 
     const aiEngine = db._sharedAIEngine;
@@ -470,8 +508,8 @@ module.exports = function (db) {
         trailing_stop: { enabled: guards.trailing_stop !== false, description: 'SL moves up as price rises' },
         multi_source_verification: { enabled: guards.multi_source_verification !== false, recent_sources: sourceCount },
         time_of_day_filter: { enabled: guards.time_of_day_filter !== false, current_window: isVolatileWindow ? 'HIGH VOLATILITY - BLOCKED' : 'NORMAL', ist_time: istTimeStr },
-        max_daily_loss: { enabled: guards.max_daily_loss !== false, today_loss: Math.round(Math.abs(todayLoss)), limit: maxDailyLoss, blocked: guards.max_daily_loss !== false && Math.abs(todayLoss) >= maxDailyLoss },
-        max_daily_profit: { enabled: guards.max_daily_profit !== false, today_profit: Math.round(todayProfit), target: maxDailyProfit, blocked: guards.max_daily_profit !== false && todayProfit > 0 && todayProfit >= maxDailyProfit },
+        max_daily_loss: { enabled: guards.max_daily_loss !== false, today_loss: Math.round(Math.abs(todayLossVal)), limit: maxDailyLoss, blocked: guards.max_daily_loss !== false && Math.abs(todayLossVal) >= maxDailyLoss },
+        max_daily_profit: { enabled: guards.max_daily_profit !== false, today_profit: Math.round(todayPnl), target: maxDailyProfit, blocked: guards.max_daily_profit !== false && todayPnl > 0 && todayPnl >= maxDailyProfit },
         kelly_sizing: { enabled: guards.kelly_sizing !== false, mode: kellyMode, win_rate: winRate, total_trades: closedTrades.length, consecutive_losses: consecutiveLosses, description: 'AI decides how much to invest per trade' },
         greeks_filter: { enabled: guards.greeks_filter !== false, description: 'Options Greeks & IV analysis filters bad options' },
       },
