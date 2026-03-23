@@ -417,37 +417,14 @@ module.exports = function createSignalGenerator(db, aiEngine) {
         return { success: false, error: `Max open trades reached (${openInInstrument.length}/${maxTotalTrades})` };
       }
 
-      // STRICT max_per_trade enforcement — check BOTH risk and auto_trading settings
+      // STRICT max_per_trade enforcement — user's setting is the HARD LIMIT
       const riskCfg = db.data?.settings?.risk || {};
       const autoTradingCfg = db.data?.settings?.auto_trading || {};
-      let maxTrade = autoTradingCfg.max_per_trade || riskCfg.max_per_trade || 20000;
-
-      // LIVE MODE: Use broker's available funds to ensure maxTrade is realistic
-      try {
-        const fundsResp = await axios.get('https://api.upstox.com/v2/user/get-funds-and-margin', {
-          headers: { Accept: 'application/json', Authorization: `Bearer ${accessToken}`, 'Api-Version': '2.0' },
-          timeout: 10000
-        });
-        if (fundsResp.data?.status === 'success' && fundsResp.data?.data) {
-          const equity = fundsResp.data.data.equity || fundsResp.data.data.commodity || {};
-          const availableMargin = equity.available_margin || 0;
-          if (availableMargin > 0) {
-            const userSetMax = autoTradingCfg.max_per_trade || riskCfg.max_per_trade || 0;
-            if (userSetMax > 0) {
-              maxTrade = userSetMax;
-            } else {
-              // No user-set limit, use 25% of available margin
-              maxTrade = Math.max(maxTrade, Math.floor(availableMargin * 0.25));
-            }
-            console.log(`[LiveTrade] max_per_trade: ₹${maxTrade} | Broker available: ₹${Math.round(availableMargin)}`);
-          }
-        }
-      } catch (e) {
-        console.log(`[LiveTrade] Funds fetch failed, using settings max: ₹${maxTrade}`);
-      }
+      const userMaxPerTrade = autoTradingCfg.max_per_trade || riskCfg.max_per_trade || 0;
+      let maxTrade = userMaxPerTrade || 20000; // Use user setting, fallback to ₹20K default
+      console.log(`[LiveTrade] User max_per_trade: ₹${maxTrade} (from settings)`);
 
       // Kelly Criterion: ONLY affects lot quantity, NOT the trade amount limit
-      // Kelly is logged as advisory info, maxTrade stays untouched
       const kellyEnabled = db.data?.settings?.ai_guards?.kelly_sizing !== false;
       if (kellyEnabled && signal.kelly_sizing?.suggested_amount > 0) {
         console.log(`[LiveTrade] Kelly advisory: Suggests ₹${Math.round(signal.kelly_sizing.suggested_amount)} (${signal.kelly_sizing.kelly_pct}% kelly). max_per_trade unchanged at ₹${maxTrade}`);
@@ -536,13 +513,14 @@ module.exports = function createSignalGenerator(db, aiEngine) {
       }
 
       const estimatedInvestment = qty * actualPremium;
-      // Safety check: investment must not exceed maxTrade (with 5% slippage tolerance)
-      if (estimatedInvestment > maxTrade * 1.05) {
-        // Reduce to fit within limit
+      // HARD CAP: Investment MUST NOT exceed max_per_trade. No exceptions.
+      if (estimatedInvestment > maxTrade) {
         qty = Math.floor(maxTrade / actualPremium / lotSize) * lotSize;
         if (qty < lotSize) qty = lotSize;
+        console.log(`[LiveTrade] Qty reduced to ${qty} to fit within max_per_trade ₹${maxTrade} (was ₹${Math.round(estimatedInvestment)})`);
       }
-      console.log(`[LiveTrade] Premium: ₹${actualPremium}, Lot: ${lotSize}, Qty: ${qty}, Investment: ₹${Math.round(qty * actualPremium)}, Max: ₹${maxTrade}`);
+      const finalInvestment = qty * actualPremium;
+      console.log(`[LiveTrade] FINAL: Premium ₹${actualPremium}, Lot ${lotSize}, Qty ${qty}, Investment ₹${Math.round(finalInvestment)}, Max ₹${maxTrade}`);
       const orderBody = { quantity: qty, product: 'I', validity: 'DAY', price: 0, instrument_token: instrumentToken, order_type: 'MARKET', transaction_type: 'BUY', disclosed_quantity: 0, trigger_price: 0, is_amo: false };
       const orderResp = await axios.post('https://api.upstox.com/v2/order/place', orderBody, { headers, timeout: 15000 });
       const orderId = orderResp.data?.data?.order_id || '';
