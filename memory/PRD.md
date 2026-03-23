@@ -77,6 +77,11 @@ Build an AI-powered automated options trading bot that connects to world news, u
    - Max articles per cycle: 30 → 10
    - Exit Advisor polling: 60s → 5 min (80% savings)
    - Estimated total API cost reduction: ~75-80%
+6. **Manual News Fetch + Analyze** - ADDED 2026-03-23
+   - "Fetch Latest News" button: Fetches news from 16 sources WITHOUT AI (FREE)
+   - "Analyze with AI" button per article: Single article AI analysis + signal generation
+   - Hint text: "Click to generate CALL/PUT signal" for BULLISH/BEARISH articles
+   - Backend: `/api/news/fetch-only` and `/api/news/analyze-article` endpoints
 
 ## Pending/Backlog
 - **P0**: Desktop app build trigger for v20.0.0+ (after instrument bug fix)

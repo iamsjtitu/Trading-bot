@@ -259,6 +259,80 @@ module.exports = function (db) {
     res.json({ status: 'success', count: news.length, news });
   });
 
+  // POST /api/news/fetch-only - Fetch news WITHOUT AI analysis (saves API calls)
+  router.post('/api/news/fetch-only', async (req, res) => {
+    try {
+      const newsCfg = db.data.settings?.news || { sources: ['demo'] };
+      const { articles: allNewsRaw, errors } = await fetchAllNews(newsCfg);
+      const seenTitles = new Set();
+      const oneHourAgo = new Date(Date.now() - 60 * 60 * 1000).toISOString();
+      const existingTitles = new Set((db.data.news_articles || []).filter(n => (n.created_at || '') > oneHourAgo).map(n => (n.title || '').toLowerCase().trim()));
+      const allNews = allNewsRaw.filter(a => {
+        const norm = (a.title || '').toLowerCase().trim();
+        if (!norm || seenTitles.has(norm) || existingTitles.has(norm)) return false;
+        seenTitles.add(norm); return true;
+      }).slice(0, 15);
+
+      if (!db.data.news_articles) db.data.news_articles = [];
+
+      const fetched = [];
+      for (const article of allNews) {
+        const articleId = uuid();
+        // Only keyword analysis (FREE - no API call)
+        const kwResult = sentiment.keywordSentiment(article);
+        const newsDoc = {
+          id: articleId, title: article.title, description: article.description,
+          content: article.content || '', source: article.source, url: article.url,
+          published_at: article.published_at, sentiment_analysis: kwResult,
+          ai_analyzed: false, created_at: new Date().toISOString()
+        };
+        db.data.news_articles.push(newsDoc);
+        fetched.push(newsDoc);
+      }
+      db.save();
+      console.log(`[News] Fetch-only: ${fetched.length} articles (no API calls used)`);
+      res.json({ status: 'success', articles_fetched: fetched.length, articles: fetched });
+    } catch (err) {
+      console.error('[News] Fetch-only error:', err);
+      res.json({ status: 'error', message: err.message });
+    }
+  });
+
+  // POST /api/news/analyze-article - Analyze single article with AI + generate signal
+  router.post('/api/news/analyze-article', async (req, res) => {
+    try {
+      const { article_id } = req.body;
+      if (!article_id) return res.json({ status: 'error', message: 'article_id required' });
+
+      const article = (db.data.news_articles || []).find(a => a.id === article_id);
+      if (!article) return res.json({ status: 'error', message: 'Article not found' });
+
+      // Run AI analysis
+      const sentimentResult = await sentiment.analyzeSentiment(article);
+      article.sentiment_analysis = sentimentResult;
+      article.ai_analyzed = true;
+      console.log(`[News] Manual AI analysis: ${(article.title || '').substring(0, 50)}...`);
+
+      let signal = null;
+      const minConfidence = db.data?.settings?.news?.min_confidence || 70;
+      if (sentimentResult.confidence >= minConfidence && sentimentResult.trading_signal !== 'HOLD') {
+        if (!db.data?.settings?.emergency_stop) {
+          if (!db.data.signals) db.data.signals = [];
+          signal = signals.generateSignal(article);
+          if (signal) {
+            db.data.signals.push(signal);
+            if (db.notify) db.notify('signal', `${signal.signal_type} Signal`, `${signal.symbol} | ${sentimentResult.sentiment} ${sentimentResult.confidence}% | ${sentimentResult.reason}`);
+          }
+        }
+      }
+      db.save();
+      res.json({ status: 'success', article, signal, message: signal ? `Signal generated: ${signal.signal_type}` : 'Analysis complete, no signal (low confidence or HOLD)' });
+    } catch (err) {
+      console.error('[News] Analyze-article error:', err);
+      res.json({ status: 'error', message: err.message });
+    }
+  });
+
   // GET /api/ai/insights
   router.get('/api/ai/insights', (req, res) => {
     const insights = aiEngine.getAIInsights();

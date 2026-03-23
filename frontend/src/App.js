@@ -103,7 +103,7 @@ function App() {
             <TabsTrigger value="system-health" data-testid="system-health-tab" className="data-[state=active]:bg-green-100 data-[state=active]:text-green-900">System Health</TabsTrigger>
           </TabsList>
 
-          <TabsContent value="news"><NewsFeed news={state.news} formatTime={state.formatTime} /></TabsContent>
+          <TabsContent value="news"><NewsFeed news={state.news} formatTime={state.formatTime} onRefresh={state.loadData} /></TabsContent>
           <TabsContent value="signals"><SignalsList signals={state.signals} formatCurrency={state.formatCurrency} formatTime={state.formatTime} tradingMode={state.tradingMode} brokerConnected={state.brokerConnected} onTradeExecuted={state.loadData} /></TabsContent>
           <TabsContent value="trades"><TradesList trades={state.displayTrades} formatCurrency={state.formatCurrency} formatTime={state.formatTime} tradingMode={state.tradingMode} brokerConnected={state.brokerConnected} onManualExit={state.handleManualExit} /></TabsContent>
           <TabsContent value="history"><TradeHistory formatCurrency={state.formatCurrency} tradingMode={state.tradingMode} brokerConnected={state.brokerConnected} brokerOrders={state.brokerOrders} /></TabsContent>

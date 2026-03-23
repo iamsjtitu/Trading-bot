@@ -22513,25 +22513,25 @@
       "published_at": "2026-03-23T13:29:17.000Z",
       "sentiment_analysis": {
         "sentiment": "NEUTRAL",
-        "confidence": 62,
+        "confidence": 55,
         "impact": "LOW",
         "sector": "BROAD_MARKET",
-        "reason": "The acquisition of Bitcoin by Saylor’s Strategy Inc. is unlikely to have a direct impact on Nifty/BankNifty in the immediate term. While Bitcoin movements can influence tech and finance sentiment globally, the Indian market's correlation with Bitcoin-specific developments remains weak. Thus, this news will mostly affect the broader market sentiment with minimal immediate impact on Indian indices.",
+        "reason": "The acquisition of Bitcoin by Michael Saylor’s Strategy Inc. is a corporate decision with negligible immediate direct impact on the Nifty 50 or Bank Nifty indices. The Indian market response to Bitcoin news is typically muted unless accompanied by broader cryptocurrency regulatory changes. There is no significant sector-level impact, and historical patterns show limited market movement from similar cryptocurrency purchases by foreign entities.",
         "trading_signal": "HOLD",
         "volatility": "STABLE",
         "time_horizon": "SHORT_TERM",
         "risk_level": "LOW",
         "secondary_sector": "NONE",
-        "trend_note": "Confidence adjusted by +4 based on recent trend",
-        "correlation_score": 88,
-        "correlation_detail": "Direction alignment: 52%, Sector: 84%, Buffer: 58 signals",
-        "confluence_score": 0,
-        "confluence_aligned": 0,
-        "composite_score": 62,
-        "freshness_score": 84,
-        "market_regime": "SIDEWAYS"
+        "correlation_score": 90,
+        "correlation_detail": "Direction alignment: 67%, Sector: 67%, Buffer: 3 signals",
+        "confluence_score": 100,
+        "confluence_aligned": 3,
+        "composite_score": 67,
+        "freshness_score": 77,
+        "market_regime": "UNKNOWN"
       },
-      "created_at": "2026-03-23T13:44:48.178Z"
+      "created_at": "2026-03-23T13:44:48.178Z",
+      "ai_analyzed": true
     },
     {
       "id": "5b586f02-2ff6-46f9-bbc8-5d831ecb8f82",
@@ -22542,26 +22542,26 @@
       "url": "https://www.bloomberg.com/news/articles/2026-03-23/alphabet-s-wing-drones-to-start-silicon-valley-deliveries-this-year",
       "published_at": "2026-03-23T13:00:00.000Z",
       "sentiment_analysis": {
-        "sentiment": "BULLISH",
-        "confidence": 61,
+        "sentiment": "NEUTRAL",
+        "confidence": 55,
         "impact": "LOW",
-        "sector": "IT",
-        "reason": "The expansion of Alphabet’s Wing drone deliveries in Silicon Valley demonstrates technological innovation and potential growth in logistics, likely benefiting the tech sector. However, the direct impact on the Indian markets is low due to the geographical focus. The sentiment boost to IT might provide slight bullishness due to positive sentiment spillover toward tech advancements.",
+        "sector": "BROAD_MARKET",
+        "reason": "The news about Alphabet's Wing expansion into drone delivery in the San Francisco Bay Area does not directly impact the Nifty 50 or Bank Nifty as it pertains to a specific technological advancement by a global tech giant, primarily affecting the US market. The fintech and logistics sectors in India might take a slight positive cue from advancements in delivery technologies, but the broader impact on Indian indices is minimal.",
         "trading_signal": "HOLD",
         "volatility": "STABLE",
         "time_horizon": "SHORT_TERM",
-        "risk_level": "MEDIUM",
+        "risk_level": "LOW",
         "secondary_sector": "NONE",
-        "trend_note": "Confidence adjusted by -5 based on recent trend",
-        "correlation_score": 69,
-        "correlation_detail": "Direction alignment: 29%, Sector: 5%, Buffer: 59 signals",
+        "correlation_score": 73,
+        "correlation_detail": "Direction alignment: 50%, Sector: 50%, Buffer: 2 signals",
         "confluence_score": 0,
         "confluence_aligned": 0,
-        "composite_score": 55,
-        "freshness_score": 60,
-        "market_regime": "SIDEWAYS"
+        "composite_score": 51,
+        "freshness_score": 55,
+        "market_regime": "UNKNOWN"
       },
-      "created_at": "2026-03-23T13:44:49.968Z"
+      "created_at": "2026-03-23T13:44:49.968Z",
+      "ai_analyzed": true
     },
     {
       "id": "383993e8-5168-4f90-8ef7-456b003612ae",
@@ -22574,24 +22574,309 @@
       "sentiment_analysis": {
         "sentiment": "BEARISH",
         "confidence": 70,
-        "impact": "HIGH",
+        "impact": "MEDIUM",
         "sector": "BANKING",
-        "reason": "A 4% decline in HDFC Bank shares hitting a 52-week low indicates significant institutional selling pressure. This directly impacts the Banking sector, potentially influencing broader market sentiment if HDFC Bank's issues reflect wider sectorial challenges. Historical patterns suggest such declines in a heavyweight like HDFC Bank often lead to cautiousness in further Banking sector investments, impacting Bank Nifty negatively in the short term.",
+        "reason": "HDFC Bank's significant drop of 4% to a 52-week low indicates potential underlying issues, such as weak quarterly results, regulatory challenges, or broader banking sector concerns. This is likely to create wider sector pressure, as HDFC Bank is a major component of Bank Nifty, making it particularly impactful. Historical patterns show such declines can lead to increased volatility with potential FII selling pressure.",
         "trading_signal": "HOLD",
         "volatility": "INCREASING",
         "time_horizon": "SHORT_TERM",
         "risk_level": "MEDIUM",
-        "secondary_sector": "NONE",
-        "trend_note": "Confidence adjusted by -5 based on recent trend",
-        "correlation_score": 57,
-        "correlation_detail": "Direction alignment: 22%, Sector: 5%, Buffer: 60 signals",
+        "secondary_sector": "BROAD_MARKET",
+        "correlation_score": 50,
+        "correlation_detail": "Insufficient signals for correlation",
         "confluence_score": 0,
         "confluence_aligned": 0,
-        "composite_score": 48,
+        "composite_score": 47,
         "freshness_score": 5,
-        "market_regime": "SIDEWAYS"
+        "market_regime": "UNKNOWN"
       },
-      "created_at": "2026-03-23T13:44:53.072Z"
+      "created_at": "2026-03-23T13:44:53.072Z",
+      "ai_analyzed": true
+    },
+    {
+      "id": "224e2ab9-70b4-4c7e-8921-d602cfb0ac79",
+      "title": "Treasuries Whipsawed by Conflicting Claims About US-Iran Talks",
+      "description": "Treasuries rose after swinging sharply with oil prices after Iran disputed statements by US President Trump regarding talks to end hostilities.",
+      "content": "Treasuries rose after swinging sharply with oil prices after Iran disputed statements by US President Trump regarding talks to end hostilities.",
+      "source": "Bloomberg",
+      "url": "https://www.bloomberg.com/news/articles/2026-03-23/treasuries-soar-after-trump-postpones-iran-power-strikes",
+      "published_at": "2026-03-23T11:22:57.000Z",
+      "sentiment_analysis": {
+        "sentiment": "NEUTRAL",
+        "confidence": 50,
+        "impact": "LOW",
+        "sector": "ENERGY",
+        "reason": "No strong keywords detected (keyword analysis)",
+        "trading_signal": "HOLD"
+      },
+      "ai_analyzed": false,
+      "created_at": "2026-03-23T13:53:48.117Z"
+    },
+    {
+      "id": "f2a67fbe-f347-4cee-9040-910dbbdb169e",
+      "title": "European Stocks Swing as Investors Gauge Iran War De-Escalation",
+      "description": "European stocks erased sharp declines to trade higher in one of the biggest swings in years after US President Donald Trump said he was postponing military strikes on Iran’s energy infrastructure following “very good” talks with Tehran.",
+      "content": "European stocks erased sharp declines to trade higher in one of the biggest swings in years after US President Donald Trump said he was postponing military strikes on Iran’s energy infrastructure following “very good” talks with Tehran.",
+      "source": "Bloomberg",
+      "url": "https://www.bloomberg.com/news/articles/2026-03-23/european-stocks-sink-into-correction-on-trump-s-iran-escalation",
+      "published_at": "2026-03-23T08:22:40.000Z",
+      "sentiment_analysis": {
+        "sentiment": "BEARISH",
+        "confidence": 55,
+        "impact": "LOW",
+        "sector": "ENERGY",
+        "reason": "Bearish signals [ENERGY]: decline (keyword analysis)",
+        "trading_signal": "HOLD"
+      },
+      "ai_analyzed": false,
+      "created_at": "2026-03-23T13:53:48.117Z"
+    },
+    {
+      "id": "e0236aa6-7828-48a8-88a0-ed8a02928a46",
+      "title": "US stocks today: Dow Jones soars 600 points, S&P, Nasdaq rise over 1% after Trump 'postpones' strikes on Iran",
+      "description": "Wall ​Street's main ​indexes opened higher ​on Monday as risk appetite returned to ‌markets ⁠after ⁠U.S. President Donald Trump ​said he would order ​the military to postpone strikes against ​Iranian power ⁠plants and ‌energy infrastructure.",
+      "content": "Wall ​Street's main ​indexes opened higher ​on Monday as risk appetite returned to ‌markets ⁠after ⁠U.S. President Donald Trump ​said he would order ​the military to postpone strikes against ​Iranian power ⁠plants and ‌energy infrastructure.",
+      "source": "Economic Times",
+      "url": "https://economictimes.indiatimes.com/markets/us-stocks/news/us-stocks-today-dow-jones-soars-600-points-sp-nasdaq-rise-over-1-after-trump-postpones-strikes-on-iran/articleshow/129754208.cms",
+      "published_at": "2026-03-23T13:35:22.000Z",
+      "sentiment_analysis": {
+        "sentiment": "BULLISH",
+        "confidence": 65,
+        "impact": "MEDIUM",
+        "sector": "ENERGY",
+        "reason": "Bullish signals [ENERGY]: gain (keyword analysis)",
+        "trading_signal": "BUY_CALL"
+      },
+      "ai_analyzed": false,
+      "created_at": "2026-03-23T13:53:48.117Z"
+    },
+    {
+      "id": "ade8f25b-d6f7-42d2-a1e7-5c4ff952ee91",
+      "title": "SEBI Chair Pandey flags board governance in HDFC Bank case; maintains status quo on F&O",
+      "description": "On the sidelines of the SEBI board meet, SEBI Chairman Tuhin Kanta Pandey flagged governance norms in the HDFC Bank case, while indicating no change in the regulator’s approach to F&O",
+      "content": "On the sidelines of the SEBI board meet, SEBI Chairman Tuhin Kanta Pandey flagged governance norms in the HDFC Bank case, while indicating no change in the regulator’s approach to F&O",
+      "source": "CNBC TV18",
+      "url": "https://www.cnbctv18.com/market/sebi-chair-flags-board-governance-in-hdfc-case-status-quo-on-f-and-o-ws-l-19873665.htm",
+      "published_at": "2026-03-23T13:52:06.000Z",
+      "sentiment_analysis": {
+        "sentiment": "NEUTRAL",
+        "confidence": 50,
+        "impact": "LOW",
+        "sector": "BANKING",
+        "reason": "No strong keywords detected (keyword analysis)",
+        "trading_signal": "HOLD"
+      },
+      "ai_analyzed": false,
+      "created_at": "2026-03-23T13:53:48.117Z"
+    },
+    {
+      "id": "a01eeba3-ca53-4b5d-8d79-964bc29f7cb0",
+      "title": "Big Sebi move: FPIs get net settlement nod, AIF rules relaxed",
+      "description": "The market regulator also approved framework that will allow more flexibility to AIFs in winding up schemes and surrendering registration",
+      "content": "The market regulator also approved framework that will allow more flexibility to AIFs in winding up schemes and surrendering registration",
+      "source": "Business Today",
+      "url": "https://www.businesstoday.in/markets/story/big-sebi-move-fpis-get-net-settlement-nod-aif-rules-relaxed-521935-2026-03-23?utm_source=rssfeed",
+      "published_at": "2026-03-23T13:37:53.000Z",
+      "sentiment_analysis": {
+        "sentiment": "BEARISH",
+        "confidence": 55,
+        "impact": "LOW",
+        "sector": "BROAD_MARKET",
+        "reason": "Bearish signals [BROAD_MARKET]:  (keyword analysis)",
+        "trading_signal": "HOLD"
+      },
+      "ai_analyzed": false,
+      "created_at": "2026-03-23T13:53:48.117Z"
+    },
+    {
+      "id": "a2ab7c65-e23f-4b81-a84f-ea63b0f020bb",
+      "title": "Pfizer’s Long-Awaited Lyme Vaccine Fails to Impress in Study",
+      "description": "Pfizer Inc. said its experimental Lyme disease vaccine was 73% effective against the tick-borne illness, a lackluster result as fewer-than-expected infections in the pivotal study made its potency hard to evaluate.",
+      "content": "Pfizer Inc. said its experimental Lyme disease vaccine was 73% effective against the tick-borne illness, a lackluster result as fewer-than-expected infections in the pivotal study made its potency hard to evaluate.",
+      "source": "Bloomberg",
+      "url": "https://www.bloomberg.com/news/articles/2026-03-23/pfizer-says-long-awaited-lyme-vaccine-was-effective-in-study",
+      "published_at": "2026-03-23T10:45:00.000Z",
+      "sentiment_analysis": {
+        "sentiment": "BULLISH",
+        "confidence": 60,
+        "impact": "LOW",
+        "sector": "PHARMA",
+        "reason": "Bullish signals [PHARMA]: gain (keyword analysis)",
+        "trading_signal": "HOLD"
+      },
+      "ai_analyzed": false,
+      "created_at": "2026-03-23T13:53:48.117Z"
+    },
+    {
+      "id": "a72db5b8-6b92-4d04-8db4-29e431f33a40",
+      "title": "HPE Gets Day in Court as State AGs Challenge $14 Billion Deal",
+      "description": "Hewlett Packard Enterprise Inc. faces a crucial hurdle Monday to reaping the benefits of its $14 billion takeover of wireless networking rival Juniper Networks Inc., as a federal judge considers whether the Trump administration improperly approved an antitrust settlement that a group of states claim was tainted.",
+      "content": "Hewlett Packard Enterprise Inc. faces a crucial hurdle Monday to reaping the benefits of its $14 billion takeover of wireless networking rival Juniper Networks Inc., as a federal judge considers whether the Trump administration improperly approved an antitrust settlement that a group of states claim was tainted.",
+      "source": "Bloomberg",
+      "url": "https://www.bloomberg.com/news/articles/2026-03-23/hpe-gets-day-in-court-as-state-ags-challenge-14-billion-deal",
+      "published_at": "2026-03-23T10:03:10.000Z",
+      "sentiment_analysis": {
+        "sentiment": "BULLISH",
+        "confidence": 55,
+        "impact": "LOW",
+        "sector": "BROAD_MARKET",
+        "reason": "Bullish signals [BROAD_MARKET]:  (keyword analysis)",
+        "trading_signal": "HOLD"
+      },
+      "ai_analyzed": false,
+      "created_at": "2026-03-23T13:53:48.117Z"
+    },
+    {
+      "id": "84e86000-722a-4960-9136-a8dcb684f1c2",
+      "title": "Indian shares extend gains; Fed rate decision eyed - Reuters",
+      "description": "Indian shares extend gains; Fed rate decision eyed - Reuters",
+      "content": "Indian shares extend gains; Fed rate decision eyed - Reuters",
+      "source": "Reuters",
+      "url": "https://news.google.com/rss/articles/CBMirgFBVV95cUxNejdfNGc5R0lYeHV3MTkzbnVmMF9pb1N2QXJjQXFuYXVPX09NMlZXUXFBTEh6X3dJb0hPbFZneldmOGNjSVNTcGZFbmIxSFM3a1FEWlB5VVkyRDBtS2dSN2YyQ0RaTW1Xc2l5akpuTUpNNjg2UW15REEzb2NWTVFhMmI3VkNhMHJyM1pqZ1hoS015U1JrZUVTYVhmZ21hZUgxdWEzWGIybHlzaGlnVlE?oc=5",
+      "published_at": "2026-03-18T03:11:29.000Z",
+      "sentiment_analysis": {
+        "sentiment": "BULLISH",
+        "confidence": 60,
+        "impact": "LOW",
+        "sector": "BROAD_MARKET",
+        "reason": "Bullish signals [BROAD_MARKET]: gain (keyword analysis)",
+        "trading_signal": "HOLD"
+      },
+      "ai_analyzed": false,
+      "created_at": "2026-03-23T13:53:48.117Z"
+    },
+    {
+      "id": "d081384b-6ebf-407d-bcf4-aa73feacba9c",
+      "title": "Dow Jones Today | US Stock Market LIVE Updates: Dow jumps 800 points at the open after Trump says US and Iran have held productive talks",
+      "description": "Dow Jones Today | US Stock Market LIVE Updates: US stocks on Monday (March 23) rallied after President Donald Trump said the United States and Iran had held talks and that he was halting strikes on Iranian power plants and energy infrastructure.",
+      "content": "Dow Jones Today | US Stock Market LIVE Updates: US stocks on Monday (March 23) rallied after President Donald Trump said the United States and Iran had held talks and that he was halting strikes on Iranian power plants and energy infrastructure.",
+      "source": "CNBC TV18",
+      "url": "https://www.cnbctv18.com/market/us-stock-market-live-updates-dow-jones-nasdaq-today-sp-500-futures-jump-after-trump-says-us-and-iran-held-productive-talks-analysis-outlook-israel-iran-war-oil-price-liveblog-ws-l-19873651.htm",
+      "published_at": "2026-03-23T13:45:35.000Z",
+      "sentiment_analysis": {
+        "sentiment": "NEUTRAL",
+        "confidence": 50,
+        "impact": "LOW",
+        "sector": "ENERGY",
+        "reason": "No strong keywords detected (keyword analysis)",
+        "trading_signal": "HOLD"
+      },
+      "ai_analyzed": false,
+      "created_at": "2026-03-23T13:53:48.117Z"
+    },
+    {
+      "id": "74cdb659-b9b4-4eff-b20c-2a7000d1d695",
+      "title": "Sensex crashed 1,800 points: 3 reasons why the stock market fell today",
+      "description": "Sensex crashed 1,800 points: 3 reasons why the stock market fell today",
+      "content": "Sensex crashed 1,800 points: 3 reasons why the stock market fell today",
+      "source": "India Today",
+      "url": "https://www.indiatoday.in/business/market/story/market-falling-today-sensex-nifty-crash-nse-bse-down-iran-us-israel-war-crude-oil-prices-investors-impact-2885709-2026-03-23",
+      "published_at": "2026-03-23T00:00:00.000Z",
+      "sentiment_analysis": {
+        "sentiment": "BEARISH",
+        "confidence": 65,
+        "impact": "MEDIUM",
+        "sector": "BROAD_MARKET",
+        "reason": "Bearish signals [BROAD_MARKET]: crash (keyword analysis)",
+        "trading_signal": "BUY_PUT"
+      },
+      "ai_analyzed": false,
+      "created_at": "2026-03-23T13:53:48.117Z"
+    },
+    {
+      "id": "9200e19d-3394-4fd7-9750-35bc45cfa93a",
+      "title": "Rupee sinks past 93 per dollar to record low as Iran war risks deepen - Reuters",
+      "description": "Rupee sinks past 93 per dollar to record low as Iran war risks deepen - Reuters",
+      "content": "Rupee sinks past 93 per dollar to record low as Iran war risks deepen - Reuters",
+      "source": "Reuters",
+      "url": "https://news.google.com/rss/articles/CBMiqwFBVV95cUxQc1psYlltUVh5ckFhNXBZQ1JsZVBKRDBEWEVQb1I2MHBHcXJwcUJuTG1Pb3lfTmtiNkJhOVAtSHdGbWVIbEF1emVrWjNWNzJCNTFJTmo3d20tTUZnTTF3ZnVVektkdGwtNHVKYm9ZNHFVVjVrUlJjYmFBbHNvMnNGMXZhTG01V21Xck0xSi1SVFdjamFweW5WUzdxcDAxV3IzbGNTTHM5Um4waDg?oc=5",
+      "published_at": "2026-03-20T10:33:49.000Z",
+      "sentiment_analysis": {
+        "sentiment": "BEARISH",
+        "confidence": 60,
+        "impact": "LOW",
+        "sector": "BROAD_MARKET",
+        "reason": "Bearish signals [BROAD_MARKET]:  (keyword analysis)",
+        "trading_signal": "HOLD"
+      },
+      "ai_analyzed": false,
+      "created_at": "2026-03-23T13:53:48.117Z"
+    },
+    {
+      "id": "5f4ed653-a8b8-4772-98f8-29f23e0adb08",
+      "title": "Which economies will hurt most from the Iran war? - Reuters",
+      "description": "Which economies will hurt most from the Iran war? - Reuters",
+      "content": "Which economies will hurt most from the Iran war? - Reuters",
+      "source": "Reuters",
+      "url": "https://news.google.com/rss/articles/CBMimwFBVV95cUxQelIzc1paaWFaa1JBRjlJWlJiTU9GRzc5WTFoNlBfbXgtOUh0bkQtLXotNzlXR0dUVmREM2ZlWURlMG9WUV9HQ2tRVXVTbUJiSDhQM0xCblRGSXBOekhEX0Q1TEZJVU1BY21wM21fRzYtN3l4ZVhua1MwTS1lTWlXMjliWlhXcGJqSmJYTjdaQkpPWmtkY3dVZjNZZw?oc=5",
+      "published_at": "2026-03-20T16:28:51.000Z",
+      "sentiment_analysis": {
+        "sentiment": "NEUTRAL",
+        "confidence": 50,
+        "impact": "LOW",
+        "sector": "BROAD_MARKET",
+        "reason": "No strong keywords detected (keyword analysis)",
+        "trading_signal": "HOLD"
+      },
+      "ai_analyzed": false,
+      "created_at": "2026-03-23T13:53:48.117Z"
+    },
+    {
+      "id": "9983eccd-9394-42e8-972e-eddb4b6bc2fb",
+      "title": "Stock Market Down: Why Nifty, Sensex are falling today— 5 key reasons",
+      "description": "Stock Market Down: Why Nifty, Sensex are falling today— 5 key reasons",
+      "content": "Stock Market Down: Why Nifty, Sensex are falling today— 5 key reasons",
+      "source": "Zee Business",
+      "url": "https://news.google.com/rss/articles/CBMiswFBVV95cUxNSDJ3TUprejBjd1pnUHI0dFllU3JfQllHMzFrR0FmOHBzbkdrZ0hRSV9kWVhTNEJicERYNkFBQ2lmUi00UmJ4VGdYN19mbzExekkxOTJVdHFIaXBNY2dTTDlScEltbEt6Uks4SzRoRENHY0VudzE3Uk5mVlU2c2U4TXlhOGxaVWhVenBKaXFZdDJscUxJY1RPZndKeGF6UEp1bkNhdGZfdlJNTDJ2QTg1SkhRdw?oc=5",
+      "published_at": "2026-03-23T04:49:46.000Z",
+      "sentiment_analysis": {
+        "sentiment": "BEARISH",
+        "confidence": 60,
+        "impact": "LOW",
+        "sector": "BROAD_MARKET",
+        "reason": "Bearish signals [BROAD_MARKET]: fall (keyword analysis)",
+        "trading_signal": "HOLD"
+      },
+      "ai_analyzed": false,
+      "created_at": "2026-03-23T13:53:48.117Z"
+    },
+    {
+      "id": "e9591c23-eaee-48a7-a6bf-8e3f0eb52900",
+      "title": "wealth creation pick long term stock investment idea",
+      "description": "wealth creation pick long term stock investment idea",
+      "content": "wealth creation pick long term stock investment idea",
+      "source": "Zee Business",
+      "url": "https://news.google.com/rss/articles/CBMirAFBVV95cUxQOFg5eFo5NlBwUnE3bDVrZm5rS1pMN0JKRGhFeGZmQnJDM2xnS2JPdFlrcFdGLTM5eF9RSnVSbWgtNFB3Y1BRS2Z6Q01leUJySEZneWFKZEFNeVpmRGxlbEZqMHlwdGk0eE11ZzZ0eGppWU9pemlodjdEbWZ1QVp3TTVGd1BBelZILUxOLTZwaTViSlhUT3RFb3M2T3UwTENibFpucm9ad1JGbS1u?oc=5",
+      "published_at": "2026-03-23T06:42:01.000Z",
+      "sentiment_analysis": {
+        "sentiment": "NEUTRAL",
+        "confidence": 50,
+        "impact": "LOW",
+        "sector": "BROAD_MARKET",
+        "reason": "No strong keywords detected (keyword analysis)",
+        "trading_signal": "HOLD"
+      },
+      "ai_analyzed": false,
+      "created_at": "2026-03-23T13:53:48.117Z"
+    },
+    {
+      "id": "3ed54fcb-601a-47bf-98e4-e817579348b7",
+      "title": "3 Extremely oversold bluechips hinting at a decade-long opportunity",
+      "description": "3 Extremely oversold bluechips hinting at a decade-long opportunity",
+      "content": "3 Extremely oversold bluechips hinting at a decade-long opportunity",
+      "source": "Financial Express",
+      "url": "https://news.google.com/rss/articles/CBMiywFBVV95cUxPYl8wdkx3MWgyaFdNSF91YjRBR28xZG04YlFWYnFsd2JsS21nM2FUMlEwOHFzSm9TRXlBZlphcWhJSlJoeFRzMG8yNHhkWWhDemIzUWhPSTQwVWFBQUtRV3NLWnl5c1FTU0UyVlphaklfdnlVTXZmTG5mUFc3ZnNZendoVUhGZGFmeW55R2JRRnhPZkQ5ZzBSb1p4VHRmU3Q2Q0JkcldfOUpubjNtdXZISWstWURiMDNldVJfSmNnVjFLcVdyUndGWGZCUdIB0gFBVV95cUxOMUNzM21KYl9WZURFVTFWcFBZTzhmWm14dnpKSWM1UHZDZk1pdkdUSTdhbHZ1Nk5RTDlvVTh6LU44bGpuVzBWMnhYTVQtejVpQzNiUjFMaGtZbWVkVERIT0NJR21yUnYzTlBUU1Juc0xnanNjZm1BeEk4aEx3aTh3SXp0R1F5TzdZeXVFa2JlbVB5ZkU2OGo4djZyZlQwWUNudUhMRERVM1NOOGNLQ1pQcGx3VGl6MS1FbTExY3pKLU9rU25YbEd3dGY3cGxKM2VkRHc?oc=5",
+      "published_at": "2026-03-21T00:00:00.000Z",
+      "sentiment_analysis": {
+        "sentiment": "NEUTRAL",
+        "confidence": 50,
+        "impact": "LOW",
+        "sector": "BROAD_MARKET",
+        "reason": "No strong keywords detected (keyword analysis)",
+        "trading_signal": "HOLD"
+      },
+      "ai_analyzed": false,
+      "created_at": "2026-03-23T13:53:48.117Z"
     }
   ],
   "journal_entries": [
@@ -22885,5 +23170,5 @@
     }
   ],
   "_cachedBrokerPnl": 724.29,
-  "_cachedBrokerPnlTime": 1774260336050
+  "_cachedBrokerPnlTime": 1774274093893
 }
