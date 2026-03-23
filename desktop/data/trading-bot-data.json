@@ -254,13 +254,13 @@
       "exit_advice": {
         "action": "HOLD",
         "confidence": 85,
-        "reason": "Market sentiment bearish hai due to global selloff aur Iran war escalation, jo put position ke liye favorable hai.",
+        "reason": "Market sentiment abhi bearish hai due to global selloff, position hold kar sakte hain.",
         "risk_level": "MEDIUM",
         "suggested_sl": null,
         "exit_pct": null,
         "trade_id": "7e04dd2e-3247-4de4-9aa9-d644faf2a82f",
         "symbol": "BANKNIFTY26032353200PE",
-        "timestamp": "2026-03-23T06:32:21.238Z",
+        "timestamp": "2026-03-23T06:37:51.927Z",
         "source": "ai",
         "pnl_at_advice": 0,
         "pnl_pct_at_advice": 0
@@ -291,14 +291,14 @@
       "pnl_percentage": 0,
       "exit_advice": {
         "action": "HOLD",
-        "confidence": 80,
-        "reason": "Market sentiment abhi bearish hai due to global selloff, position ko hold karna sahi rahega.",
+        "confidence": 85,
+        "reason": "Market sentiment abhi bearish hai due to global selloff, jo put option ke liye favorable hai.",
         "risk_level": "MEDIUM",
         "suggested_sl": null,
         "exit_pct": null,
         "trade_id": "de791b87-720d-49cd-b6ce-cda01fdfb3bd",
         "symbol": "BANKNIFTY26032353200PE",
-        "timestamp": "2026-03-23T06:32:22.412Z",
+        "timestamp": "2026-03-23T06:37:52.965Z",
         "source": "ai",
         "pnl_at_advice": 0,
         "pnl_pct_at_advice": 0
