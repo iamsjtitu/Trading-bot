@@ -3,6 +3,7 @@ import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { toast } from 'sonner';
 import axios from 'axios';
 
 const BACKEND_URL = (() => {
@@ -77,11 +78,15 @@ export default function SettingsPanel({ onClose, onSave }) {
       const res = await axios.post(`${API}/instruments/set`, { instrument });
       if (res.data.status === 'success') {
         setActiveInstrument(instrument);
-        // Keep settings state in sync to prevent overwrite on save
         setSettings(prev => ({ ...prev, trading_instrument: instrument }));
+        const label = res.data.details?.label || instrument;
+        toast.success(`Switched to ${label}`, {
+          description: 'All new signals and trades will use this instrument.',
+        });
       }
     } catch (e) {
       console.error('Set instrument error:', e);
+      toast.error('Failed to change instrument');
     }
   };
 

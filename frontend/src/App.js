@@ -1,6 +1,7 @@
 import '@/App.css';
 import { Button } from '@/components/ui/button';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Toaster } from '@/components/ui/sonner';
 import useAppState from '@/hooks/useAppState';
 import AppHeader from '@/components/AppHeader';
 import AppFooter from '@/components/AppFooter';
@@ -127,6 +128,7 @@ function App() {
           onSave={() => { state.setShowSettings(false); state.loadData(); state.loadAutoSettings(); }}
         />
       )}
+      <Toaster position="top-right" richColors />
     </div>
   );
 }
