@@ -6,7 +6,7 @@ import pytest
 import requests
 import os
 
-BASE_URL = os.environ.get('REACT_APP_BACKEND_URL', 'https://options-ai-trading.preview.emergentagent.com').rstrip('/')
+BASE_URL = os.environ.get('REACT_APP_BACKEND_URL', 'https://news-driven-options-1.preview.emergentagent.com').rstrip('/')
 
 class TestVersionVerification:
     """Test items 1-3: Version 8.1.0 verification"""

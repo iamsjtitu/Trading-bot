@@ -321,6 +321,13 @@ module.exports = function (db) {
           if (maxDailyLossEnabled && Math.abs(dayLoss) >= maxDailyLoss) {
             console.log(`[AutoExit] Re-entry BLOCKED - Daily loss ₹${Math.abs(dayLoss)} >= ₹${maxDailyLoss}`);
           } else {
+          // FEATURE 9: Max Daily Profit check before re-entry (only if enabled)
+          const maxDailyProfitEnabled = db.data?.settings?.ai_guards?.max_daily_profit !== false;
+          const maxDailyProfit = db.data?.settings?.auto_trading?.max_daily_profit || db.data?.settings?.risk?.max_daily_profit || 10000;
+          const dayProfit = dayClosedTrades.reduce((s, t) => s + Math.max(0, t.pnl || 0), 0);
+          if (maxDailyProfitEnabled && dayProfit >= maxDailyProfit) {
+            console.log(`[AutoExit] Re-entry BLOCKED - Daily profit ₹${Math.round(dayProfit)} >= target ₹${maxDailyProfit}. Target achieved!`);
+          } else {
           const reentryMinConf = db.data?.settings?.news?.min_confidence || 70;
           const news = (db.data.news_articles || []).filter(n => n.sentiment_analysis && n.sentiment_analysis.confidence >= reentryMinConf && ['BUY_CALL', 'BUY_PUT'].includes(n.sentiment_analysis.trading_signal)).sort((a, b) => (b.created_at || '').localeCompare(a.created_at || ''));
           const latestNews = news[0] || (db.data.news_articles || []).sort((a, b) => (b.created_at || '').localeCompare(a.created_at || ''))[0];
@@ -346,6 +353,7 @@ module.exports = function (db) {
             }
           }
           } // close daily loss check
+          } // close daily profit check
         }
       }
     }
@@ -424,6 +432,8 @@ module.exports = function (db) {
     const todayClosed = (db.data.trades || []).filter(t => t.status === 'CLOSED' && (t.exit_time || '') >= todayStart.toISOString());
     const todayLoss = todayClosed.reduce((s, t) => s + Math.min(0, t.pnl || 0), 0);
     const maxDailyLoss = db.data?.settings?.auto_trading?.max_daily_loss || 5000;
+    const todayProfit = todayClosed.reduce((s, t) => s + Math.max(0, t.pnl || 0), 0);
+    const maxDailyProfit = db.data?.settings?.auto_trading?.max_daily_profit || db.data?.settings?.risk?.max_daily_profit || 10000;
 
     const aiEngine = db._sharedAIEngine;
     const regime = aiEngine?.getMarketRegime ? aiEngine.getMarketRegime() : { regime: 'UNKNOWN', confidence: 0 };
@@ -461,6 +471,7 @@ module.exports = function (db) {
         multi_source_verification: { enabled: guards.multi_source_verification !== false, recent_sources: sourceCount },
         time_of_day_filter: { enabled: guards.time_of_day_filter !== false, current_window: isVolatileWindow ? 'HIGH VOLATILITY - BLOCKED' : 'NORMAL', ist_time: istTimeStr },
         max_daily_loss: { enabled: guards.max_daily_loss !== false, today_loss: Math.round(Math.abs(todayLoss)), limit: maxDailyLoss, blocked: guards.max_daily_loss !== false && Math.abs(todayLoss) >= maxDailyLoss },
+        max_daily_profit: { enabled: guards.max_daily_profit !== false, today_profit: Math.round(todayProfit), target: maxDailyProfit, blocked: guards.max_daily_profit !== false && todayProfit >= maxDailyProfit },
         kelly_sizing: { enabled: guards.kelly_sizing !== false, mode: kellyMode, win_rate: winRate, total_trades: closedTrades.length, consecutive_losses: consecutiveLosses, description: 'AI decides how much to invest per trade' },
         greeks_filter: { enabled: guards.greeks_filter !== false, description: 'Options Greeks & IV analysis filters bad options' },
       },
@@ -471,7 +482,7 @@ module.exports = function (db) {
     const body = req.body || {};
     if (!db.data.settings) db.data.settings = {};
     if (!db.data.settings.ai_guards) db.data.settings.ai_guards = {};
-    const allowed = ['multi_timeframe', 'market_regime_filter', 'trailing_stop', 'multi_source_verification', 'time_of_day_filter', 'max_daily_loss', 'kelly_sizing', 'greeks_filter'];
+    const allowed = ['multi_timeframe', 'market_regime_filter', 'trailing_stop', 'multi_source_verification', 'time_of_day_filter', 'max_daily_loss', 'max_daily_profit', 'kelly_sizing', 'greeks_filter'];
     for (const key of allowed) {
       if (key in body) db.data.settings.ai_guards[key] = !!body[key];
     }

@@ -20,6 +20,7 @@ const GUARD_INFO = {
   multi_source_verification: { label: 'Multi-Source News Verification', icon: FaNewspaper, desc: 'Trade tab ho jab 2+ alag news sources same direction dikha rahe ho 15 min mein.' },
   time_of_day_filter: { label: 'Time-of-Day Filter', icon: FaClock, desc: 'Market open (9:15-9:45) aur close (3:00-3:30) pe high volatility window mein trading pause.' },
   max_daily_loss: { label: 'Max Daily Loss Auto-Stop', icon: FaExclamationTriangle, desc: 'Agar din ka total loss limit cross kare toh baaki din trading band.' },
+  max_daily_profit: { label: 'Max Daily Profit Auto-Stop', icon: FaArrowUp, desc: 'Agar din ka target profit achieve ho jaaye toh baaki din koi trade nahi. Profit lock!' },
   kelly_sizing: { label: 'Smart Position Sizing (Kelly)', icon: FaChartLine, desc: 'AI decide kare kitna invest karna hai - win rate, streak, drawdown sab dekhke. Losing streak mein size reduce.' },
   greeks_filter: { label: 'Options Greeks & IV Filter', icon: FaLayerGroup, desc: 'Delta, Theta, IV check karke bekar options avoid. High theta decay ya expensive IV wale options block.' },
 };
@@ -136,6 +137,34 @@ export default function AIGuards() {
                                 const val = parseInt(e.target.value) || 5000;
                                 try {
                                   await axios.post(`${API}/settings/update`, { auto_trading: { max_daily_loss: val }, risk: { max_daily_loss: val } });
+                                  fetchGuards();
+                                } catch (_) {}
+                              }}
+                              onKeyDown={(e) => { if (e.key === 'Enter') e.target.blur(); }}
+                            />
+                            <span className="text-[10px] text-gray-400">min ₹500</span>
+                          </div>
+                        </div>
+                      )}
+                      {key === 'max_daily_profit' && (
+                        <div className="mt-1.5 space-y-1.5">
+                          <p className={`text-xs font-medium ${guard.blocked ? 'text-green-600' : 'text-gray-600'}`}>
+                            Today's Profit: &#8377;{guard.today_profit?.toLocaleString('en-IN')} / &#8377;{guard.target?.toLocaleString('en-IN')}
+                            {guard.blocked && <span className="ml-1 text-green-700 font-bold">TARGET HIT!</span>}
+                          </p>
+                          <div className="flex items-center gap-2">
+                            <label className="text-xs text-gray-500 whitespace-nowrap">Target &#8377;</label>
+                            <input
+                              type="number"
+                              defaultValue={guard.target || 10000}
+                              min="500"
+                              step="500"
+                              className="w-24 px-2 py-1 text-xs border border-gray-300 rounded"
+                              data-testid="max-daily-profit-input"
+                              onBlur={async (e) => {
+                                const val = parseInt(e.target.value) || 10000;
+                                try {
+                                  await axios.post(`${API}/settings/update`, { auto_trading: { max_daily_profit: val }, risk: { max_daily_profit: val } });
                                   fetchGuards();
                                 } catch (_) {}
                               }}

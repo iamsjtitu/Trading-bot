@@ -21,7 +21,7 @@ import time
 
 BASE_URL = os.environ.get('REACT_APP_BACKEND_URL', '').rstrip('/')
 if not BASE_URL:
-    BASE_URL = 'https://options-ai-trading.preview.emergentagent.com'
+    BASE_URL = 'https://news-driven-options-1.preview.emergentagent.com'
 
 print(f"Testing against: {BASE_URL}")
 
