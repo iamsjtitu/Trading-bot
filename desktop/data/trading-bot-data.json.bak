@@ -83,7 +83,7 @@
       "position_sizing_mode": "conservative",
       "kelly_sizing": true,
       "greeks_filter": true,
-      "max_daily_loss": false
+      "max_daily_loss": true
     },
     "telegram": {
       "bot_token": "8772018409:AAHml0B9cGBylPugrAudxo_sxMtAtLIu9HI",
