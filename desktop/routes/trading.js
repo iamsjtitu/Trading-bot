@@ -249,8 +249,8 @@ module.exports = function (db) {
     const autoT = db.data?.settings?.auto_trading || {};
     const targetPct = autoT.target_pct || riskCfg.target_pct || rp.target_pct;
     const stoplossPct = autoT.stoploss_pct || riskCfg.stop_loss_pct || rp.stop_loss_pct;
-    // RISK RATIO GUARD: Target must be >= StopLoss
-    const finalTargetPct = Math.max(targetPct, stoplossPct);
+    // Use user's exact target and stoploss - don't override
+    const finalTargetPct = targetPct;
     const finalStoplossPct = stoplossPct;
     const mode = db.data.settings?.trading_mode || 'PAPER';
     const accessToken = getActiveBrokerToken();
