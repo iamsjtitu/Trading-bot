@@ -74,6 +74,13 @@ module.exports = function (db) {
       const posMap = {}; for (const p of positions) { if (p.instrument_token) posMap[p.instrument_token] = p; }
       for (const t of dbOpenTrades) {
         if (t.instrument_token && !posMap[t.instrument_token]) {
+          // GRACE PERIOD: Don't close trades opened within last 2 minutes
+          // Broker may not have updated positions yet after order placement
+          const tradeAge = Date.now() - new Date(t.entry_time).getTime();
+          if (tradeAge < 2 * 60 * 1000) {
+            console.log(`[Trades] Skipping sync-close for ${t.symbol} (opened ${Math.round(tradeAge/1000)}s ago - within grace period)`);
+            continue;
+          }
           // Also check by symbol match before closing
           const symbolMatch = positions.find(p => (p.trading_symbol || '').replace(/\s+/g, '') === (t.symbol || '').replace(/\s+/g, ''));
           if (symbolMatch) {
@@ -285,6 +292,16 @@ module.exports = function (db) {
       // Use trailing SL if available, otherwise fixed SL
       const effectiveSL = trade.trailing_sl || (trade.entry_price * (1 - finalStoplossPct / 100));
       let shouldExit = false, exitReason = '';
+      
+      // GRACE PERIOD: Don't auto-exit trades opened within last 2 minutes
+      // This allows multiple trades to build up instead of immediate exit
+      const tradeAge = Date.now() - new Date(trade.entry_time).getTime();
+      const GRACE_PERIOD_MS = 2 * 60 * 1000; // 2 minutes
+      if (tradeAge < GRACE_PERIOD_MS) {
+        // Skip exit check for new trades - let them develop
+        continue;
+      }
+      
       if (currentPrice >= targetPrice) { shouldExit = true; exitReason = 'TARGET_HIT'; }
       else if (currentPrice <= effectiveSL) { shouldExit = true; exitReason = trade.trailing_sl ? 'TRAILING_SL_HIT' : 'STOPLOSS_HIT'; }
 
@@ -324,7 +341,7 @@ module.exports = function (db) {
           // FEATURE 9: Max Daily Profit check before re-entry (only if enabled)
           const maxDailyProfitEnabled = db.data?.settings?.ai_guards?.max_daily_profit !== false;
           const maxDailyProfit = db.data?.settings?.auto_trading?.max_daily_profit || db.data?.settings?.risk?.max_daily_profit || 10000;
-          const dayProfit = dayClosedTrades.reduce((s, t) => s + Math.max(0, t.pnl || 0), 0);
+          const dayProfit = dayClosedTrades.reduce((s, t) => s + (t.pnl || 0), 0); // NET P&L
           if (maxDailyProfitEnabled && dayProfit >= maxDailyProfit) {
             console.log(`[AutoExit] Re-entry BLOCKED - Daily profit ₹${Math.round(dayProfit)} >= target ₹${maxDailyProfit}. Target achieved!`);
           } else {
@@ -472,6 +489,10 @@ module.exports = function (db) {
 
     const maxDailyLoss = db.data?.settings?.auto_trading?.max_daily_loss || 5000;
     const maxDailyProfit = db.data?.settings?.auto_trading?.max_daily_profit || db.data?.settings?.risk?.max_daily_profit || 10000;
+
+    // Cache broker P&L for signal_generator (sync function can't do async fetch)
+    db.data._cachedBrokerPnl = todayPnl;
+    db.data._cachedBrokerPnlTime = Date.now();
 
     const aiEngine = db._sharedAIEngine;
     const regime = aiEngine?.getMarketRegime ? aiEngine.getMarketRegime() : { regime: 'UNKNOWN', confidence: 0 };

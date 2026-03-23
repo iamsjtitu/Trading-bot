@@ -83,31 +83,20 @@ module.exports = function createSignalGenerator(db, aiEngine) {
     }
 
     // ===== FEATURE 6: MAX DAILY LOSS AUTO-STOP (only if enabled) =====
-    // In LIVE mode, use broker's actual P&L; in PAPER mode, use local DB
+    // Use cached broker P&L in LIVE mode (updated by background job), local DB in PAPER mode
     const currentMode = db.data?.settings?.trading_mode || 'PAPER';
-    let actualPnlForGuards = null; // Will be fetched once and reused for both guards
+    let actualPnlForGuards = null;
     
-    if (currentMode === 'LIVE') {
-      const brokers = db.data?.settings?.brokers || {};
-      const upstoxToken = brokers.upstox?.access_token || '';
-      if (upstoxToken) {
-        try {
-          const headers = { Accept: 'application/json', Authorization: `Bearer ${upstoxToken}`, 'Api-Version': '2.0' };
-          const posResp = await axios.get('https://api.upstox.com/v2/portfolio/short-term-positions', { headers, timeout: 10000 });
-          if (posResp.data?.status === 'success') {
-            let rPnl = 0, uPnl = 0;
-            for (const pos of (posResp.data.data || [])) {
-              if (pos.quantity !== 0) { uPnl += pos.unrealised || ((pos.last_price - pos.average_price) * Math.abs(pos.quantity)); rPnl += pos.realised || 0; }
-              else { rPnl += pos.pnl || pos.realised || 0; }
-            }
-            actualPnlForGuards = Math.round((rPnl + uPnl) * 100) / 100;
-            console.log(`[Signal] Broker actual P&L for guards: ₹${actualPnlForGuards}`);
-          }
-        } catch (e) { console.log(`[Signal] Broker P&L fetch failed: ${e.message}`); }
+    // Check if we have a recent cached broker P&L (set by /api/trades/active or guard status)
+    if (currentMode === 'LIVE' && db.data._cachedBrokerPnl != null) {
+      const cacheAge = Date.now() - (db.data._cachedBrokerPnlTime || 0);
+      if (cacheAge < 60000) { // Use cache if less than 60 seconds old
+        actualPnlForGuards = db.data._cachedBrokerPnl;
+        console.log(`[Signal] Using cached broker P&L: ₹${actualPnlForGuards} (${Math.round(cacheAge/1000)}s old)`);
       }
     }
     
-    // Fallback to local DB if broker fetch failed or PAPER mode
+    // Fallback to local DB
     if (actualPnlForGuards === null) {
       const dayStartForLoss = new Date(); dayStartForLoss.setHours(0, 0, 0, 0);
       const todayClosedTrades = (db.data.trades || []).filter(t => t.status === 'CLOSED' && (t.exit_time || '') >= dayStartForLoss.toISOString());
@@ -205,7 +194,6 @@ module.exports = function createSignalGenerator(db, aiEngine) {
     const signalType = sentiment.trading_signal === 'BUY_CALL' ? 'CALL' : 'PUT';
 
     const activeInst = db.data?.settings?.trading_instrument || db.data?.settings?.active_instrument || 'NIFTY50';
-    const currentMode = db.data?.settings?.trading_mode || 'PAPER';
 
     // MAX OPEN TRADES in selected instrument - default 5
     const maxTotalTrades = db.data?.settings?.risk?.max_open_trades || 5;
