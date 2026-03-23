@@ -254,13 +254,13 @@
       "exit_advice": {
         "action": "HOLD",
         "confidence": 80,
-        "reason": "Market news mostly bearish, aur position abhi entry price par hai.",
+        "reason": "Market news mostly bearish, aur price entry ke barabar hai. Trend abhi clear nahi hai.",
         "risk_level": "MEDIUM",
         "suggested_sl": null,
         "exit_pct": null,
         "trade_id": "7e04dd2e-3247-4de4-9aa9-d644faf2a82f",
         "symbol": "BANKNIFTY26032353200PE",
-        "timestamp": "2026-03-23T08:06:35.953Z",
+        "timestamp": "2026-03-23T08:09:08.807Z",
         "source": "ai",
         "pnl_at_advice": 0,
         "pnl_pct_at_advice": 0
@@ -291,14 +291,14 @@
       "pnl_percentage": 0,
       "exit_advice": {
         "action": "HOLD",
-        "confidence": 75,
-        "reason": "Market sentiment abhi bearish hai aur aapka entry price current price ke barabar hai, toh wait karna sahi hoga.",
+        "confidence": 80,
+        "reason": "Market sentiment abhi bearish lag raha hai, aur aapka entry price par trade hai.",
         "risk_level": "MEDIUM",
         "suggested_sl": null,
         "exit_pct": null,
         "trade_id": "de791b87-720d-49cd-b6ce-cda01fdfb3bd",
         "symbol": "BANKNIFTY26032353200PE",
-        "timestamp": "2026-03-23T08:06:37.515Z",
+        "timestamp": "2026-03-23T08:09:09.949Z",
         "source": "ai",
         "pnl_at_advice": 0,
         "pnl_pct_at_advice": 0
