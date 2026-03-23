@@ -43,12 +43,13 @@ function isMarketHours() {
 }
 
 async function fetchMarketData(db) {
-  const activeBroker = db.data?.settings?.broker?.name || 'upstox';
-  const token = db.data?.settings?.broker?.[`${activeBroker}_token`] || null;
+  // Check all possible token locations
+  const token = db.data?.settings?.brokers?.upstox?.access_token 
+    || db.data?.settings?.broker?.access_token 
+    || null;
 
   if (!token) {
     jobState.last_status = 'no_token';
-    // Don't clear existing cached data — keep last known values
     return;
   }
 

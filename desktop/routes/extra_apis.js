@@ -170,8 +170,9 @@ module.exports = function (db) {
   });
 
   function getToken() {
-    const activeBroker = db.data.settings?.broker?.name || 'upstox';
-    return db.data.settings?.broker?.[`${activeBroker}_token`] || null;
+    return db.data.settings?.brokers?.upstox?.access_token 
+      || db.data.settings?.broker?.access_token 
+      || null;
   }
 
   function apiHeaders(token) {
