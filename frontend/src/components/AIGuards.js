@@ -119,9 +119,31 @@ export default function AIGuards() {
                         <p className={`text-xs mt-1 font-medium ${guard.current_window.includes('BLOCKED') ? 'text-red-600' : 'text-green-600'}`}>{guard.current_window}</p>
                       )}
                       {key === 'max_daily_loss' && (
-                        <p className={`text-xs mt-1 font-medium ${guard.blocked ? 'text-red-600' : 'text-gray-600'}`}>
-                          Today's Loss: &#8377;{guard.today_loss?.toLocaleString('en-IN')} / &#8377;{guard.limit?.toLocaleString('en-IN')}
-                        </p>
+                        <div className="mt-1.5 space-y-1.5">
+                          <p className={`text-xs font-medium ${guard.blocked ? 'text-red-600' : 'text-gray-600'}`}>
+                            Today's Loss: &#8377;{guard.today_loss?.toLocaleString('en-IN')} / &#8377;{guard.limit?.toLocaleString('en-IN')}
+                          </p>
+                          <div className="flex items-center gap-2">
+                            <label className="text-xs text-gray-500 whitespace-nowrap">Limit &#8377;</label>
+                            <input
+                              type="number"
+                              defaultValue={guard.limit || 5000}
+                              min="500"
+                              step="500"
+                              className="w-24 px-2 py-1 text-xs border border-gray-300 rounded"
+                              data-testid="max-daily-loss-input"
+                              onBlur={async (e) => {
+                                const val = parseInt(e.target.value) || 5000;
+                                try {
+                                  await axios.post(`${API}/settings/update`, { auto_trading: { max_daily_loss: val }, risk: { max_daily_loss: val } });
+                                  fetchGuards();
+                                } catch (_) {}
+                              }}
+                              onKeyDown={(e) => { if (e.key === 'Enter') e.target.blur(); }}
+                            />
+                            <span className="text-[10px] text-gray-400">min ₹500</span>
+                          </div>
+                        </div>
                       )}
                       {key === 'multi_source_verification' && guard.recent_sources && Object.keys(guard.recent_sources).length > 0 && (
                         <p className="text-xs mt-1 text-gray-600">Recent: {Object.entries(guard.recent_sources).map(([dir, count]) => `${dir}: ${count} sources`).join(', ')}</p>

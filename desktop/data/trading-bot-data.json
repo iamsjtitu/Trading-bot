@@ -23,7 +23,8 @@
       "stop_loss_pct": 15,
       "target_pct": 25,
       "risk_tolerance": "medium",
-      "max_open_trades": 5
+      "max_open_trades": 5,
+      "max_daily_loss": 10000
     },
     "auto_trading": {
       "auto_exit": true,
@@ -31,7 +32,8 @@
       "auto_analysis": true,
       "analysis_interval_minutes": 5,
       "target_pct": 25,
-      "stoploss_pct": 15
+      "stoploss_pct": 15,
+      "max_daily_loss": 10000
     },
     "schedule": {
       "enabled": true,
