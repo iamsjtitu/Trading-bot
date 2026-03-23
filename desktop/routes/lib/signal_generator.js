@@ -68,16 +68,19 @@ module.exports = function createSignalGenerator(db, aiEngine) {
       }
     }
 
-    // ===== FEATURE 6: MAX DAILY LOSS AUTO-STOP =====
-    const maxDailyLoss = db.data?.settings?.auto_trading?.max_daily_loss || db.data?.settings?.risk?.max_daily_loss || 5000;
-    const dayStartForLoss = new Date(); dayStartForLoss.setHours(0, 0, 0, 0);
-    const todayClosedTrades = (db.data.trades || []).filter(t => t.status === 'CLOSED' && (t.exit_time || '') >= dayStartForLoss.toISOString());
-    const todayRealizedLoss = todayClosedTrades.reduce((sum, t) => sum + Math.min(0, t.pnl || 0), 0);
-    if (Math.abs(todayRealizedLoss) >= maxDailyLoss) {
-      console.log(`[Signal] BLOCKED by Max Daily Loss - Today's loss: ₹${Math.abs(todayRealizedLoss)} >= limit ₹${maxDailyLoss}. Auto-stopped.`);
-      if (db.notify) db.notify('risk', 'Daily Loss Limit Hit', `Today's loss ₹${Math.abs(Math.round(todayRealizedLoss))} >= ₹${maxDailyLoss}. Trading paused.`);
-      notifyGuardBlock(db, 'Max Daily Loss', `Today loss ₹${Math.abs(Math.round(todayRealizedLoss))} >= limit ₹${maxDailyLoss}. Trading stopped.`);
-      return null;
+    // ===== FEATURE 6: MAX DAILY LOSS AUTO-STOP (only if enabled) =====
+    const maxDailyLossEnabled = db.data?.settings?.ai_guards?.max_daily_loss !== false;
+    if (maxDailyLossEnabled) {
+      const maxDailyLoss = db.data?.settings?.auto_trading?.max_daily_loss || db.data?.settings?.risk?.max_daily_loss || 5000;
+      const dayStartForLoss = new Date(); dayStartForLoss.setHours(0, 0, 0, 0);
+      const todayClosedTrades = (db.data.trades || []).filter(t => t.status === 'CLOSED' && (t.exit_time || '') >= dayStartForLoss.toISOString());
+      const todayRealizedLoss = todayClosedTrades.reduce((sum, t) => sum + Math.min(0, t.pnl || 0), 0);
+      if (Math.abs(todayRealizedLoss) >= maxDailyLoss) {
+        console.log(`[Signal] BLOCKED by Max Daily Loss - Today's loss: ₹${Math.abs(todayRealizedLoss)} >= limit ₹${maxDailyLoss}. Auto-stopped.`);
+        if (db.notify) db.notify('risk', 'Daily Loss Limit Hit', `Today's loss ₹${Math.abs(Math.round(todayRealizedLoss))} >= ₹${maxDailyLoss}. Trading paused.`);
+        notifyGuardBlock(db, 'Max Daily Loss', `Today loss ₹${Math.abs(Math.round(todayRealizedLoss))} >= limit ₹${maxDailyLoss}. Trading stopped.`);
+        return null;
+      }
     }
 
     // PROPER Call/Put mapping - only trade when signal is clear
