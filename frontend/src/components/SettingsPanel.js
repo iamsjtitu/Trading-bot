@@ -397,6 +397,11 @@ export default function SettingsPanel({ onClose, onSave }) {
                   <label className="block text-sm font-medium text-gray-700 mb-1">Max Per Trade</label>
                   <input type="number" value={settings.risk.max_per_trade} onChange={(e) => updateField('risk', 'max_per_trade', parseInt(e.target.value))} className="w-full px-3 py-2 border border-gray-300 rounded-lg" min="1000" step="1000" />
                 </div>
+                <div className="bg-white p-4 rounded-lg border border-orange-300 border-2">
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Max Position Value (Broker Limit)</label>
+                  <input type="number" value={settings.risk.max_position_value || 275000} onChange={(e) => updateField('risk', 'max_position_value', parseInt(e.target.value))} className="w-full px-3 py-2 border border-gray-300 rounded-lg" min="10000" step="5000" data-testid="max-position-value-input" />
+                  <p className="text-xs text-orange-600 mt-1 font-medium">Broker ki total position limit. Isse zyada hone par order reject hota hai (RMS error).</p>
+                </div>
                 <div className="bg-white p-4 rounded-lg border border-gray-200">
                   <label className="block text-sm font-medium text-gray-700 mb-1">Max Open Trades (Per Instrument)</label>
                   <input type="number" value={settings.risk.max_open_trades || 5} onChange={(e) => updateField('risk', 'max_open_trades', parseInt(e.target.value))} className="w-full px-3 py-2 border border-gray-300 rounded-lg" min="1" max="20" data-testid="max-open-trades-input" />

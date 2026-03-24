@@ -9,7 +9,7 @@ module.exports = function (db) {
       trading_mode: 'PAPER',
       ai: { emergent_llm_key: '', model: 'gpt-4o', provider: 'openai' },
       broker: { name: 'upstox', api_key: '', api_secret: '', redirect_uri: '', access_token: '', token_timestamp: '' },
-      risk: { initial_capital: 500000, daily_limit: 100000, max_per_trade: 20000, stop_loss_pct: 25, target_pct: 50, risk_tolerance: 'medium' },
+      risk: { initial_capital: 500000, daily_limit: 100000, max_per_trade: 20000, max_position_value: 275000, stop_loss_pct: 25, target_pct: 50, risk_tolerance: 'medium' },
       auto_trading: { auto_exit: true, auto_entry: false, auto_analysis: true, analysis_interval_minutes: 5 },
       schedule: { enabled: true, trading_days: ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday'], start_time: '09:15', end_time: '15:30', timezone: 'Asia/Kolkata' },
       news: { sources: ['demo'], newsapi_key: '', alphavantage_key: '', min_confidence: 60 },

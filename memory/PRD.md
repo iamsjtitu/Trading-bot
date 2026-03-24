@@ -60,6 +60,10 @@ Build an AI-powered automated options trading bot that connects to world news, u
    - Root cause: Exit Advisor `checkAllOpenTrades` sent Telegram alerts every 3 min interval for the same trade+action without any cooldown/deduplication
    - Fix: Added 30-min cooldown per trade+action combo in `advisorState.telegram_cooldown`, plus cooldown cleanup when trades close (manual exit, auto exit, stale cleanup, broker sync close)
    - Files changed: `exit_advisor.js` (cooldown tracker + cleanup), `trading.js` (clearTradeCooldown on all exit paths)
+2. **Broker Position Limit (RMS) Pre-Check (P0)** - FIXED 2026-03-24
+   - Root cause: Upstox RMS rejects orders when total position value exceeds broker's clientwise limit
+   - Fix: Added `max_position_value` setting (default ₹2,75,000), pre-trade position value check in `executeLiveTrade`, auto-reduces trade size to fit remaining capacity, clear Hinglish error messages for RMS/margin/token errors
+   - Files changed: `signal_generator.js` (position check + error parsing), `settings.js` (new default), `SettingsPanel.js` (new UI field)
 
 ## Pending/Backlog
 - **P0**: Desktop app build trigger for v27.1.0

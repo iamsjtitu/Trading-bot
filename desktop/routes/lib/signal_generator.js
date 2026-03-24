@@ -424,6 +424,33 @@ module.exports = function createSignalGenerator(db, aiEngine) {
       let maxTrade = userMaxPerTrade || 20000; // Use user setting, fallback to ₹20K default
       console.log(`[LiveTrade] User max_per_trade: ₹${maxTrade} (from settings)`);
 
+      // POSITION VALUE LIMIT CHECK - prevent broker RMS rejection
+      const maxPosValue = riskCfg.max_position_value || 275000;
+      try {
+        const posCheckResp = await axios.get('https://api.upstox.com/v2/portfolio/short-term-positions', {
+          headers: { Accept: 'application/json', Authorization: `Bearer ${accessToken}`, 'Api-Version': '2.0' }, timeout: 10000
+        });
+        if (posCheckResp.data?.status === 'success') {
+          const currentPositions = (posCheckResp.data.data || []).filter(p => p.quantity !== 0);
+          const currentPosValue = currentPositions.reduce((sum, p) => sum + Math.abs((p.last_price || p.average_price || 0) * (p.quantity || 0)), 0);
+          const estimatedNewValue = currentPosValue + maxTrade;
+          console.log(`[LiveTrade] Position check: Current ₹${Math.round(currentPosValue)} + New ~₹${maxTrade} = ~₹${Math.round(estimatedNewValue)} (Limit: ₹${maxPosValue})`);
+          if (currentPosValue >= maxPosValue) {
+            return { success: false, error: `Position limit full! Current: ₹${Math.round(currentPosValue)}, Limit: ₹${maxPosValue}. Pehle kuch positions close karo ya Settings > Risk mein limit badhao.` };
+          }
+          if (estimatedNewValue > maxPosValue) {
+            // Reduce maxTrade to fit within remaining limit
+            const remainingCapacity = maxPosValue - currentPosValue;
+            if (remainingCapacity < 1000) {
+              return { success: false, error: `Position limit almost full! Sirf ₹${Math.round(remainingCapacity)} bacha hai (Limit: ₹${maxPosValue}). Pehle positions close karo ya limit badhao.` };
+            }
+            maxTrade = Math.floor(remainingCapacity);
+            console.log(`[LiveTrade] Reduced max_per_trade to ₹${maxTrade} to fit within position limit`);
+          }
+        }
+      } catch (posErr) {
+        console.log(`[LiveTrade] Position check failed (proceeding): ${posErr.message}`);
+      }
       // Kelly Criterion: ONLY affects lot quantity, NOT the trade amount limit
       const kellyEnabled = db.data?.settings?.ai_guards?.kelly_sizing !== false;
       if (kellyEnabled && signal.kelly_sizing?.suggested_amount > 0) {
@@ -562,6 +589,12 @@ module.exports = function createSignalGenerator(db, aiEngine) {
           }
         } catch (orderErr) {
           lastError = orderErr.response?.data?.message || orderErr.message;
+          // Parse RMS errors for better messaging
+          if (lastError.includes('position limit exceeds') || lastError.includes('RMS')) {
+            lastError = `Broker Position Limit Full! ${lastError}. Pehle positions close karo ya limit badhao.`;
+            console.error(`[LiveTrade] Slice ${i + 1}/${slices.length}: ✗ RMS LIMIT - Stopping further slices`);
+            break; // Don't try more slices if position limit hit
+          }
           console.error(`[LiveTrade] Slice ${i + 1}/${slices.length}: ✗ ${lastError}`);
         }
 
@@ -640,10 +673,21 @@ module.exports = function createSignalGenerator(db, aiEngine) {
       return { success: orderSuccess, order_id: orderId, trade };
     } catch (err) {
       const upstoxErr = err.response?.data?.message || err.response?.data?.errors?.[0]?.message || err.message;
+      // Parse RMS/broker errors into user-friendly Hinglish messages
+      let userMsg = `${err.response?.status || 'unknown'}: ${upstoxErr}`;
+      if (upstoxErr.includes('position limit exceeds') || upstoxErr.includes('RMS')) {
+        userMsg = `Broker Position Limit Full! ${upstoxErr}. Settings > Risk mein "Max Position Value" kam karo ya pehle kuch positions close karo.`;
+      } else if (upstoxErr.includes('freeze quantity')) {
+        userMsg = `Order quantity freeze limit exceed ho gaya. Quantity kam karke try karo.`;
+      } else if (upstoxErr.includes('Insufficient') || upstoxErr.includes('margin')) {
+        userMsg = `Insufficient margin! Broker mein paisa kam hai. Fund add karo ya position size kam karo.`;
+      } else if (err.response?.status === 401) {
+        userMsg = `Token expired! Settings > Broker mein jaake Re-Login karo.`;
+      }
       if (!db.data.trades) db.data.trades = [];
-      db.data.trades.push({ id: uuid(), signal_id: signal.id, trade_type: signal.signal_type, symbol: signal.symbol, entry_time: new Date().toISOString(), entry_price: signal.entry_price, quantity: signal.quantity, investment: signal.investment_amount, status: 'FAILED', mode: 'LIVE', error: `${err.response?.status || 'unknown'}: ${upstoxErr}`, exit_time: null, exit_price: null, pnl: 0, pnl_percentage: 0 });
+      db.data.trades.push({ id: uuid(), signal_id: signal.id, trade_type: signal.signal_type, symbol: signal.symbol, entry_time: new Date().toISOString(), entry_price: signal.entry_price, quantity: signal.quantity, investment: signal.investment_amount, status: 'FAILED', mode: 'LIVE', error: userMsg, exit_time: null, exit_price: null, pnl: 0, pnl_percentage: 0 });
       db.save();
-      return { success: false, error: `${err.response?.status || 'unknown'}: ${upstoxErr}` };
+      return { success: false, error: userMsg };
     }
   }
 
