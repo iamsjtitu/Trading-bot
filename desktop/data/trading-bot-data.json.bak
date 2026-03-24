@@ -454,14 +454,14 @@
       "_simPrice": 150.02845998087497,
       "exit_advice": {
         "action": "EXIT_NOW",
-        "confidence": 90,
-        "reason": "Market bullish sentiment strong hai, Nifty bhi upar ja raha hai. Trend reversal ka risk hai.",
+        "confidence": 85,
+        "reason": "Market bullish sentiment strong hai, Nifty aur BankNifty dono positive trend mein hain.",
         "risk_level": "HIGH",
         "suggested_sl": null,
         "exit_pct": null,
         "trade_id": "68fa9bcd-9247-48f7-b475-8b4187174a0e",
         "symbol": "NIFTY5026032323000PE",
-        "timestamp": "2026-03-24T09:30:09.845Z",
+        "timestamp": "2026-03-24T09:33:09.231Z",
         "source": "ai",
         "pnl_at_advice": 0,
         "pnl_pct_at_advice": 0
@@ -492,13 +492,13 @@
       "exit_advice": {
         "action": "HOLD",
         "confidence": 85,
-        "reason": "Market bullish sentiment strong hai aur aapka entry price par hai, trend abhi clear nahi hai.",
+        "reason": "Market bullishness hai aur abhi entry price par hi hai, trend strong lag raha hai.",
         "risk_level": "MEDIUM",
         "suggested_sl": null,
         "exit_pct": null,
         "trade_id": "5b2bf525-70fe-41c9-85cb-a23d3076750f",
         "symbol": "NIFTY50_CALL",
-        "timestamp": "2026-03-24T09:30:11.396Z",
+        "timestamp": "2026-03-24T09:33:10.587Z",
         "source": "ai",
         "pnl_at_advice": 0,
         "pnl_pct_at_advice": 0
@@ -529,13 +529,13 @@
       "exit_advice": {
         "action": "EXIT_NOW",
         "confidence": 85,
-        "reason": "Market sentiment bullish hai aur Nifty ne recent gains hold kiye hain, jo bearish position ke liye unfavorable hai.",
+        "reason": "Market bullishness strong, Nifty likely to rise further, reducing PUT potential.",
         "risk_level": "HIGH",
         "suggested_sl": null,
         "exit_pct": null,
         "trade_id": "be6d8f3d-dec4-497e-a15a-2ead1b6f1716",
         "symbol": "NIFTY50_PUT",
-        "timestamp": "2026-03-24T09:30:12.534Z",
+        "timestamp": "2026-03-24T09:33:11.695Z",
         "source": "ai",
         "pnl_at_advice": 0,
         "pnl_pct_at_advice": 0
@@ -24619,5 +24619,5 @@
     }
   ],
   "_cachedBrokerPnl": 0,
-  "_cachedBrokerPnlTime": 1774344737957
+  "_cachedBrokerPnlTime": 1774344857739
 }
