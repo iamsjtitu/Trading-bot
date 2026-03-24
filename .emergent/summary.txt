@@ -4,71 +4,70 @@ The user wants to build an AI-powered automated options trading bot. The bot sho
 **PRODUCT REQUIREMENTS:**
 -   **Brokers:** Upstox (primary), with a framework for Zerodha, Angel One, 5paisa, Paytm Money, and IIFL.
 -   **AI Model:** Emergent LLM Key (using GPT-4o).
--   **News Source:** Live APIs and scraped news from 13 sources.
+-   **News Source:** Live APIs and scraped news from 13+ sources.
 -   **Instruments:** Nifty, BankNifty, FinNiffty, MidcapNifty, Sensex, and Bankex.
 -   **Core Features:**
     -   Switchable Paper and Live trading modes.
-    -   Automated trade entry and exit based on AI signals.
+    -   Automated and Manual trade entry/exit.
     -   Real-time market data and live Option Chain.
-    -   User-configurable , , , and other risk parameters.
-    -   AI Guards: Configurable trade limits, AI-driven safety guards (Max Daily Loss, Max Daily Profit), and smart position sizing (Kelly Criterion).
+    -   User-configurable risk parameters (, , ).
+    -   AI Guards: Trade limits, Max Daily Loss/Profit, and smart position sizing.
     -   AI Exit Advisor and Telegram alerts.
     -   Desktop application with auto-updates and System Health Dashboard.
 
 **User's preferred language**: Hinglish. The next agent MUST respond in Hinglish.
 
 **what currently exists?**
-The application is a desktop app (Electron/React/Node.js) now at version **v20.0.0**. The monolithic  has been refactored into smaller, manageable components and a central  hook. A significant number of critical bugs have been addressed, including:
--   **Data Consistency**: P&L calculations for guards now use the broker's live data, resolving mismatches between the UI and guard logic. Live market data fetching has been fixed by correcting the API token path.
--   **Trading Logic**: User-defined  is now a hard limit, preventing broker margin from overriding it. The Kelly Criterion acts as an advisory on lot size rather than blocking trades. The auto-exit feature now correctly respects the user's profit target percentage.
--   **Concurrency**: A 2-minute grace period for new trades was implemented, fixing a bug where only one trade could be open at a time.
--   **AI & API Usage**: AI API calls are now prevented when daily loss/profit limits are hit, preserving the user's key balance. The AI analysis flow has been verified to be working correctly across the application.
--   **CI/CD**: The GitHub Actions build workflow for Windows has been fixed.
+The application is a desktop app (Electron/React/Node.js) now at version **v27.0.0**. A significant number of features and bug fixes have been implemented in this session, including:
+-   **Trading Controls**: Manual signal entry, a Quick Trade tab for direct CALL/PUT trades without a signal, and manual exit buttons.
+-   **Bug Fixes**: A critical instrument selection UI bug was fixed. Logic for signal expiration (1 hour) and fresh news (last 24h) was added to prevent stale data issues.
+-   **API Cost Optimization**: A keyword pre-filter was added to news analysis, and a manual Analyze with AI button was implemented to reduce unnecessary AI API calls by over 75%.
+-   **Exchange Limit Fix**: Order Slicing was implemented for both entry and exit to handle the freeze quantity limit error from the broker.
+-   **Verification**: Comprehensive checks confirmed that auto-entry/exit toggles work correctly, preventing unwanted trades when in manual mode. A deployment health check was also successfully passed.
 
 **Last working item**:
--   **Last item agent was working**: The user reported that changing the Trading Instrument in the settings UI does not work; it always reverts to NIFTY50. The agent confirmed the backend API () works correctly, isolating the problem to the frontend. An attempt to debug the UI with the screenshot tool failed due to a non-unique locator for the Trading tab button.
+-   **Last item agent was working**: The user reported receiving Exit Now spam messages on Telegram from the Exit Advisor, even when there are no open trades. The agent began debugging this critical issue.
 -   **Status**: IN PROGRESS
 -   **Agent Testing Done**: N
--   **Which testing method agent to use?**: Frontend testing agent or screenshot tool. The agent must first fix the non-unique locator to proceed with testing.
+-   **Which testing method agent to use?**: Backend testing. Use  or a python script to verify the fix.
 -   **User Testing Done**: N
 
 **All Pending/In progress Issue list**:
--   **Issue 1: Trading Instrument selection does not persist in UI (P0)**
-    -   **Description**: When the user selects an instrument (e.g., BANKNIFTY) in the Settings panel, the UI does not reflect the change and seems to revert to the default 'NIFTY50', even though the backend successfully saves the new setting.
+-   **Issue 1: Telegram Exit Now Spam (P0)**
+    -   **Description**: The Exit Advisor sends Exit Now alerts to Telegram even when there are no open trades, causing spam and potential unnecessary API calls.
     -   **Status**: IN PROGRESS
     -   **Is recurring issue?**: N
-    -   **Attempted fixes**: The backend API was verified via  and works as expected. The agent attempted a UI test with the screenshot tool, but it failed because the selector  was not unique.
+    -   **Attempted fixes**: The agent identified the likely source is the  function in  and was reviewing the related code.
     -   **Next debug checklist**:
-        1.  **Fix Locator**: In , add a unique  to the Trading tab button (e.g., ) to make it selectable for testing.
-        2.  **Investigate State Logic**: Examine the  and  functions in . It is highly likely that a state reload function (, which calls ) is being called immediately after the instrument is set, causing a race condition where the UI re-renders with the old state before the new state is propagated.
-        3.  **Confirm State Update**: Ensure the  state is being updated correctly and not being overwritten by a broader state refresh.
-    -   **Why fix this issue and what will be achieved with the fix?**: This is a critical bug preventing users from trading any instrument other than NIFTY50, blocking a core feature of the application.
-    -   **Should Test frontend/backend/both after fix?**: Frontend.
+        1.  **Examine  in **.
+        2.  The function iterates over trades filtered by . It's possible trades are not being marked as  correctly, or the function proceeds even when the list of open trades is empty.
+        3.  **Implement Fix**: Add a guard clause at the beginning of the  function: . This will prevent the function from executing if there are no open trades.
+        4.  **Verify**: After applying the fix, restart the backend and monitor logs/Telegram to confirm that the spamming has stopped.
+    -   **Why fix this issue and what will be achieved with the fix?**: This fix will stop annoying spam notifications for the user and prevent wasted AI API calls for advice on non-existent trades.
+    -   **Should Test frontend/backend/both after fix?**: Backend.
 
 **In progress Task List**:
 None.
 
 **Upcoming and Future Tasks**
 -   **Upcoming Tasks:**
-    -   **P0:** Trigger a new desktop app build for **v20.0.0** (or higher) after fixing the instrument selection bug.
+    -   **P0:** Trigger a new desktop app build for **v27.0.0** (or higher) after fixing the Telegram spam bug.
+    -   **P0:** Remind the user to re-login to Upstox for a fresh token, as the current one is expired and blocking all LIVE trading functionality.
 -   **Future Tasks:**
     -   **P1:** Refactor the large  file (750+ lines) into smaller components.
-    -   **P2:** Add multi-broker support (Zerodha, Angel One, etc.) once the user provides API keys.
+    -   **P2:** Add multi-broker support (Zerodha, Angel One, etc.).
     -   **P3:** Add a daily performance summary with charts on Telegram.
 
 **Completed work in this session**
--   **Refactored **: Broke down the 830-line monolith into 6 components and a  hook.
--   **Fixed P&L Mismatch**: Aligned all guard and UI P&L calculations to use the live broker data as the single source of truth, fixing inconsistencies.
--   **Fixed  Limit**: Ensured the user-defined limit is a hard cap and is not overridden by available broker funds.
--   **Fixed Kelly Criterion Logic**: Changed Kelly from a hard block to an advisory on lot quantity, preventing it from incorrectly blocking valid trades.
--   **Fixed Single Trade Concurrency**: Implemented a 2-minute grace period for new trades, allowing up to 5 simultaneous open positions as intended.
--   **Fixed Auto-Exit Target**: Corrected a bug where the stop-loss percentage was overriding the profit target percentage.
--   **Fixed Live Data Failure**: Resolved an incorrect token path in  that was preventing live market data from being displayed.
--   **Optimized AI API Usage**: Implemented pre-checks to stop AI analysis when daily profit/loss limits are hit, saving API key costs.
--   **Fixed GitHub Actions Build**: Corrected Windows-specific commands (, ) in the  file.
--   **Fixed Telegram Spam**: Added a cooldown mechanism to guard-related alerts.
--   **Improved Token Expiry Handling**: Added frontend notifications and graceful backend error handling for expired broker tokens.
--   **Version Bumps**: Incremented the application version from v15.0.0 up to **v20.0.0**.
+-   **Fixed Instrument Selection Bug**: Resolved a race condition in  that overwrote the user's instrument choice.
+-   **Implemented Manual Trade Controls**: Added a Quick Trade tab for direct market entries and Enter Trade buttons on AI-generated signals.
+-   **Implemented Order Slicing**: Fixed freeze quantity limit broker errors by slicing large orders into smaller chunks for both entry () and exit ().
+-   **Optimized API Costs**: Added a manual Fetch News (free) and Analyze with AI (paid) flow, drastically reducing AI API usage.
+-   **Fixed Stale Data**: Implemented a 1-hour expiry for signals and filtered the news feed to only show articles from the last 24 hours.
+-   **Verified Auto-Trade Protection**: Confirmed that when  is OFF, no automatic trades are placed, including after an auto-exit.
+-   **Added UI/UX Enhancements**: Implemented  toast notifications for key user actions (trade entry/exit, instrument change).
+-   **Version Bumps**: Incremented application version from v20.0.0 to v27.0.0.
+-   **Deployment Health Check**: Successfully passed a pre-deployment readiness check.
 
 **Earlier issues found/mentioned but not fixed**
 None.
@@ -81,81 +80,73 @@ None.
 
 **Key Technical Concepts**
 -   **Backend**: Node.js (Express)
--   **Frontend**: React (with Custom Hooks for state management)
+-   **Frontend**: React (Custom Hooks for state)
 -   **Desktop App**: Electron
 -   **Database**:  (JSON file-based)
--   **State Management**: Refactored to use a centralized custom hook ().
--   **Data Consistency**: Prioritizing the broker API as the single source of truth for live financial data (P&L, margin).
--   **Asynchronous Handling**: Using a caching pattern () to provide recent data to synchronous functions that cannot use .
+-   **Order Slicing**: Logic to automatically break large orders into smaller chunks to comply with exchange quantity freeze limits.
+-   **On-Demand AI Analysis**: A cost-saving pattern separating news fetching from AI analysis, allowing users to trigger analysis manually per article.
 
 **key DB schema**
--   Database:  at .
--   : Key for the currently selected instrument (e.g., 'NIFTY50'). This is the focus of the current bug.
--   : The user-defined hard limit for investment per trade.
--   , : New properties added to  to cache the latest P&L fetched from the broker for use in synchronous functions.
-
-**changes in tech stack**
-None.
+-   : Includes an  (array of strings) field to support sliced orders.
+-   :  is now marked  after 1 hour.
+-   : Filtered to only include articles from the last 24 hours.
 
 **All files of reference**
--   **/app/frontend/src/components/SettingsPanel.js**: Location of the current UI bug.
--   **/app/desktop/routes/extra_apis.js**: Contains the backend logic for setting the instrument.
--   **/app/desktop/routes/lib/signal_generator.js**: Contains the core trading logic for trade execution and limit checks.
--   **/app/desktop/routes/trading.js**: Contains the logic for P&L calculations, auto-exit, and position syncing.
--   **/app/frontend/src/hooks/useAppState.js**: The central state management hook for the frontend.
--   **/app/.github/workflows/build.yml**: CI/CD build script.
--   **/app/desktop/package.json**: Single source of truth for the application version ().
+-   **/app/desktop/routes/lib/exit_advisor.js**: Primary location of the current Telegram spam bug.
+-   **/app/desktop/routes/lib/telegram.js**: Handles sending the alerts.
+-   **/app/desktop/routes/trading.js**: Contains the new Quick Trade API and exit slicing logic.
+-   **/app/frontend/src/components/QuickTrade.js**: New UI component for direct trading.
+-   **/app/desktop/routes/lib/signal_generator.js**: Contains the entry order slicing logic.
+-   **/app/desktop/routes/news.js**: Contains the manual news analysis and fetch-only logic.
 
 **Areas that need refactoring**:
--    has grown to over 750 lines and is now a monolith that should be broken down into smaller, more focused components.
--    could still be refactored into smaller, source-specific modules.
+-    is over 750 lines and should be broken into smaller components.
 
 **key api endpoints**
--   : Sets the active trading instrument. Verified to be working.
--   : Returns the status of AI guards, now fetches live P&L from the broker.
--   : Returns portfolio and broker status, now with improved token expiry error handling.
+-   : **NEW**. Executes a direct CALL/PUT trade without a signal.
+-   : **NEW**. Fetches news without triggering AI analysis.
+-   : **NEW**. Triggers AI analysis on a single news article.
+-   : The endpoint related to the current spam bug.
 
 **Critical Info for New Agent**
--   The immediate priority is fixing the instrument selection bug in the frontend (). The backend API is confirmed to be working. The problem is likely a UI state management issue or a race condition during data refresh.
--   The user is adept at finding bugs related to financial calculations and trading logic. Always ensure that user-defined settings are treated as hard limits and that financial data (like P&L) is consistent across all features by using the broker as the single source of truth.
--   After fixing the current bug, the next user request will likely be to trigger a new desktop build for v20.0.0.
+-   The immediate priority is fixing the Exit Now Telegram spam. The bug is in the backend in . The  function needs a guard clause to prevent it from running when there are no open trades.
+-   **The user's Upstox token is EXPIRED**. All LIVE mode functionality will fail with a 401 error. The user must be reminded to re-login via the UI () to generate a fresh token. Do not debug LIVE mode issues until this is resolved.
+-   The agent has added several major features: Quick Trade, Manual News Analysis, and Order Slicing. Be aware of this new functionality.
 
 **documents and test reports created in this job**
--    (updated)
--   
--   
+-    (updated multiple times)
 -   
 
 **Last 10 User Messages and any pending HUMAN messages**
-1.  **User**: Trading instrument selection is stuck on NIFTY50. (IN PROGRESS)
-2.  **User**: Okay, bump version to 20.0.0. (DONE)
-3.  **User**: A trade was executed for ₹91,000 when the  limit was ₹51,000. (FIXED)
-4.  **User**: Verify that Stop Loss %, Profit %, and Max Per Trade are working correctly. (VERIFIED & FIXED)
-5.  **User**: Live market data in the software doesn't match the data from Upstox. (FIXED)
-6.  **User**: Okay, bump version to 19.0.0. (DONE)
-7.  **User**: The trade is not auto-exiting when the 10% profit target is hit. (FIXED)
-8.  **User**: Okay, bump version to 18.0.0. (DONE)
-9.  **User**: Verify that the AI is analyzing properly and using the API key. (VERIFIED)
-10. **User**: Okay, bump version to 17.0.0. (DONE)
+1.  **User**: Telegram mai exit now ka spam aa raha hai jab trade open nahi hai. (IN PROGRESS)
+2.  **User**: version 27.0.0 karo. (DONE)
+3.  **User**: News purane aa rahe hain, signals latest nahi, aur direct trade ka option chahiye. (DONE)
+4.  **User**: 400: Order quantity exceeds instrument freeze quantity limit. (DONE)
+5.  **User**: Deployment kar diya hai. (ACKNOWLEDGED)
+6.  **User**: Call Deployer Agent and Run Health Check. (DONE)
+7.  **User**: (Signal generation issue) koi b signal nai bann raha. (DONE)
+8.  **User**: v23.0.0 version bump karo and make sure no bugs and auto trade is off. (DONE)
+9.  **User**: Telegram pe bullish signal aaya par software mein nahi dikh raha. Aur manual analysis ka option chahiye. (DONE)
+10. **User**: API key balance jaldi use ho raha hai. (DONE)
 
 **Project Health Check:**
--   **Broken**: The instrument selection UI in the Settings panel is not functional.
+-   **Broken**: The Exit Advisor is spamming Telegram with Exit Now alerts.
 -   **Mocked**: None.
 
 **3rd Party Integrations**
--   **OpenAI GPT-4o**: Uses Emergent LLM Key for sentiment analysis, exit advice, etc.
--   **Upstox API v2**: For live trading, P&L, and market data.
--   **Telegram Bot API**: For alerts and notifications.
--   **Cheerio/Axios**: For news scraping from 13 sources.
+-   **OpenAI GPT-4o**: Uses Emergent LLM Key.
+-   **Upstox API v2**: For live trading and data.
+-   **Telegram Bot API**: For alerts.
+-   **Cheerio/Axios**: For news scraping.
 
 **Testing status**
--   **Testing agent used after significant changes**: YES
+-   **Testing agent used after significant changes**: YES, a comprehensive test suite was run and passed 100% for v23.0.0.
 -   **Troubleshoot agent used after agent stuck in loop**: NO
 -   **Test files created**: None.
--   **Known regressions**: The instrument selection UI is not working.
+-   **Known regressions**: The Exit Advisor spam is a new bug introduced recently.
 
 **Credentials to test flow:**
-Credentials for Upstox, Telegram, and the AI model are stored in the application's  database and are auto-loaded.
+Credentials are auto-loaded. Note that the Upstox token is expired and requires user re-login for any LIVE mode testing.
 
 **What agent forgot to execute**
-The previous agent identified that the screenshot tool failed to test the instrument selection UI due to a non-unique locator (). The agent did not proceed to fix this locator, which is the necessary next step to debug the UI effectively.</analysis>
+The agent has been thorough in addressing user requests. The current bug is a new regression, not a forgotten task.</analysis>

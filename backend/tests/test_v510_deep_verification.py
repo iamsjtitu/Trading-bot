@@ -7,7 +7,7 @@ import requests
 import os
 import time
 
-BASE_URL = os.environ.get('REACT_APP_BACKEND_URL', 'https://options-sentinel.preview.emergentagent.com').rstrip('/')
+BASE_URL = os.environ.get('REACT_APP_BACKEND_URL', 'https://sentiment-trade-bot-3.preview.emergentagent.com').rstrip('/')
 
 class TestHealthAndVersion:
     """Health endpoint and version verification"""

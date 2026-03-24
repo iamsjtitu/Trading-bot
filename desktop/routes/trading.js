@@ -7,7 +7,7 @@ const crypto = require('crypto');
 const axios = require('axios');
 const createSignalGenerator = require('./lib/signal_generator');
 const { calculateTaxReport } = require('./lib/tax_calculator');
-const { analyzeTradeForExit, getAdvisorStatus, getAdviceForTrade, getAllAdvice } = require('./lib/exit_advisor');
+const { analyzeTradeForExit, getAdvisorStatus, getAdviceForTrade, getAllAdvice, clearTradeCooldown } = require('./lib/exit_advisor');
 let OpenAI; try { OpenAI = require('openai'); } catch (_) { OpenAI = null; }
 
 function uuid() { return crypto.randomUUID(); }
@@ -77,6 +77,8 @@ module.exports = function (db) {
         t.pnl = Math.round(((t.exit_price - (t.entry_price || 0)) * (t.quantity || 1)) * 100) / 100;
         t.pnl_percentage = t.entry_price > 0 ? Math.round(((t.exit_price - t.entry_price) / t.entry_price) * 10000) / 100 : 0;
         staleClosed++;
+        // Clear exit advisor cooldown for stale-closed trade
+        clearTradeCooldown(t.id || t.instrument_token || t.symbol);
       }
     }
     if (staleClosed > 0) {
@@ -124,6 +126,8 @@ module.exports = function (db) {
           t.pnl_percentage = t.entry_price > 0 ? Math.round(((lastPrice - t.entry_price) / t.entry_price) * 10000) / 100 : 0;
           const sig = (db.data.signals || []).find(s => s.id === t.signal_id);
           if (sig) sig.status = 'CLOSED';
+          // Clear exit advisor cooldown for broker-closed trade
+          clearTradeCooldown(t.id || t.instrument_token || t.symbol);
           if (db._autoReviewTrade) db._autoReviewTrade(t.id).catch(e => console.error('[Journal] Auto-review error:', e.message));
         }
       }
@@ -362,6 +366,8 @@ module.exports = function (db) {
         exitsCount++;
         exitDetails.push({ trade_id: trade.id, symbol: trade.symbol, type: trade.trade_type, entry: trade.entry_price, exit: currentPrice, pnl: Math.round(pnl * 100) / 100, pnl_pct: Math.round(pnlPct * 100) / 100, reason: exitReason });
         if (db.notify) db.notify('exit', `${exitReason === 'TARGET_HIT' ? 'Target Hit' : 'Stoploss Hit'}`, `${trade.symbol} | P&L: ${pnl >= 0 ? '+' : ''}${Math.round(pnl)} (${Math.round(pnlPct)}%)`);
+        // Clear exit advisor cooldown for this closed trade
+        clearTradeCooldown(trade.id || trade.instrument_token || trade.symbol);
         if (db._autoReviewTrade) db._autoReviewTrade(trade.id).catch(e => console.error('[Journal] Auto-review error:', e.message));
 
         // Telegram: Trade Exit Alert
@@ -491,6 +497,8 @@ module.exports = function (db) {
           const p = db.data.portfolio;
           if (p) { p.available_capital = (p.available_capital || 0) + (exitPrice * qty); p.invested_amount = Math.max(0, (p.invested_amount || 0) - storedTradeForSlice.investment); p.total_pnl = (p.total_pnl || 0) + pnl; p.total_trades = (p.total_trades || 0) + 1; if (pnl > 0) p.winning_trades = (p.winning_trades || 0) + 1; else p.losing_trades = (p.losing_trades || 0) + 1; p.last_updated = new Date().toISOString(); }
           db.save();
+          // Clear exit advisor cooldown for this closed trade
+          clearTradeCooldown(storedTradeForSlice.id || storedTradeForSlice.instrument_token || storedTradeForSlice.symbol);
           if (db._autoReviewTrade) db._autoReviewTrade(storedTradeForSlice.id).catch(e => console.error('[Journal] Auto-review error:', e.message));
           const tgAlertsLive = db.data?.settings?.telegram?.alerts || {};
           if (tgAlertsLive.trade_exit !== false) { try { const tg = require('./lib/telegram'); tg.sendTradeExitAlert(storedTradeForSlice).catch(() => {}); } catch (_) {} }
@@ -505,6 +513,8 @@ module.exports = function (db) {
     trade.status = 'CLOSED'; trade.exit_time = new Date().toISOString(); trade.exit_price = Math.round(exitPrice * 100) / 100; trade.pnl = Math.round(pnl * 100) / 100; trade.pnl_percentage = trade.entry_price > 0 ? Math.round(((exitPrice - trade.entry_price) / trade.entry_price) * 10000) / 100 : 0; trade.exit_reason = 'MANUAL_EXIT';
     const p = db.data.portfolio; if (p) { p.available_capital = (p.available_capital || 0) + (exitPrice * trade.quantity); p.invested_amount = Math.max(0, (p.invested_amount || 0) - trade.investment); p.total_pnl = (p.total_pnl || 0) + pnl; p.total_trades = (p.total_trades || 0) + 1; if (pnl > 0) p.winning_trades = (p.winning_trades || 0) + 1; else p.losing_trades = (p.losing_trades || 0) + 1; p.last_updated = new Date().toISOString(); }
     db.save(); if (db.notify) db.notify('exit', 'Manual Exit', `${trade.symbol} | P&L: ${Math.round(pnl)}`);
+    // Clear exit advisor cooldown for this closed trade
+    clearTradeCooldown(trade.id || trade.instrument_token || trade.symbol);
     if (db._autoReviewTrade) db._autoReviewTrade(trade.id).catch(e => console.error('[Journal] Auto-review error:', e.message));
     // Telegram: Trade Exit Alert (Paper manual exit)
     const tgAlertsPaper = db.data?.settings?.telegram?.alerts || {};

@@ -12,7 +12,7 @@ Build an AI-powered automated options trading bot that connects to world news, u
 - **APIs**: Upstox REST API v2, Telegram Bot API
 - **Proxy**: Python FastAPI at `/app/backend/server.py` (forwards to Node.js)
 
-## Current Version: v26.0.0
+## Current Version: v27.1.0
 
 ## Version Management
 - **Single source of truth**: `desktop/package.json` -> `version` field
@@ -47,58 +47,37 @@ Build an AI-powered automated options trading bot that connects to world news, u
 - Fixed Live Data Failure (token path)
 - Fixed GitHub Actions Build (Windows xcopy/if exist)
 - Token Expiry Handling (frontend notifications + backend graceful errors)
+- Manual Trade Entry from Signals
+- Manual Trade Exit with Toast
+- Quick Trade (Direct CALL/PUT without signal)
+- Order Slicing (entry + exit, respects freeze quantity limits)
+- API Cost Optimization (keyword pre-filter, manual analyze)
+- Signal Expiry (1 hour)
+- Fresh News Filter (last 24 hours)
 
-## Bug Fixes (v20.0.0 Session)
-1. **Trading Instrument Selection Bug (P0)** - FIXED 2026-03-23
-   - Root cause: `saveSettings()` sent the stale `trading_instrument` from initial `loadSettings()` back to `/api/settings/update`, overwriting the new instrument set via `/api/instruments/set`
-   - Fix: (a) `handleInstrumentChange` now also syncs `settings` state, (b) `saveSettings` strips `trading_instrument` and `active_broker` from the save payload
-   - Also fixed duplicate `<TabsContent value="risk">` in JSX
-
-## New Features (v21.0.0)
-1. **Manual Trade Entry from Signals** - ADDED 2026-03-23
-   - "Enter CALL/PUT Trade" button on each signal card in Signals tab
-   - Works in both Paper and Live modes
-   - Shows "Already Traded" badge for signals that already have an open trade
-   - Toast notification on successful/failed trade execution
-   - When Auto Entry is OFF, user can manually pick signals and enter trades
-   - Button disabled in LIVE mode when broker is disconnected
-2. **Manual Trade Exit with Toast** - ENHANCED 2026-03-23
-   - Already existing "Exit" button now shows toast notification on success
-   - "Ask AI" button for AI exit advice on each trade
-   - Works for both Paper and Live modes
-3. **Instrument Change Toast** - ADDED 2026-03-23
-   - Shows confirmation toast when trading instrument is changed (e.g., "Switched to Bank Nifty")
-4. **Auto Entry/Exit Protection Verified** - 2026-03-23
-   - When Auto Entry OFF: Signals generate but no auto-trade execution
-   - When Auto Exit OFF: No auto-exit at SL/target, user controls exits manually
-   - Backend double-checks settings before any auto-action
-5. **API Cost Optimization** - ADDED 2026-03-23
-   - Keyword pre-filter: Only market-relevant articles sent to GPT-4o (~70-85% API calls saved)
-   - Max articles per cycle: 30 → 10
-   - Exit Advisor polling: 60s → 5 min (80% savings)
-   - Estimated total API cost reduction: ~75-80%
-6. **Manual News Fetch + Analyze** - ADDED 2026-03-23
-   - "Fetch Latest News" button: Fetches news from 16 sources WITHOUT AI (FREE)
-   - "Analyze with AI" button per article: Single article AI analysis + signal generation
-   - Hint text: "Click to generate CALL/PUT signal" for BULLISH/BEARISH articles
-   - Backend: `/api/news/fetch-only` and `/api/news/analyze-article` endpoints
+## Bug Fixes (v27.1.0)
+1. **Exit Advisor Telegram Spam Fix (P0)** - FIXED 2026-03-24
+   - Root cause: Exit Advisor `checkAllOpenTrades` sent Telegram alerts every 3 min interval for the same trade+action without any cooldown/deduplication
+   - Fix: Added 30-min cooldown per trade+action combo in `advisorState.telegram_cooldown`, plus cooldown cleanup when trades close (manual exit, auto exit, stale cleanup, broker sync close)
+   - Files changed: `exit_advisor.js` (cooldown tracker + cleanup), `trading.js` (clearTradeCooldown on all exit paths)
 
 ## Pending/Backlog
-- **P0**: Desktop app build trigger for v20.0.0+ (after instrument bug fix)
+- **P0**: Desktop app build trigger for v27.1.0
+- **P0**: Remind user to re-login to Upstox (token expired)
 - **P1**: Refactor SettingsPanel.js (750+ lines -> smaller components)
 - **P2**: Multi-broker support (Zerodha, Angel One, etc.)
 - **P3**: Daily performance summary with charts on Telegram
-- **P3**: News fetcher refactoring
 
 ## Key Files
-- `/app/frontend/src/components/SettingsPanel.js` - Settings UI (instrument bug fixed here)
-- `/app/desktop/routes/extra_apis.js` - Instruments/brokers/option-chain APIs
-- `/app/desktop/routes/settings.js` - Settings CRUD APIs
+- `/app/desktop/routes/lib/exit_advisor.js` - Exit Advisor with 30-min Telegram cooldown
+- `/app/desktop/routes/trading.js` - Trading routes with cooldown cleanup on exits
+- `/app/desktop/routes/lib/telegram.js` - Telegram notification module
 - `/app/desktop/routes/lib/signal_generator.js` - Trade execution with smart sizing
-- `/app/desktop/routes/trading.js` - P&L, auto-exit, position sync
+- `/app/frontend/src/components/SettingsPanel.js` - Settings UI
 - `/app/frontend/src/hooks/useAppState.js` - State management hook
-- `/app/frontend/src/App.js` - Refactored main UI (134 lines)
+- `/app/frontend/src/App.js` - Refactored main UI
 
 ## Test Reports
 - `/app/test_reports/iteration_45.json` - v15.0.0 App.js refactoring
 - `/app/test_reports/iteration_46.json` - v15.0.0 Telegram/Guard bug fixes
+- `/app/test_reports/iteration_47.json` - Latest test run

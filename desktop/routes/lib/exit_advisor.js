@@ -13,7 +13,11 @@ let advisorState = {
   last_check: null,
   check_count: 0,
   active_advice: {}, // trade_id -> advice
+  telegram_cooldown: {}, // trade_key:action -> last_sent_timestamp (anti-spam)
 };
+
+// Cooldown period for repeated Telegram alerts (30 minutes)
+const TELEGRAM_COOLDOWN_MS = 30 * 60 * 1000;
 
 function isMarketHours() {
   const now = new Date();
@@ -220,17 +224,27 @@ async function checkAllOpenTrades(db) {
       // Store advice in trade object too
       trade.exit_advice = advice;
 
-      // Notify if action needed
+      // Notify if action needed (desktop notification - always send)
       if (advice.action !== 'HOLD' && db.notify) {
         const emoji = advice.action === 'EXIT_NOW' ? '[EXIT]' : advice.action === 'PARTIAL_EXIT' ? '[PARTIAL]' : '[TIGHTEN SL]';
         db.notify('exit_advice', `${emoji} ${trade.symbol}`, advice.reason);
       }
 
-      // Telegram: Exit Advice Alert (skip HOLD to avoid spam)
+      // Telegram: Exit Advice Alert (with 30-min cooldown per trade+action to prevent spam)
       const tgAlerts = db.data?.settings?.telegram?.alerts || {};
       if (tgAlerts.exit_advice !== false && advice.action !== 'HOLD') {
-        const tg = require('./telegram');
-        tg.sendExitAdviceAlert(trade, advice).catch(() => {});
+        const cooldownKey = `${tradeKey}:${advice.action}`;
+        const lastSent = advisorState.telegram_cooldown[cooldownKey] || 0;
+        const now = Date.now();
+        if (now - lastSent >= TELEGRAM_COOLDOWN_MS) {
+          const tg = require('./telegram');
+          tg.sendExitAdviceAlert(trade, advice).catch(() => {});
+          advisorState.telegram_cooldown[cooldownKey] = now;
+          console.log(`[ExitAdvisor] Telegram alert sent for ${trade.symbol}: ${advice.action}`);
+        } else {
+          const minsLeft = Math.round((TELEGRAM_COOLDOWN_MS - (now - lastSent)) / 60000);
+          console.log(`[ExitAdvisor] Telegram skipped for ${trade.symbol} (cooldown: ${minsLeft}min left)`);
+        }
       }
 
       console.log(`[ExitAdvisor] ${trade.symbol}: ${advice.action} (${advice.confidence}%) - ${advice.reason}`);
@@ -262,7 +276,14 @@ function stopExitAdvisor() {
     advisorState.intervalId = null;
   }
   advisorState.running = false;
+  advisorState.telegram_cooldown = {}; // Reset cooldowns on stop
   console.log('[ExitAdvisor] Stopped');
+}
+
+// Clear cooldown for a specific trade (call when trade is closed/exited)
+function clearTradeCooldown(tradeKey) {
+  const keysToRemove = Object.keys(advisorState.telegram_cooldown).filter(k => k.startsWith(`${tradeKey}:`));
+  keysToRemove.forEach(k => delete advisorState.telegram_cooldown[k]);
 }
 
 function getAdvisorStatus() {
@@ -283,4 +304,4 @@ function getAllAdvice() {
   return advisorState.active_advice;
 }
 
-module.exports = { startExitAdvisor, stopExitAdvisor, getAdvisorStatus, analyzeTradeForExit, getAdviceForTrade, getAllAdvice };
+module.exports = { startExitAdvisor, stopExitAdvisor, getAdvisorStatus, analyzeTradeForExit, getAdviceForTrade, getAllAdvice, clearTradeCooldown };
