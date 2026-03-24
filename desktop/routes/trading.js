@@ -331,7 +331,26 @@ module.exports = function (db) {
 
       if (shouldExit) {
         if (mode === 'LIVE' && accessToken && trade.instrument_token) {
-          try { const sellResp = await axios.post('https://api.upstox.com/v2/order/place', { quantity: trade.quantity, product: 'I', validity: 'DAY', price: 0, instrument_token: trade.instrument_token, order_type: 'MARKET', transaction_type: 'SELL', disclosed_quantity: 0, trigger_price: 0, is_amo: false }, { headers: { Accept: 'application/json', Authorization: `Bearer ${accessToken}`, 'Api-Version': '2.0', 'Content-Type': 'application/json' }, timeout: 15000 }); trade.exit_order_id = sellResp.data?.data?.order_id || ''; } catch (err) { trade.exit_error = err.message; }
+          try {
+            // ORDER SLICING for auto-exit SELL
+            const FREEZE_QTY_AE = { NIFTY50: 1800, BANKNIFTY: 900, FINNIFTY: 1200, MIDCPNIFTY: 2800, SENSEX: 1000, BANKEX: 1500 };
+            const aeInst = trade.instrument || 'NIFTY50';
+            const aeFreeze = FREEZE_QTY_AE[aeInst] || 1800;
+            const aeSlices = [];
+            let aeRem = trade.quantity;
+            while (aeRem > 0) { const s = Math.min(aeRem, aeFreeze); aeSlices.push(s); aeRem -= s; }
+            const aeOrderIds = [];
+            for (let si = 0; si < aeSlices.length; si++) {
+              try {
+                const sellResp = await axios.post('https://api.upstox.com/v2/order/place', { quantity: aeSlices[si], product: 'I', validity: 'DAY', price: 0, instrument_token: trade.instrument_token, order_type: 'MARKET', transaction_type: 'SELL', disclosed_quantity: 0, trigger_price: 0, is_amo: false }, { headers: { Accept: 'application/json', Authorization: `Bearer ${accessToken}`, 'Api-Version': '2.0', 'Content-Type': 'application/json' }, timeout: 15000 });
+                if (sellResp.data?.data?.order_id) aeOrderIds.push(sellResp.data.data.order_id);
+              } catch (sliceErr) { console.error(`[AutoExit] Sell slice ${si+1} failed: ${sliceErr.message}`); }
+              if (si < aeSlices.length - 1) await new Promise(r => setTimeout(r, 500));
+            }
+            trade.exit_order_id = aeOrderIds[0] || '';
+            trade.exit_order_ids = aeOrderIds;
+            console.log(`[AutoExit] SELL ${aeSlices.length} slice(s) for ${trade.symbol} qty=${trade.quantity}`);
+          } catch (err) { trade.exit_error = err.message; }
         }
         const pnl = (currentPrice - trade.entry_price) * trade.quantity; const pnlPct = (pnl / trade.investment) * 100;
         trade.status = 'CLOSED'; trade.exit_time = new Date().toISOString(); trade.exit_price = Math.round(currentPrice * 100) / 100; trade.pnl = Math.round(pnl * 100) / 100; trade.pnl_percentage = Math.round(pnlPct * 100) / 100; trade.exit_reason = exitReason;
@@ -419,7 +438,66 @@ module.exports = function (db) {
   router.post('/api/trades/manual-exit', async (req, res) => {
     const { instrument_token, trade_id } = req.body || {}; const mode = db.data.settings?.trading_mode || 'PAPER'; const accessToken = getActiveBrokerToken();
     if (mode === 'LIVE' && accessToken && instrument_token) {
-      try { const headers = { Accept: 'application/json', Authorization: `Bearer ${accessToken}`, 'Api-Version': '2.0', 'Content-Type': 'application/json' }; const posResp = await axios.get('https://api.upstox.com/v2/portfolio/short-term-positions', { headers: { Accept: 'application/json', Authorization: `Bearer ${accessToken}`, 'Api-Version': '2.0' }, timeout: 10000 }); let position = null; if (posResp.data?.status === 'success') position = (posResp.data.data || []).find(p => p.instrument_token === instrument_token && p.quantity !== 0); if (!position) return res.json({ status: 'error', message: 'Position not found on Upstox.' }); const qty = Math.abs(position.quantity); const txnType = position.quantity > 0 ? 'SELL' : 'BUY'; const orderResp = await axios.post('https://api.upstox.com/v2/order/place', { quantity: qty, product: 'I', validity: 'DAY', price: 0, instrument_token, order_type: 'MARKET', transaction_type: txnType, disclosed_quantity: 0, trigger_price: 0, is_amo: false }, { headers, timeout: 15000 }); const orderId = orderResp.data?.data?.order_id || ''; const orderSuccess = orderResp.data?.status === 'success'; const storedTrade = (db.data.trades || []).find(t => t.instrument_token === instrument_token && t.status === 'OPEN' && t.mode === 'LIVE'); if (storedTrade) { const exitPrice = position.last_price || 0; const entryPrice = position.average_price || storedTrade.entry_price || 0; const pnl = position.pnl || ((exitPrice - entryPrice) * qty); storedTrade.status = 'CLOSED'; storedTrade.exit_time = new Date().toISOString(); storedTrade.exit_price = exitPrice; storedTrade.pnl = Math.round(pnl * 100) / 100; storedTrade.pnl_percentage = entryPrice > 0 ? Math.round(((exitPrice - entryPrice) / entryPrice) * 10000) / 100 : 0; storedTrade.exit_reason = 'MANUAL_EXIT'; storedTrade.exit_order_id = orderId; const p = db.data.portfolio; if (p) { p.available_capital = (p.available_capital || 0) + (exitPrice * qty); p.invested_amount = Math.max(0, (p.invested_amount || 0) - storedTrade.investment); p.total_pnl = (p.total_pnl || 0) + pnl; p.total_trades = (p.total_trades || 0) + 1; if (pnl > 0) p.winning_trades = (p.winning_trades || 0) + 1; else p.losing_trades = (p.losing_trades || 0) + 1; p.last_updated = new Date().toISOString(); } db.save(); if (db._autoReviewTrade) db._autoReviewTrade(storedTrade.id).catch(e => console.error('[Journal] Auto-review error:', e.message)); const tgAlertsLive = db.data?.settings?.telegram?.alerts || {}; if (tgAlertsLive.trade_exit !== false) { try { const tg = require('./lib/telegram'); tg.sendTradeExitAlert(storedTrade).catch(() => {}); } catch (_) {} } } if (db.notify) db.notify('exit', 'Manual Exit', `${instrument_token} | Qty: ${qty}`); return res.json({ status: orderSuccess ? 'success' : 'error', message: orderSuccess ? `Exit order placed. Order ID: ${orderId}` : 'Exit order failed', order_id: orderId }); } catch (err) { return res.json({ status: 'error', message: `Exit failed: ${err.response?.data?.message || err.message}` }); }
+      try {
+        const headers = { Accept: 'application/json', Authorization: `Bearer ${accessToken}`, 'Api-Version': '2.0', 'Content-Type': 'application/json' };
+        const posResp = await axios.get('https://api.upstox.com/v2/portfolio/short-term-positions', { headers: { Accept: 'application/json', Authorization: `Bearer ${accessToken}`, 'Api-Version': '2.0' }, timeout: 10000 });
+        let position = null;
+        if (posResp.data?.status === 'success') position = (posResp.data.data || []).find(p => p.instrument_token === instrument_token && p.quantity !== 0);
+        if (!position) return res.json({ status: 'error', message: 'Position not found on Upstox.' });
+        const qty = Math.abs(position.quantity);
+        const txnType = position.quantity > 0 ? 'SELL' : 'BUY';
+
+        // ORDER SLICING for exit - respect freeze quantity limits
+        const FREEZE_QTY = { NIFTY50: 1800, BANKNIFTY: 900, FINNIFTY: 1200, MIDCPNIFTY: 2800, SENSEX: 1000, BANKEX: 1500 };
+        const storedTradeForSlice = (db.data.trades || []).find(t => t.instrument_token === instrument_token && t.status === 'OPEN' && t.mode === 'LIVE');
+        const instName = storedTradeForSlice?.instrument || 'NIFTY50';
+        const freezeLimit = FREEZE_QTY[instName] || 1800;
+
+        const exitSlices = [];
+        let rem = qty;
+        while (rem > 0) {
+          const s = Math.min(rem, freezeLimit);
+          exitSlices.push(s);
+          rem -= s;
+        }
+        console.log(`[ManualExit] Slicing: ${exitSlices.length} slice(s) [${exitSlices.join(', ')}] for qty=${qty} (freeze=${freezeLimit})`);
+
+        const exitOrderIds = [];
+        for (let i = 0; i < exitSlices.length; i++) {
+          try {
+            const sliceResp = await axios.post('https://api.upstox.com/v2/order/place', { quantity: exitSlices[i], product: 'I', validity: 'DAY', price: 0, instrument_token, order_type: 'MARKET', transaction_type: txnType, disclosed_quantity: 0, trigger_price: 0, is_amo: false }, { headers, timeout: 15000 });
+            if (sliceResp.data?.data?.order_id) exitOrderIds.push(sliceResp.data.data.order_id);
+          } catch (sliceErr) {
+            console.error(`[ManualExit] Slice ${i+1} failed: ${sliceErr.response?.data?.message || sliceErr.message}`);
+          }
+          if (i < exitSlices.length - 1) await new Promise(r => setTimeout(r, 500));
+        }
+
+        const orderId = exitOrderIds[0] || '';
+        const orderSuccess = exitOrderIds.length > 0;
+
+        if (storedTradeForSlice) {
+          const exitPrice = position.last_price || 0;
+          const entryPrice = position.average_price || storedTradeForSlice.entry_price || 0;
+          const pnl = position.pnl || ((exitPrice - entryPrice) * qty);
+          storedTradeForSlice.status = 'CLOSED';
+          storedTradeForSlice.exit_time = new Date().toISOString();
+          storedTradeForSlice.exit_price = exitPrice;
+          storedTradeForSlice.pnl = Math.round(pnl * 100) / 100;
+          storedTradeForSlice.pnl_percentage = entryPrice > 0 ? Math.round(((exitPrice - entryPrice) / entryPrice) * 10000) / 100 : 0;
+          storedTradeForSlice.exit_reason = 'MANUAL_EXIT';
+          storedTradeForSlice.exit_order_id = orderId;
+          storedTradeForSlice.exit_order_ids = exitOrderIds;
+          const p = db.data.portfolio;
+          if (p) { p.available_capital = (p.available_capital || 0) + (exitPrice * qty); p.invested_amount = Math.max(0, (p.invested_amount || 0) - storedTradeForSlice.investment); p.total_pnl = (p.total_pnl || 0) + pnl; p.total_trades = (p.total_trades || 0) + 1; if (pnl > 0) p.winning_trades = (p.winning_trades || 0) + 1; else p.losing_trades = (p.losing_trades || 0) + 1; p.last_updated = new Date().toISOString(); }
+          db.save();
+          if (db._autoReviewTrade) db._autoReviewTrade(storedTradeForSlice.id).catch(e => console.error('[Journal] Auto-review error:', e.message));
+          const tgAlertsLive = db.data?.settings?.telegram?.alerts || {};
+          if (tgAlertsLive.trade_exit !== false) { try { const tg = require('./lib/telegram'); tg.sendTradeExitAlert(storedTradeForSlice).catch(() => {}); } catch (_) {} }
+        }
+        if (db.notify) db.notify('exit', 'Manual Exit', `${instrument_token} | Qty: ${qty}`);
+        return res.json({ status: orderSuccess ? 'success' : 'error', message: orderSuccess ? `Exit order placed (${exitOrderIds.length} slice(s)). Order IDs: ${exitOrderIds.join(', ')}` : 'Exit order failed', order_id: orderId });
+      } catch (err) { return res.json({ status: 'error', message: `Exit failed: ${err.response?.data?.message || err.message}` }); }
     }
     const trade = (db.data.trades || []).find(t => (trade_id ? t.id === trade_id : t.instrument_token === instrument_token) && t.status === 'OPEN');
     if (!trade) return res.json({ status: 'error', message: 'Trade not found' });

@@ -12,7 +12,7 @@ Build an AI-powered automated options trading bot that connects to world news, u
 - **APIs**: Upstox REST API v2, Telegram Bot API
 - **Proxy**: Python FastAPI at `/app/backend/server.py` (forwards to Node.js)
 
-## Current Version: v24.0.0
+## Current Version: v25.0.0
 
 ## Version Management
 - **Single source of truth**: `desktop/package.json` -> `version` field

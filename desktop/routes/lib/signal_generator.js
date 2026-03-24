@@ -521,10 +521,62 @@ module.exports = function createSignalGenerator(db, aiEngine) {
       }
       const finalInvestment = qty * actualPremium;
       console.log(`[LiveTrade] FINAL: Premium ₹${actualPremium}, Lot ${lotSize}, Qty ${qty}, Investment ₹${Math.round(finalInvestment)}, Max ₹${maxTrade}`);
-      const orderBody = { quantity: qty, product: 'I', validity: 'DAY', price: 0, instrument_token: instrumentToken, order_type: 'MARKET', transaction_type: 'BUY', disclosed_quantity: 0, trigger_price: 0, is_amo: false };
-      const orderResp = await axios.post('https://api.upstox.com/v2/order/place', orderBody, { headers, timeout: 15000 });
-      const orderId = orderResp.data?.data?.order_id || '';
-      const orderSuccess = orderResp.data?.status === 'success';
+
+      // FREEZE QUANTITY LIMITS (exchange limits - orders above this are rejected)
+      const FREEZE_QTY = { NIFTY50: 1800, BANKNIFTY: 900, FINNIFTY: 1200, MIDCPNIFTY: 2800, SENSEX: 1000, BANKEX: 1500 };
+      const freezeLimit = FREEZE_QTY[activeInst] || 1800;
+
+      // ORDER SLICING: Split large orders into freeze-compliant slices
+      const slices = [];
+      let remaining = qty;
+      while (remaining > 0) {
+        const sliceQty = Math.min(remaining, freezeLimit);
+        // Ensure slice is a multiple of lot size
+        const roundedSlice = Math.floor(sliceQty / lotSize) * lotSize;
+        if (roundedSlice > 0) slices.push(roundedSlice);
+        remaining -= (roundedSlice > 0 ? roundedSlice : remaining);
+      }
+
+      console.log(`[LiveTrade] Order slicing: ${slices.length} slice(s) [${slices.join(', ')}] (freeze limit: ${freezeLimit})`);
+
+      const orderIds = [];
+      let totalFilled = 0;
+      let lastError = null;
+
+      for (let i = 0; i < slices.length; i++) {
+        const sliceQty = slices[i];
+        const orderBody = { quantity: sliceQty, product: 'I', validity: 'DAY', price: 0, instrument_token: instrumentToken, order_type: 'MARKET', transaction_type: 'BUY', disclosed_quantity: 0, trigger_price: 0, is_amo: false };
+
+        try {
+          const orderResp = await axios.post('https://api.upstox.com/v2/order/place', orderBody, { headers, timeout: 15000 });
+          const orderId = orderResp.data?.data?.order_id || '';
+          const orderSuccess = orderResp.data?.status === 'success';
+
+          if (orderSuccess && orderId) {
+            orderIds.push(orderId);
+            totalFilled += sliceQty;
+            console.log(`[LiveTrade] Slice ${i + 1}/${slices.length}: ✓ qty=${sliceQty} orderId=${orderId}`);
+          } else {
+            lastError = orderResp.data?.message || 'Order failed';
+            console.error(`[LiveTrade] Slice ${i + 1}/${slices.length}: ✗ ${lastError}`);
+          }
+        } catch (orderErr) {
+          lastError = orderErr.response?.data?.message || orderErr.message;
+          console.error(`[LiveTrade] Slice ${i + 1}/${slices.length}: ✗ ${lastError}`);
+        }
+
+        // Small delay between slices to avoid rate limiting
+        if (i < slices.length - 1) await new Promise(r => setTimeout(r, 500));
+      }
+
+      if (orderIds.length === 0) {
+        return { success: false, error: lastError || 'All order slices failed' };
+      }
+
+      // Use totalFilled as the actual qty
+      qty = totalFilled;
+      const orderId = orderIds[0]; // Primary order ID for tracking
+      const orderSuccess = true;
 
       let actualEntryPrice = signal.entry_price;
       if (orderSuccess && orderId) {
@@ -567,12 +619,12 @@ module.exports = function createSignalGenerator(db, aiEngine) {
         entry_price: actualEntryPrice, quantity: qty, investment: qty * actualEntryPrice,
         stop_loss: liveStopLoss,
         target: liveTarget,
-        status: orderSuccess ? 'OPEN' : 'FAILED', mode: 'LIVE', order_id: orderId, instrument_token: instrumentToken,
+        status: orderSuccess ? 'OPEN' : 'FAILED', mode: 'LIVE', order_id: orderId, order_ids: orderIds, slices: slices.length, instrument_token: instrumentToken,
         sentiment: signal.sentiment || 'N/A',
         confidence: signal.confidence || 0,
         sector: signal.sector || 'BROAD_MARKET',
         exit_time: null, exit_price: null, pnl: 0, pnl_percentage: 0,
-        upstox_status: orderResp.data?.status || 'unknown', upstox_message: orderResp.data?.message || '',
+        upstox_status: 'success', upstox_message: `${orderIds.length} slice(s) placed`,
       };
       db.data.trades.push(trade);
       if (orderSuccess) {
