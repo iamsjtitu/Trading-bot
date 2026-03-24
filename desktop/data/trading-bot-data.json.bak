@@ -256,15 +256,15 @@
       "pnl": 0,
       "pnl_percentage": 0,
       "exit_advice": {
-        "action": "HOLD",
+        "action": "EXIT_NOW",
         "confidence": 85,
-        "reason": "Market sentiment overall bearish, but no movement in option price yet. Wait for clearer trend.",
-        "risk_level": "MEDIUM",
+        "reason": "Banking sector sentiment strong hai, aur Nifty rally kar raha hai, jo BankNifty ko support karega.",
+        "risk_level": "HIGH",
         "suggested_sl": null,
         "exit_pct": null,
         "trade_id": "7e04dd2e-3247-4de4-9aa9-d644faf2a82f",
         "symbol": "BANKNIFTY26032353200PE",
-        "timestamp": "2026-03-23T10:00:10.268Z",
+        "timestamp": "2026-03-24T04:16:26.566Z",
         "source": "ai",
         "pnl_at_advice": 0,
         "pnl_pct_at_advice": 0
@@ -294,15 +294,15 @@
       "pnl": 0,
       "pnl_percentage": 0,
       "exit_advice": {
-        "action": "HOLD",
+        "action": "EXIT_NOW",
         "confidence": 85,
-        "reason": "Market sentiment bearish hai, aur aapka entry price par trade hai. Trend abhi strong lag raha hai.",
-        "risk_level": "MEDIUM",
+        "reason": "Banking sector sentiment bullish hai aur Nifty rally kar raha hai, jo ki bearish position ke liye unfavorable hai.",
+        "risk_level": "HIGH",
         "suggested_sl": null,
         "exit_pct": null,
         "trade_id": "de791b87-720d-49cd-b6ce-cda01fdfb3bd",
         "symbol": "BANKNIFTY26032353200PE",
-        "timestamp": "2026-03-23T10:00:11.416Z",
+        "timestamp": "2026-03-24T04:16:27.589Z",
         "source": "ai",
         "pnl_at_advice": 0,
         "pnl_pct_at_advice": 0
@@ -447,7 +447,21 @@
       "exit_price": null,
       "pnl": 0,
       "pnl_percentage": 0,
-      "_simPrice": 150.04695934286525
+      "_simPrice": 150.04695934286525,
+      "exit_advice": {
+        "action": "EXIT_NOW",
+        "confidence": 85,
+        "reason": "Nifty rally kar raha hai aur market sentiment bullish hai, isliye reversal ka risk hai.",
+        "risk_level": "HIGH",
+        "suggested_sl": null,
+        "exit_pct": null,
+        "trade_id": "68fa9bcd-9247-48f7-b475-8b4187174a0e",
+        "symbol": "NIFTY5026032323000PE",
+        "timestamp": "2026-03-24T04:16:28.582Z",
+        "source": "ai",
+        "pnl_at_advice": 0,
+        "pnl_pct_at_advice": 0
+      }
     }
   ],
   "signals": [
@@ -5080,7 +5094,7 @@
       },
       "reason": "The relaxation of FPI settlement norms by SEBI is positive for the market as it may reduce transaction costs and attract more foreign investments, leading to potential inflows. The simplified IPO disclosure and increased transparency could boost investor confidence, fostering a favorable market sentiment. Historically, similar measures have led to market upticks. | Correlation: 84% | Regime: MIXED",
       "news_id": "f7e9962e-6698-422d-9823-c4c1835d6d5d",
-      "status": "ACTIVE",
+      "status": "EXPIRED",
       "mode": "LIVE",
       "created_at": "2026-03-23T13:42:55.356Z",
       "expires_at": "2026-03-30T13:42:55.356Z"
@@ -5136,7 +5150,7 @@
       },
       "reason": "The sale of land by GOCL Corporation is a significant one-time cash influx that can potentially improve their financial health, leading to a positive sentiment in the stock. Although the stock price decreased initially, the long-term liquidity and debt servicing capabilities enhancement through the cash inflow may boost investor confidence, positively impacting broader market sentiment, particularly if the company plans strategic reinvestment or debt clearance. | Correlation: 83% | Regime: MIXED",
       "news_id": "7cfda700-249e-4569-af2f-de937cf3252d",
-      "status": "ACTIVE",
+      "status": "EXPIRED",
       "mode": "LIVE",
       "created_at": "2026-03-23T13:43:07.270Z",
       "expires_at": "2026-03-30T13:43:07.270Z"
@@ -5192,7 +5206,7 @@
       },
       "reason": "The positive news from the US about potential talks with Iran and halting strikes is driving a significant rally in US futures. This could lead to a bullish spillover effect on the global markets, including India, as easing geopolitical tensions typically lead to improved investor sentiment. The immediate impact is likely to be a boost in Nifty and Bank Nifty due to global correlation. | Correlation: 82% | Regime: SIDEWAYS",
       "news_id": "94a68800-20e9-4e7c-ba8b-6eee73b60f75",
-      "status": "ACTIVE",
+      "status": "EXPIRED",
       "mode": "LIVE",
       "created_at": "2026-03-23T13:44:22.922Z",
       "expires_at": "2026-03-30T13:44:22.922Z"
@@ -5308,6 +5322,48 @@
       "mode": "PAPER",
       "created_at": "2026-03-23T14:02:19.348Z",
       "expires_at": "2026-03-30T14:02:19.348Z"
+    },
+    {
+      "id": "478ec66a-0a35-4331-a6c6-d14bfda2d9ef",
+      "signal_type": "PUT",
+      "symbol": "NIFTY50",
+      "option_symbol": "NIFTY50_PUT",
+      "strike_price": 23950,
+      "entry_price": 120,
+      "target": 132,
+      "stop_loss": 90,
+      "quantity": 130,
+      "lots": 2,
+      "investment_amount": 15600,
+      "sentiment": "BEARISH",
+      "confidence": 60,
+      "reason": "Bearish signals [METAL]: crash (keyword analysis)",
+      "composite_score": 60,
+      "source": "MANUAL_ANALYSIS",
+      "mode": "LIVE",
+      "status": "ACTIVE",
+      "created_at": "2026-03-24T04:16:02.373Z"
+    },
+    {
+      "id": "5299f36c-7bc6-407b-a79f-bcaa9bf211cd",
+      "signal_type": "CALL",
+      "symbol": "NIFTY50",
+      "option_symbol": "NIFTY50_CALL",
+      "strike_price": 24050,
+      "entry_price": 120,
+      "target": 132,
+      "stop_loss": 90,
+      "quantity": 130,
+      "lots": 2,
+      "investment_amount": 15600,
+      "sentiment": "BULLISH",
+      "confidence": 72,
+      "reason": "The positive development regarding US-Iran tensions and a significant jump in GIFT Nifty suggest a bullish sentiment for Indian markets. A delay in US strikes on Iran leads to a potential ease in crude oil prices, reducing input costs for Indian companies, and aligns with Indian market catalysts such as reduced fiscal deficit risk. Additionally, improved investor sentiment and sharp gains in Wall Street futures could provide a supportive global backdrop. Historical events of de-escalation in geopolitical tensions have often led to short-term rallies in Indian indices.",
+      "composite_score": 72,
+      "source": "MANUAL_ANALYSIS",
+      "mode": "LIVE",
+      "status": "ACTIVE",
+      "created_at": "2026-03-24T04:16:15.217Z"
     }
   ],
   "news_articles": [
@@ -5382,14 +5438,25 @@
       "url": "https://www.livemint.com/money/personal-finance/home-loan-interest-rates-march-2026-top-7-psu-banks-compared-and-5-key-things-to-check-before-applying-11774254949381.html",
       "published_at": "2026-03-23T09:22:52.000Z",
       "sentiment_analysis": {
-        "sentiment": "BEARISH",
-        "confidence": 68,
+        "sentiment": "NEUTRAL",
+        "confidence": 55,
         "impact": "LOW",
         "sector": "BANKING",
-        "reason": "Bearish signals [BANKING]: red (keyword analysis)",
-        "trading_signal": "HOLD"
+        "reason": "The article discusses home loan interest rates in March 2026 from various banks, including SBI, PNB, BoB, Union Bank, Canara Bank, and others. While important for consumers, this doesn't significantly impact Nifty or Bank Nifty in the immediate term. The low freshness score indicates it's not a market-moving news item. Institutional flows or global correlations are unlikely to be affected. The historical pattern of such news doesn't usually move markets sharply.",
+        "trading_signal": "HOLD",
+        "volatility": "STABLE",
+        "time_horizon": "SHORT_TERM",
+        "risk_level": "LOW",
+        "secondary_sector": "NONE",
+        "correlation_score": 50,
+        "correlation_detail": "Insufficient signals for correlation",
+        "confluence_score": 0,
+        "confluence_aligned": 0,
+        "composite_score": 39,
+        "freshness_score": 5,
+        "market_regime": "UNKNOWN"
       },
-      "ai_analyzed": false,
+      "ai_analyzed": true,
       "created_at": "2026-03-23T14:02:21.766Z"
     },
     {
@@ -5420,14 +5487,25 @@
       "url": "https://www.ndtvprofit.com/markets/gold-vs-silver-what-investors-must-know-before-picking-a-precious-metal-11254468#publisher=newsstand",
       "published_at": "2026-03-23T11:47:04.000Z",
       "sentiment_analysis": {
-        "sentiment": "BEARISH",
-        "confidence": 68,
+        "sentiment": "NEUTRAL",
+        "confidence": 55,
         "impact": "LOW",
-        "sector": "METAL",
-        "reason": "Bearish signals [METAL]: crash (keyword analysis)",
-        "trading_signal": "HOLD"
+        "sector": "BROAD_MARKET",
+        "reason": "The World Gold Council's insights highlight the traditional role of gold as a safe haven, which can attract some safe-haven buying but does not directly impact equity markets considerably. The relative performance of gold and silver has minimal short-term correlation with the Nifty 50 or Bank Nifty indices. Additionally, safe-haven flow into gold typically signifies caution rather than enthusiasm for equities. Hence, market sentiment is neutral.",
+        "trading_signal": "HOLD",
+        "volatility": "STABLE",
+        "time_horizon": "SHORT_TERM",
+        "risk_level": "LOW",
+        "secondary_sector": "NONE",
+        "correlation_score": 50,
+        "correlation_detail": "Insufficient signals for correlation",
+        "confluence_score": 0,
+        "confluence_aligned": 0,
+        "composite_score": 39,
+        "freshness_score": 5,
+        "market_regime": "UNKNOWN"
       },
-      "ai_analyzed": false,
+      "ai_analyzed": true,
       "created_at": "2026-03-23T14:02:21.766Z"
     },
     {
@@ -5508,25 +5586,25 @@
       "published_at": "2026-03-23T11:34:16.000Z",
       "sentiment_analysis": {
         "sentiment": "BULLISH",
-        "confidence": 80,
-        "impact": "HIGH",
+        "confidence": 72,
+        "impact": "MEDIUM",
         "sector": "BROAD_MARKET",
-        "reason": "The surge in GIFT Nifty following Trump's comment points towards a possible short-term easing of geopolitical tensions with Iran, which is likely to lead to a decrease in crude oil prices. This is bullish for Indian markets as it may reduce input costs and improve the fiscal outlook. Additionally, the positive sentiment from the gain in Wall Street futures indicates a likely rebound in global equities, further supporting an uptick in Indian markets.",
+        "reason": "The positive development regarding US-Iran tensions and a significant jump in GIFT Nifty suggest a bullish sentiment for Indian markets. A delay in US strikes on Iran leads to a potential ease in crude oil prices, reducing input costs for Indian companies, and aligns with Indian market catalysts such as reduced fiscal deficit risk. Additionally, improved investor sentiment and sharp gains in Wall Street futures could provide a supportive global backdrop. Historical events of de-escalation in geopolitical tensions have often led to short-term rallies in Indian indices.",
         "trading_signal": "HOLD",
         "volatility": "INCREASING",
-        "time_horizon": "IMMEDIATE",
+        "time_horizon": "SHORT_TERM",
         "risk_level": "MEDIUM",
         "secondary_sector": "ENERGY",
-        "trend_note": "Confidence adjusted by -5 based on recent trend",
-        "correlation_score": 68,
-        "correlation_detail": "Direction alignment: 17%, Sector: 83%, Buffer: 6 signals",
+        "correlation_score": 80,
+        "correlation_detail": "Direction alignment: 50%, Sector: 100%, Buffer: 2 signals",
         "confluence_score": 0,
         "confluence_aligned": 0,
-        "composite_score": 57,
-        "freshness_score": 18,
-        "market_regime": "TRENDING_DOWN"
+        "composite_score": 51,
+        "freshness_score": 5,
+        "market_regime": "UNKNOWN"
       },
-      "created_at": "2026-03-23T14:02:16.581Z"
+      "created_at": "2026-03-23T14:02:16.581Z",
+      "ai_analyzed": true
     },
     {
       "id": "e38fbd69-eed3-41d4-884e-0a51317ab9d1",
@@ -24093,6 +24171,6 @@
       "created_at": "2026-03-20T18:49:02.511Z"
     }
   ],
-  "_cachedBrokerPnl": 720.0699999999999,
-  "_cachedBrokerPnlTime": 1774275938746
+  "_cachedBrokerPnl": 0,
+  "_cachedBrokerPnlTime": 1774325793083
 }

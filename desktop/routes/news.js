@@ -311,22 +311,82 @@ module.exports = function (db) {
       const sentimentResult = await sentiment.analyzeSentiment(article);
       article.sentiment_analysis = sentimentResult;
       article.ai_analyzed = true;
-      console.log(`[News] Manual AI analysis: ${(article.title || '').substring(0, 50)}...`);
+      console.log(`[News] Manual AI analysis: ${(article.title || '').substring(0, 50)}... | ${sentimentResult.sentiment} ${sentimentResult.confidence}% | signal=${sentimentResult.trading_signal}`);
 
+      if (db.data?.settings?.emergency_stop) {
+        db.save();
+        return res.json({ status: 'success', article, signal: null, message: 'Emergency stop active - no signals allowed' });
+      }
+
+      if (!db.data.signals) db.data.signals = [];
       let signal = null;
-      const minConfidence = db.data?.settings?.news?.min_confidence || 70;
-      if (sentimentResult.confidence >= minConfidence && sentimentResult.trading_signal !== 'HOLD') {
-        if (!db.data?.settings?.emergency_stop) {
-          if (!db.data.signals) db.data.signals = [];
-          signal = signals.generateSignal(article);
-          if (signal) {
-            db.data.signals.push(signal);
-            if (db.notify) db.notify('signal', `${signal.signal_type} Signal`, `${signal.symbol} | ${sentimentResult.sentiment} ${sentimentResult.confidence}% | ${sentimentResult.reason}`);
-          }
+
+      // Try normal signal generation first
+      if (sentimentResult.trading_signal !== 'HOLD' && sentimentResult.confidence >= 60) {
+        signal = signals.generateSignal(article);
+      }
+
+      // MANUAL FALLBACK: If no signal from normal flow, generate based on best available sentiment
+      // User explicitly chose this article - provide actionable signal with relaxed guards
+      if (!signal) {
+        const kwResult = sentiment.keywordSentiment(article);
+        // Use strongest non-NEUTRAL signal between AI and keyword
+        let bestSentiment = 'NEUTRAL';
+        let bestConfidence = 0;
+        let bestReason = '';
+
+        if (sentimentResult.sentiment !== 'NEUTRAL' && sentimentResult.confidence >= 50) {
+          bestSentiment = sentimentResult.sentiment;
+          bestConfidence = sentimentResult.confidence;
+          bestReason = sentimentResult.reason || '';
+        }
+        if (kwResult.sentiment !== 'NEUTRAL' && kwResult.confidence > bestConfidence) {
+          bestSentiment = kwResult.sentiment;
+          bestConfidence = kwResult.confidence;
+          bestReason = kwResult.reason || bestReason;
+        }
+
+        if (bestSentiment === 'BULLISH' || bestSentiment === 'BEARISH') {
+          const signalType = bestSentiment === 'BULLISH' ? 'CALL' : 'PUT';
+          const instrument = db.data?.settings?.trading_instrument || 'NIFTY50';
+          const instConfig = signals.INSTRUMENTS?.[instrument] || { base_price: 24000, strike_step: 50 };
+          const lotSize = signals.LOT_SIZE_MAP?.[instrument] || 65;
+          const maxPerTrade = db.data?.settings?.risk?.max_per_trade || 50000;
+          const estimatedPremium = instConfig.base_price * 0.005;
+          const lots = Math.max(1, Math.floor(maxPerTrade / (estimatedPremium * lotSize)));
+          const quantity = lots * lotSize;
+
+          signal = {
+            id: require('crypto').randomUUID(),
+            signal_type: signalType,
+            symbol: instrument,
+            option_symbol: `${instrument}_${signalType}`,
+            strike_price: instConfig.base_price + (signalType === 'CALL' ? instConfig.strike_step : -instConfig.strike_step),
+            entry_price: estimatedPremium,
+            target: Math.round(estimatedPremium * 1.1 * 100) / 100,
+            stop_loss: Math.round(estimatedPremium * 0.75 * 100) / 100,
+            quantity,
+            lots,
+            investment_amount: Math.round(estimatedPremium * quantity),
+            sentiment: bestSentiment,
+            confidence: bestConfidence,
+            reason: bestReason || 'Manual analysis signal',
+            composite_score: bestConfidence,
+            source: 'MANUAL_ANALYSIS',
+            mode: db.data?.settings?.trading_mode || 'PAPER',
+            status: 'ACTIVE',
+            created_at: new Date().toISOString(),
+          };
+          console.log(`[News] Manual fallback signal: ${signalType} ${instrument} | ${bestSentiment} ${bestConfidence}%`);
         }
       }
+
+      if (signal) {
+        db.data.signals.push(signal);
+        if (db.notify) db.notify('signal', `${signal.signal_type} Signal`, `${signal.symbol} | ${sentimentResult.sentiment} ${sentimentResult.confidence}% | ${sentimentResult.reason}`);
+      }
       db.save();
-      res.json({ status: 'success', article, signal, message: signal ? `Signal generated: ${signal.signal_type}` : 'Analysis complete, no signal (low confidence or HOLD)' });
+      res.json({ status: 'success', article, signal, message: signal ? `Signal generated: ${signal.signal_type} ${signal.symbol}` : `Analysis: ${sentimentResult.sentiment} ${sentimentResult.confidence}% - No tradeable signal` });
     } catch (err) {
       console.error('[News] Analyze-article error:', err);
       res.json({ status: 'error', message: err.message });
