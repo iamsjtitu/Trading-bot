@@ -255,7 +255,11 @@ module.exports = function (db) {
   // GET /api/news/latest
   router.get('/api/news/latest', (req, res) => {
     const limit = parseInt(req.query.limit) || 20;
-    const news = (db.data.news_articles || []).slice().sort((a, b) => (b.created_at || '').localeCompare(a.created_at || '')).slice(0, limit);
+    const oneDayAgo = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
+    const news = (db.data.news_articles || [])
+      .filter(n => (n.created_at || '') > oneDayAgo)
+      .slice().sort((a, b) => (b.created_at || '').localeCompare(a.created_at || ''))
+      .slice(0, limit);
     res.json({ status: 'success', count: news.length, news });
   });
 

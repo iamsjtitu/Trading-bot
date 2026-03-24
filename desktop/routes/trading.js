@@ -517,6 +517,74 @@ module.exports = function (db) {
   // ============ Execute Signal ============
   router.post('/api/trades/execute-signal', async (req, res) => { const { signal_id } = req.body || {}; const mode = db.data.settings?.trading_mode || 'PAPER'; let signal; if (signal_id) signal = (db.data.signals || []).find(s => s.id === signal_id); else { const tradedIds = new Set((db.data.trades || []).filter(t => t.status === 'OPEN').map(t => t.signal_id)); signal = (db.data.signals || []).filter(s => s.status === 'ACTIVE' && !tradedIds.has(s.id)).sort((a, b) => (b.created_at || '').localeCompare(a.created_at || ''))[0]; } if (!signal) return res.json({ status: 'error', message: 'No active untraded signal found' }); if (mode === 'LIVE') { const token = getActiveBrokerToken(); if (!token) return res.json({ status: 'error', message: 'Broker not connected' }); const result = await signalGen.executeLiveTrade(signal, token); if (result?.success) { signal.status = 'TRADED'; db.save(); } return res.json(result?.success ? { status: 'success', trade: result.trade, message: 'LIVE trade placed', order_id: result.order_id } : { status: 'error', message: result?.error || 'Trade execution failed', detail: result?.error }); } else { signalGen.executePaperTrade(signal); signal.status = 'TRADED'; db.save(); return res.json({ status: 'success', message: 'Paper trade executed' }); } });
 
+  // ============ Direct Manual Trade (CALL/PUT without signal) ============
+  router.post('/api/trades/direct', async (req, res) => {
+    try {
+      const { trade_type } = req.body; // 'CALL' or 'PUT'
+      if (!trade_type || !['CALL', 'PUT'].includes(trade_type)) {
+        return res.json({ status: 'error', message: 'trade_type must be CALL or PUT' });
+      }
+
+      const mode = db.data.settings?.trading_mode || 'PAPER';
+      const instrument = db.data?.settings?.trading_instrument || 'NIFTY50';
+      const instConfig = signalGen.INSTRUMENTS?.[instrument] || { base_price: 24000, strike_step: 50 };
+      const lotSize = signalGen.LOT_SIZE_MAP?.[instrument] || 65;
+      const maxPerTrade = db.data?.settings?.risk?.max_per_trade || 50000;
+      const riskSettings = db.data?.settings?.risk || {};
+      const slPct = riskSettings.stop_loss_pct || 25;
+      const tgtPct = riskSettings.target_pct || 10;
+
+      // Create a virtual signal for the direct trade
+      const estimatedPremium = instConfig.base_price * 0.005;
+      const lots = Math.max(1, Math.floor(maxPerTrade / (estimatedPremium * lotSize)));
+      const quantity = lots * lotSize;
+      const strikePrice = instConfig.base_price + (trade_type === 'CALL' ? instConfig.strike_step : -instConfig.strike_step);
+
+      const signal = {
+        id: require('crypto').randomUUID(),
+        signal_type: trade_type,
+        symbol: instrument,
+        option_symbol: `${instrument}_${trade_type}`,
+        strike_price: strikePrice,
+        entry_price: estimatedPremium,
+        target: Math.round(estimatedPremium * (1 + tgtPct / 100) * 100) / 100,
+        stop_loss: Math.round(estimatedPremium * (1 - slPct / 100) * 100) / 100,
+        quantity,
+        lots,
+        investment_amount: Math.round(estimatedPremium * quantity),
+        sentiment: trade_type === 'CALL' ? 'BULLISH' : 'BEARISH',
+        confidence: 100,
+        reason: 'Direct manual trade by user',
+        composite_score: 100,
+        source: 'DIRECT_MANUAL',
+        mode,
+        status: 'TRADED',
+        created_at: new Date().toISOString(),
+      };
+
+      if (!db.data.signals) db.data.signals = [];
+      db.data.signals.push(signal);
+
+      if (mode === 'LIVE') {
+        const token = getActiveBrokerToken();
+        if (!token) return res.json({ status: 'error', message: 'Broker not connected. Login in Settings > Broker.' });
+        const result = await signalGen.executeLiveTrade(signal, token);
+        db.save();
+        return res.json(result?.success
+          ? { status: 'success', trade: result.trade, signal, message: `LIVE ${trade_type} trade placed on ${instrument}`, order_id: result.order_id }
+          : { status: 'error', message: result?.error || 'Trade execution failed' });
+      } else {
+        signalGen.executePaperTrade(signal);
+        db.save();
+        return res.json({ status: 'success', signal, message: `Paper ${trade_type} trade executed on ${instrument}` });
+      }
+    } catch (err) {
+      console.error('[DirectTrade] Error:', err);
+      res.json({ status: 'error', message: err.message });
+    }
+  });
+
+
   // ============ Debug / Test ============
   router.get('/api/trades/log', (req, res) => { const limit = parseInt(req.query.limit) || 50; const mode = db.data.settings?.trading_mode || 'PAPER'; const allTrades = (db.data.trades || []).filter(t => (t.mode || 'PAPER') === mode).slice(-limit).reverse(); res.json({ status: 'success', total: allTrades.length, open: allTrades.filter(t => t.status === 'OPEN').length, closed: allTrades.filter(t => t.status === 'CLOSED').length, failed: allTrades.filter(t => t.status === 'FAILED').length, trades: allTrades }); });
 

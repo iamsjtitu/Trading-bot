@@ -14,6 +14,7 @@ import RiskPanel from '@/components/RiskPanel';
 import NewsFeed from '@/components/NewsFeed';
 import TradesList from '@/components/TradesList';
 import SignalsList from '@/components/SignalsList';
+import QuickTrade from '@/components/QuickTrade';
 import AutoTradingSettings from '@/components/AutoTradingSettings';
 import PositionCalculator from '@/components/PositionCalculator';
 import TradeHistory from '@/components/TradeHistory';
@@ -90,6 +91,7 @@ function App() {
         <Tabs defaultValue="news" value={state.activeTab} onValueChange={state.setActiveTab} className="space-y-4">
           <TabsList className="bg-white border-gray-200 shadow-sm">
             <TabsTrigger value="news" data-testid="news-tab" className="data-[state=active]:bg-blue-100 data-[state=active]:text-blue-900">News Feed</TabsTrigger>
+            <TabsTrigger value="quick-trade" data-testid="quick-trade-tab" className="data-[state=active]:bg-green-100 data-[state=active]:text-green-900 font-bold">Quick Trade</TabsTrigger>
             <TabsTrigger value="signals" data-testid="signals-tab" className="data-[state=active]:bg-blue-100 data-[state=active]:text-blue-900">Signals</TabsTrigger>
             <TabsTrigger value="trades" data-testid="trades-tab" className="data-[state=active]:bg-blue-100 data-[state=active]:text-blue-900">Active Trades</TabsTrigger>
             <TabsTrigger value="history" data-testid="history-tab" className="data-[state=active]:bg-blue-100 data-[state=active]:text-blue-900">Trade History</TabsTrigger>
@@ -104,6 +106,7 @@ function App() {
           </TabsList>
 
           <TabsContent value="news"><NewsFeed news={state.news} formatTime={state.formatTime} onRefresh={state.loadData} /></TabsContent>
+          <TabsContent value="quick-trade"><QuickTrade tradingMode={state.tradingMode} brokerConnected={state.brokerConnected} formatCurrency={state.formatCurrency} onTradeExecuted={state.loadData} /></TabsContent>
           <TabsContent value="signals"><SignalsList signals={state.signals} formatCurrency={state.formatCurrency} formatTime={state.formatTime} tradingMode={state.tradingMode} brokerConnected={state.brokerConnected} onTradeExecuted={state.loadData} /></TabsContent>
           <TabsContent value="trades"><TradesList trades={state.displayTrades} formatCurrency={state.formatCurrency} formatTime={state.formatTime} tradingMode={state.tradingMode} brokerConnected={state.brokerConnected} onManualExit={state.handleManualExit} /></TabsContent>
           <TabsContent value="history"><TradeHistory formatCurrency={state.formatCurrency} tradingMode={state.tradingMode} brokerConnected={state.brokerConnected} brokerOrders={state.brokerOrders} /></TabsContent>
