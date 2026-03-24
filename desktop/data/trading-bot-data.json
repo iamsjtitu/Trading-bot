@@ -258,13 +258,13 @@
       "exit_advice": {
         "action": "EXIT_NOW",
         "confidence": 85,
-        "reason": "Banking sector sentiment bullish hai aur Nifty rally kar raha hai, jo put position ke against hai.",
+        "reason": "Banking sector sentiment strong hai, aur Nifty rally kar raha hai, jo BankNifty ko support de sakta hai.",
         "risk_level": "HIGH",
         "suggested_sl": null,
         "exit_pct": null,
         "trade_id": "7e04dd2e-3247-4de4-9aa9-d644faf2a82f",
         "symbol": "BANKNIFTY26032353200PE",
-        "timestamp": "2026-03-24T04:25:54.468Z",
+        "timestamp": "2026-03-24T04:29:34.570Z",
         "source": "ai",
         "pnl_at_advice": 0,
         "pnl_pct_at_advice": 0
@@ -296,13 +296,13 @@
       "exit_advice": {
         "action": "EXIT_NOW",
         "confidence": 85,
-        "reason": "Banking sector sentiment bullish due to strong earnings, reducing probability of BankNifty decline.",
+        "reason": "Banking sector strong earnings news hai aur Nifty rally kar raha hai, jo bearish position ke against jaa sakta hai.",
         "risk_level": "HIGH",
         "suggested_sl": null,
         "exit_pct": null,
         "trade_id": "de791b87-720d-49cd-b6ce-cda01fdfb3bd",
         "symbol": "BANKNIFTY26032353200PE",
-        "timestamp": "2026-03-24T04:25:55.549Z",
+        "timestamp": "2026-03-24T04:29:35.543Z",
         "source": "ai",
         "pnl_at_advice": 0,
         "pnl_pct_at_advice": 0
@@ -451,13 +451,13 @@
       "exit_advice": {
         "action": "EXIT_NOW",
         "confidence": 85,
-        "reason": "Nifty rallying strongly and market sentiment bullish, PUT position unlikely to gain.",
+        "reason": "Nifty rallying 2% suggests strong bullish sentiment, which is against the bearish PUT position.",
         "risk_level": "HIGH",
         "suggested_sl": null,
         "exit_pct": null,
         "trade_id": "68fa9bcd-9247-48f7-b475-8b4187174a0e",
         "symbol": "NIFTY5026032323000PE",
-        "timestamp": "2026-03-24T04:25:56.704Z",
+        "timestamp": "2026-03-24T04:29:36.535Z",
         "source": "ai",
         "pnl_at_advice": 0,
         "pnl_pct_at_advice": 0
