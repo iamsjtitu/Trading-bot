@@ -25,7 +25,7 @@
       "risk_tolerance": "medium",
       "max_open_trades": 5,
       "max_daily_loss": 10000,
-      "max_position_value": 300000
+      "max_position_value": 275000
     },
     "auto_trading": {
       "auto_exit": false,
@@ -456,13 +456,13 @@
       "exit_advice": {
         "action": "EXIT_NOW",
         "confidence": 90,
-        "reason": "Market bullishness badh raha hai, aur Nifty ne gains hold kiye hain. Trend reversal ka signal hai.",
+        "reason": "Market bullish sentiment strong, Nifty likely to rise further, reducing put option potential.",
         "risk_level": "HIGH",
         "suggested_sl": null,
         "exit_pct": null,
         "trade_id": "68fa9bcd-9247-48f7-b475-8b4187174a0e",
         "symbol": "NIFTY5026032323000PE",
-        "timestamp": "2026-03-24T09:45:09.490Z",
+        "timestamp": "2026-03-24T09:48:10.636Z",
         "source": "ai",
         "pnl_at_advice": 0,
         "pnl_pct_at_advice": 0
@@ -492,14 +492,14 @@
       "_simPrice": 119.99609801179741,
       "exit_advice": {
         "action": "HOLD",
-        "confidence": 75,
-        "reason": "Market bullishness hai aur Nifty trend positive lag raha hai, abhi trade hold karna sahi hoga.",
+        "confidence": 85,
+        "reason": "Market bullishness aur recent news positive hai, trend abhi strong lag raha hai.",
         "risk_level": "MEDIUM",
         "suggested_sl": null,
         "exit_pct": null,
         "trade_id": "5b2bf525-70fe-41c9-85cb-a23d3076750f",
         "symbol": "NIFTY50_CALL",
-        "timestamp": "2026-03-24T09:45:10.597Z",
+        "timestamp": "2026-03-24T09:48:11.717Z",
         "source": "ai",
         "pnl_at_advice": 0,
         "pnl_pct_at_advice": 0
@@ -530,13 +530,13 @@
       "exit_advice": {
         "action": "EXIT_NOW",
         "confidence": 85,
-        "reason": "Market bullishness strong hai, Nifty bhi upar ja raha hai, bearish position risk mein hai.",
+        "reason": "Market bullish sentiment strong hai, Nifty bhi upar ja raha hai, isliye reversal ka chance zyada hai.",
         "risk_level": "HIGH",
         "suggested_sl": null,
         "exit_pct": null,
         "trade_id": "be6d8f3d-dec4-497e-a15a-2ead1b6f1716",
         "symbol": "NIFTY50_PUT",
-        "timestamp": "2026-03-24T09:45:11.573Z",
+        "timestamp": "2026-03-24T09:48:12.877Z",
         "source": "ai",
         "pnl_at_advice": 0,
         "pnl_pct_at_advice": 0
